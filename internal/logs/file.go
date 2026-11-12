@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"golang.org/x/sys/unix"
 )
 
 // MaxSize is how large the log grows before it rotates, and Keep how many
@@ -37,7 +35,7 @@ func Open(path string, std bool) (*File, error) {
 }
 
 func (l *File) open() error {
-	f, err := os.OpenFile(l.path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	f, err := openAppend(l.path)
 	if err != nil {
 		return err
 	}
@@ -47,11 +45,9 @@ func (l *File) open() error {
 		return err
 	}
 	if l.std {
-		for _, fd := range []int{1, 2} {
-			if err := unix.Dup2(int(f.Fd()), fd); err != nil {
-				_ = f.Close() // as above
-				return fmt.Errorf("log: stderr: %w", err)
-			}
+		if err := toStd(f); err != nil {
+			_ = f.Close() // as above
+			return fmt.Errorf("log: stderr: %w", err)
 		}
 	}
 	if l.f != nil {
