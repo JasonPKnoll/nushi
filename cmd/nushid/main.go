@@ -21,8 +21,6 @@ import (
 	"sync"
 	"syscall"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/afrase/claude-acp-go/claudeacp"
 
 	"github.com/afrase/nushi/internal/ante"
@@ -248,7 +246,7 @@ func serve(srv *http.Server, ln net.Listener, stop <-chan os.Signal, restartDue 
 		var w string
 		select {
 		case sig := <-stop:
-			w = unix.SignalName(sig.(syscall.Signal)) //nolint:forcetypeassert // signal.Notify sends syscall.Signals
+			w = signalName(sig)
 		case <-deleted:
 			w = "its app was deleted"
 		case <-restartDue:

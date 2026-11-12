@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"syscall"
 )
 
 // loginFlag starts the daemon through the user's login shell: the app
@@ -50,7 +49,7 @@ func execLogin() error {
 	}
 	argv, env := loginCommand(loginShell(), bin, dir, os.Environ())
 	keepOnlyStdio()
-	return syscall.Exec(argv[0], argv, env) //nolint:gosec // the login shell, running this nushid
+	return replace(argv, env)
 }
 
 // loginCommand is the login shell's command line and environment. The
