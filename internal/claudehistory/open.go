@@ -2,13 +2,11 @@ package claudehistory
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/afrase/nushi/internal/claude"
@@ -71,11 +69,4 @@ func open(dir string, startedAt func(pid int) (time.Time, bool)) map[string]stri
 		}
 	}
 	return out
-}
-
-// alive says whether a process runs with pid (one of another user's
-// counts).
-func alive(pid int) bool {
-	err := syscall.Kill(pid, 0)
-	return err == nil || errors.Is(err, syscall.EPERM)
 }
