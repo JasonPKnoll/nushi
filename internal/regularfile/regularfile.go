@@ -11,6 +11,8 @@ import (
 	"io/fs"
 	"os"
 	"syscall"
+
+	"github.com/afrase/nushi/internal/openflag"
 )
 
 var (
@@ -26,9 +28,9 @@ var (
 // device), and the open checks again: a fifo put there since doesn't
 // wait, nor is a link put there since followed without follow.
 func Open(path string, follow bool) (*os.File, fs.FileInfo, error) {
-	stat, flag := os.Stat, os.O_RDONLY|syscall.O_NONBLOCK
+	stat, flag := os.Stat, os.O_RDONLY|openflag.NonBlock
 	if !follow {
-		stat, flag = os.Lstat, flag|syscall.O_NOFOLLOW
+		stat, flag = os.Lstat, flag|openflag.NoFollow
 	}
 	if err := regular(path, stat); err != nil {
 		return nil, nil, err
@@ -55,7 +57,7 @@ func OpenIn(root *os.Root, name string, follow bool) (*os.File, fs.FileInfo, err
 	}
 	// os.Root follows a link whatever the flags: one put there since
 	// the Lstat still can't lead out of root.
-	f, err := root.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	f, err := root.OpenFile(name, os.O_RDONLY|openflag.NonBlock, 0)
 	if err != nil {
 		return nil, nil, err
 	}

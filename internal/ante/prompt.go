@@ -9,11 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	acp "github.com/afrase/acp-go/unstable"
 
 	"github.com/afrase/nushi/internal/imagefit"
+	"github.com/afrase/nushi/internal/openflag"
 	"github.com/afrase/nushi/internal/toolcall"
 )
 
@@ -139,7 +139,7 @@ func saveImage(dir func() (string, error), img *acp.ImageContent, room int) (pat
 	name := make([]byte, 8)
 	rand.Read(name)
 	path = filepath.Join(d, hex.EncodeToString(name)+imageExt[mimeType])
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o600) //nolint:gosec // a new file in the bridge's private temp folder, links not followed
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|openflag.NoFollow, 0o600) //nolint:gosec // a new file in the bridge's private temp folder, links not followed
 	if err != nil {
 		return "", false, err
 	}

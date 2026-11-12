@@ -14,9 +14,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/openflag"
 )
 
 // Worktrees makes and removes git worktrees.
@@ -286,7 +286,7 @@ func Exclude(ctx context.Context, folder, line string) error {
 	} else if err != nil || !fi.IsDir() {
 		return fmt.Errorf("%s is not a folder (a link?)", dir)
 	}
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0o644) //nolint:gosec // info/exclude, as git makes it
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND|openflag.NoFollow|openflag.NonBlock, 0o644) //nolint:gosec // info/exclude, as git makes it
 	if err != nil {
 		return fmt.Errorf("%s: %w (a link?)", path, err)
 	}
