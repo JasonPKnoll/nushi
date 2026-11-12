@@ -42,7 +42,7 @@ BUILD := $(or $(shell git rev-list --count HEAD 2>/dev/null),1)
 MACOS_MIN := 13.0
 MACOS_CGO := -O2 -g -mmacosx-version-min=$(MACOS_MIN)
 
-.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-web lint lint-go lint-dart lint-linux check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
+.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-web lint lint-go lint-dart lint-linux lint-windows check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
 
 # Starts the daemon in the background (unless one is running), then the app.
 run: daemon app
@@ -206,7 +206,7 @@ $(GOVULNCHECK): tools/lint/go.mod tools/lint/go.sum
 # (govulncheck asks vuln.go.dev, so this needs the network). CI runs the
 # parts as jobs of their own (.github/workflows/ci.yml); make check runs
 # everything they do.
-lint: lint-go lint-dart lint-linux
+lint: lint-go lint-dart lint-linux lint-windows
 
 # Go's: on macOS (the keychain's cgo needs its SDK).
 lint-go: $(GOLANGCI) $(GOVULNCHECK)
@@ -225,6 +225,13 @@ lint-linux: $(GOLANGCI)
 	GOOS=linux CGO_ENABLED=0 go vet ./...
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GOLANGCI) run ./...
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOLANGCI) run ./...
+
+# Every package built for Windows without cgo (ADR 0123): what it lacks
+# answers errors.ErrUnsupported, and code macOS and Linux share is in a
+# _unix.go file. Build only: most tests are Unix's, so vet (which builds
+# them) and lint would fail on those.
+lint-windows:
+	GOOS=windows CGO_ENABLED=0 go build ./...
 
 # The protos' and Dart's, and the native code of the app and its Dart
 # packages only in a platform's *_macos.dart or *_linux.dart files

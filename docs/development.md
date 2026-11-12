@@ -43,6 +43,7 @@ tools/linux-smoke.sh dist/nushi-1.2.0-linux-amd64.tar.gz  # install and start it
 
 - golangci-lint (with gofmt and goimports) and govulncheck;
 - `make lint-linux`: every Go package built, vetted and linted (golangci-lint) with `GOOS=linux CGO_ENABLED=0`, so macOS-only code outside a `_darwin.go` file fails (ADR 0097) and the `_linux.go` files, which the Mac's lint never sees, are linted (ADR 0101);
+- `make lint-windows`: every Go package built with `GOOS=windows CGO_ENABLED=0` (not vetted or linted: most tests are Unix's), so a Unix-only call outside a `_unix.go` file fails (ADR 0123);
 - `tools/native-edge` (first in `make lint-dart`): a platform channel or message (a `BinaryMessenger`, a `MethodCall` or its codec, `SystemChannels`) or `dart:ffi` in the app's or a Dart package's `lib` outside a `*_macos.dart` or `*_linux.dart` file fails, named with its line, as do `webview_flutter_wkwebview` outside a `*_macos.dart` file, `dbus` outside a `*_linux.dart` one, and a platform's file named (an import, export or part) anywhere but in that platform's own files and in `main.dart` (only `native_macos.dart` and `native_linux.dart`); protoc's and Connect's output is left out (ADR 0097, 0104);
 - `tools/design-check` (next in `make lint-dart`): app code that goes around the shared pieces of [`docs/design.md`](design.md) fails, named with its line: a raw `Tooltip(`, a Material button, an `AlertDialog(` outside `nushiDialog`, a tooltip's shortcut in brackets or after spaces (`withKey` instead), a `Color(0x…)` or a `Colors.<name>` other than `transparent`, a `fontSize:` number. The controls' files (`controls*.dart`), `theme/` and generated code make the pieces and are left out; a deliberate use stays with `// design: <why>` on its line or alone on the line above;
 - `buf lint` and `buf format`;
@@ -75,12 +76,14 @@ To change it and Nushi at once:
 
 With a `go.work`, `make lint` builds golangci-lint into `bin/` because `go tool -modfile` refuses a workspace; before committing a version change, `GOWORK=off make check` against the tag in `go.mod`. A library fix is its own release there, then `go get` here.
 
+The same goes for Claude's library, `github.com/afrase/claude-acp-go` (`go work init . ../claude-acp-go`).
+
 ## CI
 
 CI (`.github/workflows/ci.yml`) runs the same parts as `make check`, as parallel jobs, in under 3 minutes (the Linux app's package longer, a Flutter release build on each architecture):
 
 - on macOS: Go's lint and tests and the window's placement maths, the web app's end-to-end test, and the app's tests in two shards (`make test-app SHARD=1/2`: every second test file);
-- on Linux: the protos' and Dart's lint (with `tools/native-edge`), the Dart packages' tests, every Go package's tests (`make test-go`, with bubblewrap from apt for npm's sandbox and AppArmor's rule on unprivileged user namespaces off), `make lint-linux` and `go mod tidy -diff` (ADR 0101);
+- on Linux: the protos' and Dart's lint (with `tools/native-edge`), the Dart packages' tests, every Go package's tests (`make test-go`, with bubblewrap from apt for npm's sandbox and AppArmor's rule on unprivileged user namespaces off), `make lint-linux`, `make lint-windows` and `go mod tidy -diff` (ADR 0101, 0123);
 - the Linux app (ADR 0104): its tests in two shards (goldens skipped), and on each architecture (Ubuntu 22.04, amd64 and arm64) its package built as a release builds it (`tools/release.sh 0.0.0-ci linux`, glibc 2.34 at most), installed into a throwaway home and started on a virtual display until it connects to the daemon it started (`tools/linux-smoke.sh`, whose screenshot is the job's artifact), and on amd64 the runner's channels (`tools/linux-channels.sh`).
 
 ### The daemon's tests on Linux
@@ -101,6 +104,8 @@ go test -c -o /tmp/kc.test ./internal/keychain
 The Linux app's runner channels (`app/linux/runner`: the clipboard, default apps, the window), for real, in a debug build: `tools/linux-channels.sh` from the repository root, with Flutter, the Linux build's packages (clang, cmake, ninja, GTK 3's headers), `xvfb-run`, `dbus-run-session` and `xclip`; it opens nothing of the machine's (fake default apps in throwaway XDG folders) and passes other arguments to `flutter test`.
 
 On a Mac, an OrbStack machine works (`orb create arch nushi-linux`; it can't see your files unless you copy them in). Under Rosetta (an x86_64 machine on Apple silicon) bubblewrap 0.13 can't mount anything ("Can't open source /: Function not implemented"), so npm's sandbox tests skip there unless an older `bwrap` is first on `PATH`; an arm64 machine or CI runs them.
+
+On a Windows machine with Go (ADR 0123; no make or cgo needed): `GOOS=windows CGO_ENABLED=0 go build ./...`, as `make lint-windows` does, and `go test ./internal/procgroup ./internal/filelock ./internal/logs` and `go test -run TestAlive ./internal/claudehistory`, the Windows tests so far (the rest assume Unix: its paths, mode bits, signals). Clone with `core.autocrlf` false, or gofmt reports every file. `go build -o bin/nushid.exe ./cmd/nushid` runs on a short `NUSHI_DATA` (the socket's path has a limit); its API answers on `nushid.sock` over HTTP/2 without TLS, which neither Git for Windows' curl nor Windows' own speaks to a Unix socket, so call it from a few lines of Go (`http.Protocols`' unencrypted HTTP/2 and a `unix` dialer).
 
 ## Install, releases, logs
 

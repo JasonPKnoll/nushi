@@ -1,0 +1,23 @@
+# 0123. The daemon builds on Windows
+
+Status: accepted, 2026-11-13. Builds on [0097](0097-native-code-behind-interfaces.md) (the seams) and [0101](0101-the-daemon-runs-on-linux.md) (a second platform's files).
+
+## Context
+Windows is on the roadmap (the owner, 2026-10-27). ADR 0097 put the Mac's own code behind `_darwin.go` files and ADR 0101 gave Linux its `_linux.go` ones, but the calls macOS and Linux share (process groups and signals, flock and fcntl, dup2, open(2)'s flags, a pseudo-terminal, a Unix stat) sat in files every OS compiles: both are Unix, so nothing made them split. This is Windows's first phase: `nushid` and every Go package build with `GOOS=windows`, and the daemon starts and answers its API. Making each part work there, the app, packaging and CI are later phases.
+
+## Decision
+- **Files**: code macOS and Linux share is in `foo_unix.go` (`//go:build unix`), Windows's in `foo_windows.go`, beside `foo_darwin.go` and `foo_linux.go` as before. A `foo_other.go` (`!darwin && !linux`) still answers for Windows where Windows has nothing of its own yet; where it has, the stand-in becomes `unix && !darwin && !linux`. A test of Unix behaviour is in a `_unix_test.go`; Windows's own in a `_windows_test.go`, run on Windows. No cgo on Windows.
+- **What Windows does now**: the open flags are `openflag`'s (no-follow is CreateFile's `FILE_FLAG_OPEN_REPARSE_POINT`, which opens a link as itself for the stat after to refuse; non-blocking and directory are nothing). `procgroup.Kill` ends a process tree with the system's `taskkill /T /F` by its full path, `Own` does nothing (no group a child joins by itself), `Session` starts with no console window. `filelock.Lock` takes the whole file with `LockFileEx`, as Rust's `File::try_lock`; `Held` is false, since only taking the lock would tell. The log makes the process's standard handles a duplicate of its own (`SetStdHandle`, which the runtime reads for each write of a crash), and is opened shared for delete so it can be renamed to rotate. A Claude record's process is alive when `OpenProcess` gives no exit code yet, or is refused for access. A process's exit is logged by its code alone.
+- **Off on Windows**, as ADR 0097's stand-ins answer (`errors.ErrUnsupported` or an empty result): terminals (`Start` refuses; ConPTY is next), reading and signalling processes (`proctree`, `listeners`, `footprint`), `-login` (no exec, no login shell), the login shell's environment (shellenv runs `/bin/sh`, missing there, so agents start with the daemon's own), a default data folder (`NUSHI_DATA` is needed), the keychain, keep-awake and the system's proxies. A file's links and owner aren't read (`regularfile.Owner`), so a preview there can't be saved.
+- **claude-acp-go**: its `sessions` opened a sidecar with `O_NOFOLLOW`; v0.4.0 keeps that in a `_unix.go` file and checks for a link first elsewhere, so it builds on Windows with nothing here.
+- **`make lint-windows`** builds every package for Windows without cgo, as part of `make lint` and CI's Linux job, so a Unix-only call in a shared file fails there. Build only: most tests are Unix's, and vet builds them.
+
+## Consequences
+- `nushid.exe` built on Windows starts on `NUSHI_DATA`, serves the API on its Unix socket (AF_UNIX, Windows 10 1803 and later; HTTP/2 without TLS, as everywhere), and its `Ping` says `windows`; no agent is found yet. Nushi still ships only for the Mac and Linux.
+- Unix behaves as before. `procgroup`'s `Own`, `Kill` and `Session` are now what `agentproc`, `shellenv` and `homebrew` call, rather than setting `SysProcAttr` themselves.
+- `tools/claude-record` builds on Unix only: claude-tee, which it runs, is Unix's.
+
+## Alternatives considered
+- A job object for a bound command: it holds every process below, even one whose parent ended first, which taskkill's tree misses; but the process must be added to it after it starts, a race with what it starts at once, or started suspended, which `os/exec` doesn't do. The next phase, with the terminals.
+- Taking a lock and letting it go for `Held`: it races an agent starting at that moment, which ADR 0101 refused for Linux too.
+- Running the Linux build under WSL: unchanged code, but the agents, folders and shells are the Linux machine's, not the Windows user's.
