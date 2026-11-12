@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-// Bound has cmd, made by exec.CommandContext, start so that what it starts
-// can be ended with it (procgroup_unix.go, procgroup_windows.go), all of it
-// killed when its context ends; Wait then gives what it left running a
-// second to let go of its stdout and stderr.
+// Bound has cmd, made by exec.CommandContext, start in a group of its own
+// (Own), killed whole when its context ends (Kill); Wait then gives what
+// it left running a second to let go of its stdout and stderr.
 func Bound(cmd *exec.Cmd) {
-	bound(cmd)
+	Own(cmd)
+	cmd.Cancel = func() error { return Kill(cmd.Process.Pid) }
 	cmd.WaitDelay = time.Second
 }
