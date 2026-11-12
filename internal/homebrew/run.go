@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"syscall"
 
 	"github.com/afrase/nushi/internal/procgroup"
 )
@@ -21,7 +20,7 @@ func run(ctx context.Context, env []string, name string, args ...string) ([]byte
 	}
 	out := &tail{max: maxOutput}
 	cmd.Stdout, cmd.Stderr = out, out // one writer for both: exec writes to it from one goroutine
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	procgroup.Session(cmd)
 	procgroup.Bound(cmd)
 	err := cmd.Run()
 	return out.end(), err

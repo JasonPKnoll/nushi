@@ -20,3 +20,12 @@ func Own(cmd *exec.Cmd) {
 
 // Kill kills the process group pid leads, as Own started it.
 func Kill(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
+
+// Session has cmd start in a session of its own, with no terminal to take
+// or wait on; its group is then its own too, which Own keeps.
+func Session(cmd *exec.Cmd) {
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.Setsid = true
+}

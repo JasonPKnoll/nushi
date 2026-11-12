@@ -5,6 +5,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 // Own does nothing: Windows has no process group a child joins by itself,
@@ -35,4 +38,14 @@ func taskkill() string {
 		root = `C:\Windows`
 	}
 	return filepath.Join(root, "System32", "taskkill.exe")
+}
+
+// Session has cmd start with no console window: the daemon has no
+// console of its own to share, and a console program started without one
+// would open a window of its own.
+func Session(cmd *exec.Cmd) {
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.CreationFlags |= windows.CREATE_NO_WINDOW
 }

@@ -53,8 +53,8 @@ func Read(ctx context.Context, shell string, env []string, timeout time.Duration
 	}
 	out := &limited{max: maxOutput}
 	cmd.Stdout = out
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} // no terminal to take or wait on
-	procgroup.Bound(cmd)                                 // something it started in the background may hold stdout
+	procgroup.Session(cmd) // no terminal to take or wait on
+	procgroup.Bound(cmd)   // something it started in the background may hold stdout
 	err := cmd.Run()
 	vars, perr := parse(out.Bytes(), start, end)
 	switch {
