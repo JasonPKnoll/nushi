@@ -18,7 +18,6 @@ import (
 
 	"github.com/afrase/acp-go/steering"
 	acp "github.com/afrase/acp-go/unstable"
-	"golang.org/x/sys/unix"
 )
 
 // NotFound says an agent's error is ACP's "Resource not found" (-32002),
@@ -241,8 +240,8 @@ func (a *Agent) opened(method string, session acp.SessionID, start time.Time, ar
 // long it ran, and whether Nushi stopped it or it died.
 func (a *Agent) exited(ran time.Duration) {
 	args := []any{"ran", ran.Round(100 * time.Millisecond)}
-	if ws, ok := a.cmd.ProcessState.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
-		args = append(args, "signal", unix.SignalName(ws.Signal()))
+	if sig, ok := killedBy(a.cmd.ProcessState); ok {
+		args = append(args, "signal", sig)
 	} else {
 		args = append(args, "code", a.cmd.ProcessState.ExitCode())
 	}
