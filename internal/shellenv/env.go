@@ -32,9 +32,10 @@ type Env struct {
 }
 
 // New is the environment of shell over base (the daemon's), not read yet:
-// Start reads it.
+// Start reads it. On Windows there's no shell to run: the registry's
+// environment is read, and Status names it Windows.
 func New(shell string, base []string) *Env {
-	return &Env{shell: shell, base: slices.Clone(base), first: make(chan struct{})}
+	return &Env{shell: source(shell), base: slices.Clone(base), first: make(chan struct{})}
 }
 
 // Off is base alone, never read from a shell: for a daemon whose
@@ -97,11 +98,11 @@ func added(base, over []string) []string {
 	has := map[string]bool{}
 	for _, kv := range base {
 		name, _, _ := strings.Cut(kv, "=")
-		has[name] = true
+		has[nameKey(name)] = true
 	}
 	var out []string
 	for _, kv := range over {
-		if name, _, _ := strings.Cut(kv, "="); !has[name] {
+		if name, _, _ := strings.Cut(kv, "="); !has[nameKey(name)] {
 			out = append(out, name)
 		}
 	}
