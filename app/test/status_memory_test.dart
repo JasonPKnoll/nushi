@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:connectrpc/connect.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -123,6 +124,35 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     expect(reads(), 5);
 
+    await closeView(tester, d);
+  });
+
+  testWidgets("a daemon that can't read memory is asked once, the window "
+      'shown again or not, and the card shows none', (tester) async {
+    var reads = 0; // the fake doesn't keep a call its answer fails
+    final fake = FakeDaemon([])
+      ..answer = (input) {
+        if (input is! GetMemoryRequest) return null;
+        reads++;
+        throw ConnectException(
+          Code.unimplemented,
+          "reading processes' memory on windows: unsupported operation",
+        );
+      };
+    final d = await fake.connect(tester);
+    await tester.pumpWidget(themed(StatusBar(d)));
+    await tester.pump();
+    expect(reads, 1);
+    expect(find.textContaining('MB'), findsNothing);
+    await tester.pump(const Duration(seconds: 15));
+    const <AppLifecycleState>[
+      .inactive,
+      .hidden,
+      .inactive,
+      .resumed,
+    ].forEach(tester.binding.handleAppLifecycleStateChanged);
+    await tester.pump();
+    expect(reads, 1);
     await closeView(tester, d);
   });
 }
