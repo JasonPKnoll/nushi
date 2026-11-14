@@ -71,6 +71,16 @@ const linuxConventions = Conventions(
   badge: 'App icon badge',
 );
 
+/// Windows's (ADR 0124).
+const windowsConventions = Conventions(
+  commandKey: CommandKey.control,
+  reveal: 'Show in Explorer',
+  system: 'Windows',
+  machine: 'PC',
+  keyring: 'Credential Manager',
+  badge: 'taskbar badge',
+);
+
 /// The platform's conventions, as a widget reads them: on the phone, whose
 /// web app shares the widgets but has no native edge, the paired
 /// computer's words ([phoneHost]) with the phone's own modifier, ⌘, as an
