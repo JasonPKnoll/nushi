@@ -9,13 +9,14 @@ import (
 
 // What each kind of use is called, outside the files that may hold it.
 const (
-	channel   = "a platform channel outside a *_macos.dart or *_linux.dart file"
-	message   = "a platform message outside a *_macos.dart or *_linux.dart file"
-	ffi       = "dart:ffi outside a *_macos.dart or *_linux.dart file"
+	channel   = "a platform channel outside a *_macos.dart or *_linux.dart or *_windows.dart file"
+	message   = "a platform message outside a *_macos.dart or *_linux.dart or *_windows.dart file"
+	ffi       = "dart:ffi outside a *_macos.dart or *_linux.dart or *_windows.dart file"
 	webKit    = "webview_flutter_wkwebview (macOS's WebKit) outside a *_macos.dart file"
 	dbus      = "dbus (Linux's D-Bus) outside a *_linux.dart file"
 	macFile   = "a Mac implementation's file "
 	linuxFile = "a Linux implementation's file "
+	winFile   = "a Windows implementation's file "
 )
 
 func TestCheck(t *testing.T) {
@@ -57,6 +58,11 @@ func TestCheck(t *testing.T) {
 		"notify.dart":           "import 'package:dbus/dbus.dart';\n",
 		"status.dart":           "import 'package:nushi/alerts_linux.dart';\n",
 		"phone/scan_linux.dart": "import 'package:nushi/native_linux.dart';\n",
+		// Windows's, as Linux's: FFI its own, a set naming its files, and
+		// none named from outside them.
+		"file_mode_windows.dart": "import 'dart:ffi';\nimport 'package:dbus/dbus.dart';\n",
+		"native_windows.dart":    "import 'package:nushi/file_mode_windows.dart';\n",
+		"install.dart":           "import 'package:nushi/app_install_windows.dart';\n",
 	}
 	for name, body := range files {
 		path := filepath.Join(root, name)
@@ -74,7 +80,7 @@ func TestCheck(t *testing.T) {
 	var got []string
 	for _, u := range uses {
 		rel, _ := filepath.Rel(root, u.path)
-		got = append(got, rel+": "+u.what)
+		got = append(got, filepath.ToSlash(rel)+": "+u.what)
 	}
 	slices.Sort(got)
 	want := []string{
@@ -86,7 +92,9 @@ func TestCheck(t *testing.T) {
 		"dispatch.dart: " + message,
 		"events.dart: " + channel,
 		"ffi_cond.dart: " + ffi,
+		"file_mode_windows.dart: " + dbus,
 		"gen/sneaky.dart: " + channel,
+		"install.dart: " + winFile + "(package:nushi/app_install_windows.dart)",
 		"main.dart: " + linuxFile + "(package:nushi/alerts_linux.dart)",
 		"main.dart: " + macFile + "(package:nushi/alerts_macos.dart)",
 		"messenger.dart: " + message,

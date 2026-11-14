@@ -1,17 +1,17 @@
 // Command native-edge checks that the app's native code stays at its edge
-// (ADR 0097, 0104): platform channels and messages (MethodChannel,
+// (ADR 0097, 0104, 0124): platform channels and messages (MethodChannel,
 // EventChannel, BasicMessageChannel, a BinaryMessenger, a MethodCall or its
 // codec, SystemChannels, sendPlatformMessage) and FFI (dart:ffi,
 // package:ffi) appear in the Dart libraries it's given only in a platform's
-// file, <capability>_macos.dart or <capability>_linux.dart, its
-// implementation of an interface the capability's user declares; a
-// platform's own package only in that platform's files
-// (webview_flutter_wkwebview the Mac's, dbus Linux's). No file reaches a
-// platform's file (an import, export or part of one) but that platform's
-// own, and main.dart, which picks a set (native_macos.dart or
-// native_linux.dart). It prints each use elsewhere and exits 1. make
-// lint-dart runs it from the repository root over each Dart package's lib
-// (app/lib when given none).
+// file, <capability>_macos.dart, <capability>_linux.dart or
+// <capability>_windows.dart, its implementation of an interface the
+// capability's user declares; a platform's own package only in that
+// platform's files (webview_flutter_wkwebview the Mac's, dbus Linux's). No
+// file reaches a platform's file (an import, export or part of one) but
+// that platform's own, and main.dart, which picks a set
+// (native_macos.dart, native_linux.dart or native_windows.dart). It prints
+// each use elsewhere and exits 1. make lint-dart runs it from the
+// repository root over each Dart package's lib (app/lib when given none).
 package main
 
 import (
@@ -30,12 +30,13 @@ import (
 type platform struct{ suffix, name string }
 
 var (
-	mac   = platform{"macos", "a Mac implementation's file"}
-	linux = platform{"linux", "a Linux implementation's file"}
+	mac     = platform{"macos", "a Mac implementation's file"}
+	linux   = platform{"linux", "a Linux implementation's file"}
+	windows = platform{"windows", "a Windows implementation's file"}
 )
 
 // platforms are every platform with files of its own.
-var platforms = []platform{mac, linux}
+var platforms = []platform{mac, linux, windows}
 
 // native is what only some platforms' files may use, what to call it, and
 // those platforms.
@@ -54,13 +55,13 @@ var native = []struct {
 
 // platformFile is a URI of a platform's file, as an import, export or part
 // names it (on its own line too, as a conditional import's), and its suffix.
-var platformFile = regexp.MustCompile(`['"]([^'"]*_(macos|linux)\.dart)['"]`)
+var platformFile = regexp.MustCompile(`['"]([^'"]*_(macos|linux|windows)\.dart)['"]`)
 
 // picksASet is the one file that may name another platform's file, and
 // theSets the ones it may name: main.dart sets the machine's at startup.
 const picksASet = "main.dart"
 
-var theSets = []string{"native_macos.dart", "native_linux.dart"}
+var theSets = []string{"native_macos.dart", "native_linux.dart", "native_windows.dart"}
 
 // generated are the suffixes of protoc's and Connect's Dart, left out.
 var generated = []string{".pb.dart", ".pbenum.dart", ".pbjson.dart", ".pbserver.dart", ".pbgrpc.dart"}
@@ -91,8 +92,8 @@ func main() {
 	}
 	if len(uses) > 0 {
 		fmt.Fprintln(os.Stderr, "Native code goes behind an interface its user declares, each platform's implementation in "+
-			"<capability>_macos.dart or <capability>_linux.dart, reached only through Native and chosen in main.dart "+
-			"(native_macos.dart or native_linux.dart; ADR 0097 and 0104, docs/adr/).")
+			"<capability>_macos.dart, <capability>_linux.dart or <capability>_windows.dart, reached only through Native "+
+			"and chosen in main.dart (native_macos.dart, native_linux.dart or native_windows.dart; ADR 0097, 0104 and 0124, docs/adr/).")
 		os.Exit(1)
 	}
 }

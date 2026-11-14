@@ -234,9 +234,10 @@ lint-windows:
 	GOOS=windows CGO_ENABLED=0 go build ./...
 
 # The protos' and Dart's, and the native code of the app and its Dart
-# packages only in a platform's *_macos.dart or *_linux.dart files
-# (tools/native-edge, ADR 0097, 0104), and the app's views built from the
-# shared controls and tokens (tools/design-check, docs/design.md): anywhere.
+# packages only in a platform's *_macos.dart, *_linux.dart or
+# *_windows.dart files (tools/native-edge, ADR 0097, 0104, 0124), and the
+# app's views built from the shared controls and tokens
+# (tools/design-check, docs/design.md): anywhere.
 lint-dart:
 	go run ./tools/native-edge $(addsuffix /lib,$(DART_DIRS))
 	go run ./tools/design-check app/lib
