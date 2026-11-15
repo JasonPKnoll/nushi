@@ -270,6 +270,13 @@ class _BesideState extends State<Beside> {
           ),
           child: child,
         );
+        // Over [main] a pane is never narrower than its least; in a room
+        // narrower than theirs, all of them are narrowed alike to fit, the
+        // first never past its left edge.
+        final used = fit.widths.values.fold(0.0, (w, x) => w + x);
+        final squeezed = over && used > room
+            ? {for (final e in fit.widths.entries) e.key: e.value * room / used}
+            : const <String, double>{};
         final railName = details?.name ?? _BesideState._railName;
         final children = [
           // First in the tree, as they were above and below the rest: they
@@ -394,6 +401,7 @@ class _BesideState extends State<Beside> {
               railShown: rail,
               railWidth: details?.width ?? 0,
               over: over,
+              squeezed: squeezed,
               going: [
                 for (final s in _seen)
                   if (!now.contains(s) && s != railName) s,

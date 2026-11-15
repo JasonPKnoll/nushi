@@ -420,4 +420,39 @@ void main() {
     expect(tester.takeException(), isNull);
     await closeView(tester, d);
   }, variant: _mac);
+
+  testWidgets("a chat narrower than its panes' least widths narrows them "
+      'alike, none past its left edge', (tester) async {
+    // 732 for the chat: the side chat, Files and the preview need 800.
+    final (d, _) = await panesApp(
+      tester,
+      width: windowFor(732, sidebar: true),
+      sidebar: true,
+      open: _open(side: true, files: true, previews: 1),
+    );
+    expect(tester.takeException(), isNull);
+    final area = _rect(tester, find.byType(Pane));
+    final panes = [
+      for (final t in [SideChat, FilesPane, PreviewPane])
+        _rect(tester, find.byType(t)),
+    ];
+    expect(panes.first.left, area.left);
+    for (var i = 1; i < panes.length; i++) {
+      expect(panes[i].left, closeTo(panes[i - 1].right, 0.01));
+    }
+    expect(panes.last.right, area.right);
+    // Each by the same share of its least: 732 of 800.
+    for (final (i, least) in [300.0, 200.0, 300.0].indexed) {
+      expect(panes[i].width, closeTo(least * 732 / 800, 0.01));
+    }
+    // Wider, they're back at their least or more.
+    viewport(tester, Size(windowFor(900, sidebar: true), 900));
+    await tester.pumpAndSettle();
+    expect(
+      _rect(tester, find.byType(SideChat)).width,
+      greaterThanOrEqualTo(300),
+    );
+    expect(tester.takeException(), isNull);
+    await closeView(tester, d);
+  }, variant: _mac);
 }

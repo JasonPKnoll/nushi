@@ -65,6 +65,7 @@ class _Beside extends MultiChildLayoutDelegate {
     required this.railShown,
     required this.railWidth,
     required this.over,
+    required this.squeezed,
     required this.going,
     required this.at,
     required this.widths,
@@ -76,6 +77,7 @@ class _Beside extends MultiChildLayoutDelegate {
   final bool railShown;
   final double railWidth;
   final bool over;
+  final Map<String, double> squeezed; // the most each takes, too narrow
   final List<String> going;
   final Map<String, Rect> at;
   final Map<String, double> widths; // each pane's, as last laid out beside
@@ -126,7 +128,7 @@ class _Beside extends MultiChildLayoutDelegate {
       final w = layoutChild(
         p,
         BoxConstraints(
-          maxWidth: width,
+          maxWidth: squeezed[p] ?? width,
           minHeight: max(0, bottom - top),
           maxHeight: max(0, bottom - top),
         ),

@@ -5,6 +5,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/chat_area.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_filter.dart';
 import 'package:nushi/files_pane.dart';
@@ -588,7 +589,13 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         final pane = tester.getRect(_pane);
-        expect(pane.width, greaterThanOrEqualTo(200));
+        // Narrow, over the transcript, it and the preview are narrowed
+        // alike to fit the chat's pane, from its left edge (ADR 0123).
+        expect(pane.width, greaterThanOrEqualTo(180));
+        expect(
+          pane.left,
+          greaterThanOrEqualTo(tester.getRect(find.byType(ChatArea)).left),
+        );
         expect(tester.getRect(find.byType(PreviewPane)).left, pane.right);
         expectTextInside(tester, width);
         await render(tester, find.byType(NushiApp), 'files_${size}_$name');
