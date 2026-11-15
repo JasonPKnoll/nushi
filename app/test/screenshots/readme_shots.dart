@@ -14,6 +14,7 @@ import 'package:nushi/clock.dart';
 import 'package:nushi/collapsible.dart';
 import 'package:nushi/context_cache.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/files_pane.dart' show showInFiles;
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone.dart';
@@ -138,6 +139,14 @@ Object? _demo(Object input) => switch (input) {
   _ => null,
 };
 
+/// The demo's worktree as its Files pane's tree lists it, by folder, a
+/// folder's name ending in a slash.
+const _folder = {
+  '': ['cmd/', 'docs/', 'internal/', 'web/', 'go.mod', 'go.sum', 'README.md'],
+  'docs': ['design/', 'api.md'],
+  'docs/design': ['feed-cursor.md', 'notifications.md'],
+};
+
 /// The Mac app at [size] in [brightness], on the demo's chats.
 Future<(Daemon, FakeDaemon)> _app(
   WidgetTester tester,
@@ -181,6 +190,21 @@ Future<(Daemon, FakeDaemon)> _app(
         ),
         AttachTerminalRequest() => AttachTerminalResponse(
           data: utf8.encode(demoTerminal),
+        ),
+        WatchChatFolderRequest(:final path) => WatchChatFolderResponse(
+          folders: [
+            FolderListing(
+              path: path,
+              entries: [
+                for (final name in _folder[path] ?? const <String>[])
+                  FolderEntry(
+                    name: name.replaceAll('/', ''),
+                    kind: name.endsWith('/') ? 'folder' : 'file',
+                    size: Int64(1200),
+                  ),
+              ],
+            ),
+          ],
         ),
         _ => null,
       };
@@ -282,7 +306,8 @@ void main() {
 
   testWidgets('preview: the design note the agent wrote', (tester) async {
     final (d, _) = await _app(tester, _small, select: 'feed', details: false);
-    d.chats['feed']!.openInFiles('docs/design/feed-cursor.md');
+    final feed = d.chats['feed']!..openInFiles('docs/design/feed-cursor.md');
+    showInFiles(feed, 'docs/design/feed-cursor.md');
     await _pump(tester, 10);
     await _shoot(tester, 'preview');
     d.dispose();
