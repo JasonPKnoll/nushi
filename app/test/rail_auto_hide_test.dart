@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
@@ -20,7 +22,6 @@ import 'package:nushi/side_chat.dart';
 import 'package:nushi/sidebar.dart';
 import 'package:nushi/sidebar_beside.dart';
 import 'package:nushi/subagent_pane.dart';
-import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/transcript.dart';
 
 import 'fake_daemon.dart' show loadFonts;
@@ -129,6 +130,28 @@ void main() {
               tester,
               find.byType(NushiApp),
               'rail_line_${row.name}_${w.toInt()}_$named',
+            );
+          }
+        }
+        if (row.narrow case final n?) {
+          // At the line the panes are at their widths; a point under it the
+          // widest gives that point, still beside the transcript.
+          final narrow = windowFor(n, sidebar: sidebar);
+          for (final (w, less) in [(narrow, 0.0), (narrow - 1, 1.0)]) {
+            await at(w);
+            expect(_rail(), false, reason: 'at $w');
+            expect(_over(tester, row.panes), false, reason: 'at $w');
+            final widths = [
+              for (final p in row.panes)
+                tester.getRect(find.byType(_typeOf(p))).width,
+            ];
+            final want = [for (final p in row.panes) p.initial];
+            want[want.lastIndexOf(want.reduce(max))] -= less;
+            expect(widths, want, reason: 'at $w');
+            await render(
+              tester,
+              find.byType(NushiApp),
+              'narrow_line_${row.name}_${w.toInt()}_$named',
             );
           }
         }
@@ -461,52 +484,6 @@ void main() {
       expect(find.byType(DetailsPanel, skipOffstage: false), findsNothing);
       expect(asks(), asked);
     }
-    await closeView(tester, d);
-  }, variant: _mac);
-
-  testWidgets('over the transcript: the header across it all, the panes '
-      "under it and over the terminal, the first one's shadow on it", (
-    tester,
-  ) async {
-    // 1100 for the chat: under the 1160 the three need at their least.
-    final (d, _) = await panesApp(
-      tester,
-      width: windowFor(1100, sidebar: false),
-      terminal: true,
-      open: _openOf([ChatPanes.side, ChatPanes.files, ChatPanes.preview]),
-    );
-    final area = tester.getRect(find.byType(Pane));
-    final header = tester.getRect(find.byType(ChatHeader));
-    final terminal = tester.getRect(find.byType(TerminalPanel));
-    expect(header.width, area.width);
-    for (final t in [SideChat, FilesPane, PreviewPane]) {
-      final r = tester.getRect(find.byType(t));
-      expect(r.top, header.bottom);
-      expect(r.bottom, terminal.top);
-    }
-    final transcript = tester.getRect(
-      find.byWidgetPredicate(
-        (w) => w is Transcript && w.items == null && w.chat.id == 'c',
-      ),
-    );
-    expect(transcript.right, area.right);
-    // The shadow, on the first pane alone.
-    bool shadowed(Type pane) => tester
-        .widgetList<DecoratedBox>(
-          find.ancestor(
-            of: find.byType(pane),
-            matching: find.byType(DecoratedBox),
-          ),
-        )
-        .any(
-          (b) => switch (b.decoration) {
-            BoxDecoration(:final boxShadow?) => boxShadow.isNotEmpty,
-            _ => false,
-          },
-        );
-    expect(shadowed(SideChat), isTrue);
-    expect(shadowed(FilesPane), isFalse);
-    expect(shadowed(PreviewPane), isFalse);
     await closeView(tester, d);
   }, variant: _mac);
 

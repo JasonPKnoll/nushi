@@ -22,9 +22,10 @@ class PaneSpec {
 }
 
 /// What [besideFit] works out: whether the panes lie `over` the view or
-/// beside it, whether the details `rail` shows, the room `left` of the
-/// panes (the view's and the rail's; over the view, all of it), each
-/// pane's width, and the most each may be dragged to.
+/// beside it, whether the details `rail` shows, the width `left` for the
+/// view and the rail, which the chat's header spans (beside the panes, the
+/// room they leave; under them, the view's least, or all the room when
+/// that's less), each pane's width, and the most each may be dragged to.
 typedef BesideFit = ({
   bool over,
   bool rail,
@@ -74,7 +75,13 @@ BesideFit besideFit({
   }
   if (panes.isNotEmpty && room - leastSum < least) {
     final at = {for (final p in panes) p.name: p.min};
-    return (over: true, rail: false, left: room, widths: at, most: {...at});
+    return (
+      over: true,
+      rail: false,
+      left: min(least, room),
+      widths: at,
+      most: {...at},
+    );
   }
   final avail = room - least;
   double base(PaneSpec p, Map<String, double> live) =>

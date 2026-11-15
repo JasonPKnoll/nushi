@@ -206,7 +206,8 @@ ScrollPosition _row(WidgetTester tester) => tester
 /// file and three.
 Map<String, Rect> _marks(WidgetTester tester) {
   Rect at(Finder f) => tester.getRect(f);
-  // A pane at its least (a narrow window, ADR 0123) folds it into ⋯.
+  // A pane at its least (a narrow window, ADR 0123) folds Show in Finder
+  // into ⋯, and a header at the transcript's least folds the tabs.
   Rect? folds(Finder f) => f.evaluate().isEmpty ? null : at(f);
   return {
     'pane': at(find.byType(PreviewPane)),
@@ -220,12 +221,12 @@ Map<String, Rect> _marks(WidgetTester tester) {
     'body': at(_inPane(find.byType(PreviewBody))),
     'transcript': at(find.byType(Transcript)),
     'chat header': at(find.byType(ChatHeader)),
-    'header’s tabs': at(find.byType(Segmented<ChatTab>)),
+    'header’s tabs': ?folds(find.byType(Segmented<ChatTab>)),
     'chat menu': at(find.byTooltip('Chat menu')),
-    'Chat': at(
+    'Chat': ?folds(
       find.descendant(of: find.byType(ChatHeader), matching: find.text('Chat')),
     ),
-    'Changes': at(
+    'Changes': ?folds(
       find.descendant(
         of: find.byType(ChatHeader),
         matching: find.text('Changes'),

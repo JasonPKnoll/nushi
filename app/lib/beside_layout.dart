@@ -51,24 +51,25 @@ enum _Slot { main, head, foot }
 /// the panes as laid out, so a pane being resized moves the rest with it;
 /// it decides nothing itself.
 ///
-/// Beside the main view, the panes run its full height at its right, right
-/// to left; left of them the header across the view and the rail, the
-/// terminal under them, and between the two the view and, at its right,
-/// the rail. Over the main view, the header and the terminal run across
-/// all of it and the panes lie between them at its right. Those [going]
-/// stay where they were ([at], which it keeps up to date), laid out as
-/// they were; so does the rail while it's tucked away.
+/// The panes run its full height at its right, right to left; left of them
+/// the header across the view and the rail, the terminal under them, and
+/// between the two the view and, at its right, the rail. Over the main
+/// view, those keep [block] (the view's least) and lie under the panes,
+/// which cover their right: the same parts in the same places, the panes
+/// only further left. Those [going] stay where they were ([at], which it
+/// keeps up to date), laid out as they were; so does the rail while it's
+/// tucked away.
 class _Beside extends MultiChildLayoutDelegate {
   new({
     required this.panes,
     required this.rail,
     required this.railShown,
     required this.railWidth,
-    required this.over,
     required this.squeezed,
     required this.going,
     required this.at,
     required this.widths,
+    this.block,
     this.cover,
   });
 
@@ -76,7 +77,7 @@ class _Beside extends MultiChildLayoutDelegate {
   final String? rail; // the rail's slot, while it's in the tree
   final bool railShown;
   final double railWidth;
-  final bool over;
+  final double? block; // the view's width under the panes, over it
   final Map<String, double> squeezed; // the most each takes, too narrow
   final List<String> going;
   final Map<String, Rect> at;
@@ -107,15 +108,7 @@ class _Beside extends MultiChildLayoutDelegate {
       positionChild(slot, r.topLeft);
     }
 
-    // Beside, the panes run the full height; over, under the header and
-    // over the terminal, which then run across all of it.
-    var bottom = height;
-    var top = 0.0;
-    var across = width;
-    if (over) {
-      bottom -= foot(width);
-      top = head;
-    }
+    // The panes run the full height, beside the view or over it.
     var x = width;
     for (final p in panes.reversed) {
       if (p == cover) {
@@ -129,19 +122,19 @@ class _Beside extends MultiChildLayoutDelegate {
         p,
         BoxConstraints(
           maxWidth: squeezed[p] ?? width,
-          minHeight: max(0, bottom - top),
-          maxHeight: max(0, bottom - top),
+          minHeight: height,
+          maxHeight: height,
         ),
       ).width;
       widths[p] = w;
       x -= w;
-      positionChild(p, Offset(x, top));
-      at[p] = Rect.fromLTWH(x, top, w, bottom - top);
+      positionChild(p, Offset(x, 0));
+      at[p] = Rect.fromLTWH(x, 0, w, height);
     }
-    if (!over) {
-      across = max(0, x);
-      bottom -= foot(across);
-    }
+    // The view's header, terminal and rail: beside the panes, the room
+    // they leave; over the view, its least, under them.
+    final across = block ?? max(0.0, x);
+    final bottom = height - foot(across);
     if (head > 0) {
       layoutChild(_Slot.head, BoxConstraints.tight(Size(across, head)));
       positionChild(_Slot.head, Offset.zero);
@@ -162,7 +155,7 @@ class _Beside extends MultiChildLayoutDelegate {
       }
     }
     for (final g in going) {
-      place(g, at[g] ?? Rect.fromLTWH(width, top, 0, bottom - top));
+      place(g, at[g] ?? Rect.fromLTWH(width, 0, 0, height));
     }
     layoutChild(_Slot.main, BoxConstraints.tight(Size(main, band)));
     positionChild(_Slot.main, Offset(0, head));

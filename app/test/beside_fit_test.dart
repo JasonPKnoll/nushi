@@ -72,11 +72,7 @@ void main() {
           final g = fit(b + d, panes);
           expect(g.over, d < 0, reason: '${row.name} at ${b + d}');
           expect(g.rail, false, reason: '${row.name} at ${b + d}');
-          expect(
-            g.left,
-            d < 0 ? b + d : least,
-            reason: '${row.name} at ${b + d}',
-          );
+          expect(g.left, least, reason: '${row.name} at ${b + d}');
           final used = g.widths.values.fold(0.0, (w, x) => w + x);
           if (d <= 0) {
             expect(g.widths, {for (final p in panes) p.name: p.min});
@@ -102,7 +98,7 @@ void main() {
           if (row.panes.isNotEmpty) {
             final least = leastBeside(row.panes);
             if (f.over) {
-              expect(f.left, room);
+              expect(f.left, min(least, room));
             } else {
               expect(f.left, greaterThanOrEqualTo(least));
             }
@@ -133,25 +129,36 @@ void main() {
   };
 
   test("stepped a point at a time across every line, the panes' left edge "
-      'never jumps', () {
+      "and the header's width never jump", () {
     for (final row in thresholdRows.where((r) => r.panes.isNotEmpty)) {
       for (final MapEntry(key: name, value: saved) in savedSets.entries) {
         for (final want in [true, false]) {
           double? edge;
+          double? header;
           for (var room = 200.0; room <= 2600; room += 1) {
             final f = fit(room, row.panes, saved: saved, wantRail: want);
             final used = f.widths.values.fold(0.0, (w, x) => w + x);
             // Where the panes start; in a room under their least widths
             // they're narrowed alike from its left edge (Beside).
             final e = max(0.0, room - used);
+            // The header spans the transcript and the rail, beside the
+            // panes or under them: shown or tucked, it's [left].
+            final h = f.left;
+            final why = '${row.name}, $name, rail $want, at $room';
             if (edge != null) {
               expect(
                 (e - edge).abs(),
                 lessThanOrEqualTo(1 + 1e-9),
-                reason: '${row.name}, $name, rail $want, at $room',
+                reason: why,
+              );
+              expect(
+                (h - header!).abs(),
+                lessThanOrEqualTo(1 + 1e-9),
+                reason: why,
               );
             }
             edge = e;
+            header = h;
           }
         }
       }
@@ -308,6 +315,7 @@ void main() {
     expect(none.over, true);
     expect(none.most['preview'], 300);
     expect(none.widths['preview'], 300);
+    expect(none.left, 320);
     final tiny = fit(200, [ChatPanes.files, ChatPanes.preview]);
     expect(tiny.over, true);
     expect(tiny.widths, {'files': 200, 'preview': 300});

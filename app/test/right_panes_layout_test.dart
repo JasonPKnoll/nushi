@@ -12,6 +12,7 @@ import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_panes.dart';
+import 'package:nushi/chat_view.dart';
 import 'package:nushi/controls.dart' show MenuField;
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/files_pane.dart';
@@ -196,19 +197,23 @@ void main() {
               );
             }
             final first = panes.first;
+            // Beside the transcript or over it, the panes run the pane's
+            // full height, the terminal or not, each top row level with
+            // the chat's header, which spans the transcript and the rail
+            // and never the panes.
+            for (final p in panes) {
+              expect(p.top, area.top);
+              expect(p.bottom, area.bottom);
+            }
+            for (final t in kind.types) {
+              final row = _rect(tester, _topRow(find.byType(t)));
+              expect(row.top, header.top);
+              expect(row.bottom, header.bottom);
+            }
+            expect(header.width, fit.left);
+            expect(menu.right, header.right - ChatHeader.end);
             if (!fit.over) {
               expect(first.left, area.left + fit.left);
-              // The panes run the pane's full height, the terminal or not.
-              for (final p in panes) {
-                expect(p.top, area.top);
-                expect(p.bottom, area.bottom);
-              }
-              // Each top row level with the chat's header.
-              for (final t in kind.types) {
-                final row = _rect(tester, _topRow(find.byType(t)));
-                expect(row.top, header.top);
-                expect(row.bottom, header.bottom);
-              }
               expect(header.right, first.left);
               expect(menu.right, first.left - ChatHeader.end);
               if (terminal) {
@@ -227,19 +232,16 @@ void main() {
                 expect(transcript.right, first.left);
               }
             } else {
-              // Over the transcript, under the header, over the terminal.
-              expect(header.right, area.right);
-              expect(menu.right, area.right - ChatHeader.end);
-              expect(transcript.right, area.right);
+              // Over the transcript, which keeps its least under them, the
+              // header and the terminal as wide; the panes cover its right.
+              expect(header.right, greaterThan(first.left));
+              expect(transcript.left, area.left);
+              expect(transcript.right, header.right);
               expect(find.byType(DetailsPanel), findsNothing);
-              for (final p in panes) {
-                expect(p.top, header.bottom);
-                expect(p.bottom, bottom);
-              }
               if (terminal) {
                 final term = _rect(tester, find.byType(TerminalPanel));
                 expect(term.left, area.left);
-                expect(term.right, area.right);
+                expect(term.right, header.right);
               }
             }
             // Each pane's buttons in its own top row, none of them in the
@@ -605,8 +607,9 @@ void main() {
             expect(rail, findsNothing);
             expect(header().right, lessThan(area.right));
           case 'over':
+            // The chat at its least under the panes, its header too.
             expect(rail, findsNothing);
-            expect(header().right, area.right);
+            expect(header().width, ChatView.leastBesideWide);
         }
         expect(tester.takeException(), isNull);
         await expectLater(

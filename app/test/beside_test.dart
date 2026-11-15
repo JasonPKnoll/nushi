@@ -211,8 +211,9 @@ void main() {
     pane = tester.getRect(_pane);
     expect(pane.right, 820 - NushiTheme.windowPad);
     expect(pane.width, 220);
-    // The transcript keeps its width, under the pane.
-    expect(_transcript(tester).right, 820 - NushiTheme.windowPad);
+    // The transcript keeps its least, under the pane.
+    expect(_transcript(tester).width, ChatView.leastBesideWide);
+    expect(_transcript(tester).right, greaterThan(pane.left));
     await tester.tap(
       find.descendant(of: _pane, matching: find.byIcon(Icons.close)),
     );

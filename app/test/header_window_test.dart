@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
+import 'package:nushi/chat_view.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
@@ -109,19 +110,21 @@ void main() {
       expect(menu.right, header.right - ChatHeader.end);
       // The header is the main pane's top, the window's margin in, across
       // the details too where they show: they're under it. The preview,
-      // beside them, ends it (ADR 0123); over the transcript, at 720, it's
-      // under it.
+      // beside them, ends it (ADR 0123); over the transcript, at 720, the
+      // header keeps the transcript's least under it.
       final pane = tester.getRect(find.byType(Pane));
       expect(pane.right, width - NushiTheme.windowPad);
       final beside = preview && width > 720;
       final right = beside
           ? tester.getRect(find.byType(PreviewPane)).left
+          : preview
+          ? pane.left + ChatView.leastBesideWide
           : pane.right;
       expect(header.right, right);
       if (preview) {
         final shown = tester.getRect(find.byType(PreviewPane));
         expect(shown.right, pane.right);
-        expect(shown.top, beside ? pane.top : header.bottom);
+        expect(shown.top, pane.top);
       }
       if (find.byType(DetailsPanel).evaluate().isNotEmpty) {
         final details = tester.getRect(find.byType(DetailsPanel));

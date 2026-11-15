@@ -16,16 +16,17 @@ part 'beside_layout.dart';
 /// [panes], each resizable; [head] over [main] and the rail,
 /// [PaneHeader.height] high, and [foot] under them (the chat's header and
 /// its terminal). The panes run its full height, their own top rows level
-/// with [head].
+/// with [head], whether beside [main] or over it.
 ///
 /// How the room is shared is [besideFit]'s: when [main] would keep less
 /// than [railLeast] beside the rail, the rail tucks itself away (kept,
 /// not drawn; never saved, as it's still wanted); when [main] would keep
 /// less than [least] beside the panes alone, they narrow, the widest
-/// first, never saved; and once each is at its least, they lie over it,
-/// under [head], [head] and [foot] then across all of it. A pane's edge,
-/// dragged while the panes are beside [main], stops where [main] keeps
-/// [least]; the rail tucks and comes back as the edge moves.
+/// first, never saved; and once each is at its least, they lie over it.
+/// Then [main], [head] and [foot] keep [least] and lie under the panes,
+/// which cover their right: nothing changes place at that line. A pane's
+/// edge, dragged while the panes are beside [main], stops where [main]
+/// keeps [least]; the rail tucks and comes back as the edge moves.
 ///
 /// A pane slides its full width in from the right as it opens and out as
 /// it closes ([Presence], [paneSlide]), and so does the rail as it's shown,
@@ -199,9 +200,10 @@ class _BesideState extends State<Beside> {
         _rail = rail;
         final t = NushiTheme.of(context).t;
         final now = {for (final p in panes) p.name, if (rail) ?details?.name};
-        // What glides: what's open beside [main], whether the panes lie
-        // over it, and the sidebar, which moves everything sideways.
-        final token = [...now, if (over) 'over', sidebarShut].join(',');
+        // What glides: what's open beside [main] and the sidebar, which
+        // moves everything sideways. The panes lying over [main] moves
+        // nothing: the layout is the same either side of that line.
+        final token = [...now, sidebarShut].join(',');
         // The rail has its token from the first build it's in, tucked or
         // not: coming back, it slides in, never gliding from where it was
         // laid out tucked.
@@ -402,7 +404,7 @@ class _BesideState extends State<Beside> {
               rail: _seen.contains(railName) ? railName : null,
               railShown: rail,
               railWidth: details?.width ?? 0,
-              over: over,
+              block: over ? fit.left : null,
               squeezed: squeezed,
               going: [
                 for (final s in _seen)
