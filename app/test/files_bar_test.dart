@@ -350,18 +350,25 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('Collapse all folders closes every folder at once, and is off '
-      'with none open, in the ⋯, View and the palette alike', (tester) async {
+  testWidgets('Collapse all folders closes every folder at once and ends '
+      'their watches; it is off with none open in the ⋯ and the palette, '
+      'and View’s item, built ahead, does nothing then', (tester) async {
+    final cancels = <String>[];
     final (d, _) = await panesApp(
       tester,
       width: 1700,
       details: false,
       open: _files,
+      folderCancels: cancels,
     );
     final tree = folderTreeOf(d.chats['c']!);
     expect(_button(tester, _collapse).onTap, isNull);
     expect(_palette(tester, d, Act.collapseFolders).enabled, isFalse);
-    expect(_viewMenu(tester), contains('Collapse All Folders'));
+    // The menu bar isn't rebuilt as folders open: its item stays on, and
+    // picking it with none open does nothing (runAct skips it).
+    _viewMenu(tester, pick: 'Collapse All Folders');
+    await tester.pumpAndSettle();
+    expect(tree.open, isEmpty);
 
     await tester.tap(find.text('auth'));
     await tester.pumpAndSettle();
@@ -387,10 +394,13 @@ void main() {
 
     var told = 0;
     tree.addListener(() => told++);
+    expect(cancels, isEmpty);
     await tester.tap(_collapse);
     await tester.pumpAndSettle();
     expect(told, 1);
     expect(tree.open, isEmpty);
+    // Closed, their listings are no longer watched; the top level still is.
+    expect(cancels, unorderedEquals(['auth', 'auth/auth']));
     expect(tree.selected, 'auth', reason: 'the top folder that held it');
     expect(find.text('README.md'), findsOneWidget);
     expect(_button(tester, _collapse).onTap, isNull);
@@ -401,6 +411,7 @@ void main() {
     filesTree.value = false;
     await tester.pumpAndSettle();
     expect(_button(tester, _collapse).onTap, isNull);
+    expect(_palette(tester, d, Act.collapseFolders).enabled, isFalse);
     await closeView(tester, d);
   }, variant: _mac);
 

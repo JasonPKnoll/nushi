@@ -91,7 +91,8 @@ const PanesOpen noPanes = (
 /// sidebar shown or hidden, the details wanted or not, the terminal open
 /// or not and [open]'s panes open, the chat archived or not, holding
 /// [items] ([panesItems] by default). The fake is
-/// returned, to count what was asked.
+/// returned, to count what was asked; [folderCancels] hears each folder
+/// whose listing's watch ends.
 Future<(Daemon, FakeDaemon)> panesApp(
   WidgetTester tester, {
   required double width,
@@ -104,6 +105,7 @@ Future<(Daemon, FakeDaemon)> panesApp(
   PanesOpen open = noPanes,
   Map<String, double> widths = const {},
   List<Item>? items,
+  List<String>? folderCancels,
 }) async {
   // On Linux, its window and conventions, as a real Linux machine has.
   if (defaultTargetPlatform == TargetPlatform.linux) {
@@ -157,20 +159,22 @@ Future<(Daemon, FakeDaemon)> panesApp(
         opened.add(s);
         return s.stream;
       case WatchChatFolderRequest(:final path):
-        final s = StreamController<WatchChatFolderResponse>()
-          ..add(
-            WatchChatFolderResponse(
-              folders: [
-                FolderListing(
-                  path: path,
-                  entries: [
-                    FolderEntry(name: 'auth', kind: 'folder'),
-                    FolderEntry(name: 'README.md', kind: 'file'),
-                  ],
-                ),
-              ],
-            ),
-          );
+        final s =
+            StreamController<WatchChatFolderResponse>(
+              onCancel: () => folderCancels?.add(path),
+            )..add(
+              WatchChatFolderResponse(
+                folders: [
+                  FolderListing(
+                    path: path,
+                    entries: [
+                      FolderEntry(name: 'auth', kind: 'folder'),
+                      FolderEntry(name: 'README.md', kind: 'file'),
+                    ],
+                  ),
+                ],
+              ),
+            );
         opened.add(s);
         return s.stream;
     }
