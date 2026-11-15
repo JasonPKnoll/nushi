@@ -22,6 +22,7 @@ import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/side_chat.dart';
+import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/terminal_panel.dart';
@@ -46,6 +47,11 @@ const _both = TargetPlatformVariant({
   TargetPlatform.macOS,
   TargetPlatform.linux,
 });
+
+/// Whether a row of the layout's matrix runs on Linux too: at 1700 and
+/// 720, the sidebar shown and hidden, the terminal shut (ADR 0123).
+bool _onLinux(double width, {required bool terminal}) =>
+    !terminal && (width == 1700 || width == 720);
 
 /// A kind of pane, how to open it, what it opens as (its specs, left to
 /// right) and the widget each is.
@@ -173,6 +179,22 @@ void main() {
             expect(header.top, area.top);
             expect(header.left, area.left);
             expect(header.height, PaneHeader.height);
+            if (!sidebar) {
+              // The sidebar's button past the Mac's lights or at Linux's
+              // inset, and the title past the buttons.
+              expect(
+                _rect(tester, find.byType(SidebarButton)).left,
+                NushiTheme.windowPad + lightsInset - SidebarButton.reach,
+              );
+              final title = find.descendant(
+                of: find.byType(ChatHeader),
+                matching: find.text('Fix the login redirect'),
+              );
+              expect(
+                _rect(tester, title).left,
+                greaterThanOrEqualTo(NushiTheme.windowPad + hiddenHeaderStart),
+              );
+            }
             final first = panes.first;
             if (!fit.over) {
               expect(first.left, area.left + fit.left);
@@ -282,7 +304,7 @@ void main() {
               expect(_rect(tester, below).top, row.bottom);
             }
             await closeView(tester, d);
-          }, variant: width == 1700 && !sidebar && !terminal ? _both : _mac);
+          }, variant: _onLinux(width, terminal: terminal) ? _both : _mac);
         }
       }
     }

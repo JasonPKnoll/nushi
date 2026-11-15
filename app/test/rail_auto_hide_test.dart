@@ -212,7 +212,7 @@ void main() {
     expect(_tip(tester), 'Show details');
     expect(showDetails.value, isFalse);
     await closeView(tester, d);
-  }, variant: _mac);
+  }, variant: _both);
 
   for (final tucked in [false, true]) {
     testWidgets('a peek at the hidden sidebar, the rail '
