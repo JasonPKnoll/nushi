@@ -213,14 +213,20 @@ class _SourceEditorState extends State<SourceEditor> {
                 // re_editor draws with no text scaling.
                 column: columnWidth(code, TextScaler.noScaling),
               ),
+            // At the top right, and no wider than the pane leaves it: a
+            // pane at its least is narrower than the bar.
             Positioned(
               top: 8,
+              left: NushiTheme.gutter,
               right: NushiTheme.gutter,
-              child: EditorFindBar(
-                find: _find,
-                lines: _lines,
-                gutter: _gutter,
-                down: _down,
+              child: Align(
+                alignment: Alignment.topRight,
+                child: EditorFindBar(
+                  find: _find,
+                  lines: _lines,
+                  gutter: _gutter,
+                  down: _down,
+                ),
               ),
             ),
           ],
