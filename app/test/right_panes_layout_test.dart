@@ -526,4 +526,66 @@ void main() {
     expect(bar.top, greaterThan(_rect(tester, find.byType(ChatHeader)).bottom));
     await closeView(tester, d);
   }, variant: _both);
+
+  // The window with its panes, compared (macOS only; CI within
+  // golden_tolerance.dart): the hairlines' seams, the tabs in the top row
+  // and the rail's band, each way the panes are laid out, with two
+  // browser tabs.
+  final shots = <(String, double, bool, PanesOpen, String)>[
+    ('beside', 1700, false, _open(browser: 2), 'rail'),
+    ('tucked', 1515, false, _open(files: true, browser: 2), 'tucked'),
+    // The side chat, Files and the preview need 1560 of the chat's room:
+    // at 1500 they lie over the transcript, the sidebar hidden as in
+    // every window golden.
+    ('over', 1500, false, _open(side: true, files: true, browser: 2), 'over'),
+    ('cover', 1700, false, _open(browser: 2), 'cover'),
+    ('720', 720, false, _open(browser: 2), 'over'),
+  ];
+  for (final (name, width, sidebar, open, way) in shots) {
+    for (final brightness in [Brightness.dark, Brightness.light]) {
+      testWidgets('the window, $name, ${brightness.name}', (tester) async {
+        browserFakes();
+        final (d, _) = await panesApp(
+          tester,
+          width: width,
+          sidebar: sidebar,
+          brightness: brightness,
+          open: open,
+        );
+        if (way == 'cover') {
+          await tester.tap(find.byTooltip('Expand'));
+          await tester.pumpAndSettle();
+        }
+        FocusManager.instance.primaryFocus?.unfocus(); // no caret
+        await tester.pumpAndSettle();
+        // Laid out the way the name says.
+        final area = _rect(tester, find.byType(Pane));
+        final rail = find.byType(DetailsPanel);
+        Rect header() => _rect(tester, find.byType(ChatHeader));
+        switch (way) {
+          case 'cover':
+            // Over everything: no header, the browser the whole pane.
+            expect(find.byType(ChatHeader), findsNothing);
+            expect(_rect(tester, find.byType(BrowserPane)), area);
+          case 'rail':
+            expect(rail, findsOneWidget);
+            expect(header().right, lessThan(area.right));
+          case 'tucked':
+            expect(rail, findsNothing);
+            expect(header().right, lessThan(area.right));
+          case 'over':
+            expect(rail, findsNothing);
+            expect(header().right, area.right);
+        }
+        expect(tester.takeException(), isNull);
+        await expectLater(
+          find.byType(NushiApp),
+          matchesGoldenFile(
+            'goldens/right_panes_${name}_${brightness.name}.png',
+          ),
+        );
+        await closeView(tester, d);
+      }, variant: _mac);
+    }
+  }
 }
