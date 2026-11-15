@@ -9,6 +9,7 @@ import 'package:nushi/arrangement.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_mode.dart';
 import 'package:nushi/fonts.dart';
+import 'package:nushi/run_state.dart';
 import 'package:nushi/tile_images.dart';
 import 'package:nushi/tile_look.dart';
 import 'package:nushi/tile_picture.dart';
@@ -18,7 +19,8 @@ import 'package:nushi/tile_picture.dart';
 /// are collapsed and their order, what each chat's Changes view shows, the
 /// side panes' widths (not the details panel's, which is fixed), whether
 /// changed files show flat and diffs unified, which chats show their
-/// terminals and their Files pane, whether it lists ignored files and
+/// terminals and their Files pane (opened by its own button, not a file's
+/// opening), whether it lists ignored files and
 /// shows its tree and on which side, whether its clicks open preview tabs,
 /// its tab size, indent guides and scrolling past the end, the
 /// terminal's font, the app's and code's fonts, whether the chat takes the
@@ -71,8 +73,21 @@ final Pref<bool> diffUnified = _plain('unified', false);
 final Pref<Set<String>> terminalChats = _set('terminals', chats: true);
 
 /// The chats whose Files pane is open, and whether the pane lists what git
-/// ignores.
-final Pref<Set<String>> filesChats = _set('files', chats: true);
+/// ignores. Saved only for the chats whose pane was opened by its own
+/// button, key or menu: one a file's opening opened ([filesPassing]) is
+/// left out, as its file tabs are (ADR 0123).
+final Pref<Set<String>> filesChats = Pref(
+  'files',
+  (v) => {..._strings(v) ?? const []},
+  write: (s) => s.difference(filesPassing).toList(),
+  chats: (s) => s,
+  without: (s, gone) => s.difference(gone),
+);
+
+/// The chats whose Files pane a file's opening opened (a path's click,
+/// `show`, ⌘P), not the pane's own button, while the app runs: their open
+/// pane isn't saved.
+final Set<String> filesPassing = runSet();
 final Pref<bool> filesIgnored = _plain('filesIgnored', false);
 
 /// Whether the Files pane shows its tree beside its viewer (on at first;
