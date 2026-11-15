@@ -110,4 +110,23 @@ void main() {
   testWidgets('the top row folds, and never overflows', (tester) async {
     expect(await _sweep(tester, file: 'files_top_row.dart'), isEmpty);
   }, variant: _both);
+
+  testWidgets('the second row folds, and never overflows', (tester) async {
+    expect(await _sweep(tester, file: 'files_bar.dart'), isEmpty);
+  }, variant: _both);
+
+  testWidgets('squeezed, the source button is in the ⋯', (tester) async {
+    final (d, _) = await panesApp(tester, width: 1700);
+    viewport(tester, const Size(600, 600));
+    filesTree.value = false;
+    d.chats['c']!.openInFiles('PLAN.md');
+    await _pane(tester, d, 140);
+    expect(find.byTooltip('View source'), findsNothing);
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View source'));
+    await tester.pumpAndSettle();
+    expect(d.chats['c']!.files.sources, contains('PLAN.md'));
+    await closeView(tester, d);
+  }, variant: _both);
 }

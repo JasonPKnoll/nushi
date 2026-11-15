@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import 'package:nushi/app_actions.dart' show fileTreeKey;
@@ -47,12 +49,15 @@ class FilesBar extends StatelessWidget {
   /// The least the path keeps beside the file's buttons before they fold.
   static const _pathLeast = 160.0;
 
+  /// The room after the file's buttons, before the right end's.
+  static const _gap = 8.0;
+
   /// The size of the right end's icons, the top row's Expand's.
   static const _icon = 18.0;
 
   /// The right end's width: its three buttons' boxes, side by side as the
   /// top row's Expand and × are, so the tree's button sits under Expand
-  /// and the ⋯ under ×, as in Claude desktop.
+  /// and the ⋯ under ×, as in Claude desktop. Squeezed under it, fewer.
   static const double ends = 3 * PaneEndButtons.box;
 
   @override
@@ -76,21 +81,43 @@ class FilesBar extends StatelessWidget {
         ]),
         builder: (context, _) => LayoutBuilder(
           builder: (context, box) {
+            // Squeezed with the tree on the left, the path's start gives
+            // way to the right end's buttons.
+            // Narrower than all three, Collapse goes, then the tree's
+            // button: the ⋯ has both.
+            final buttons = (box.maxWidth / PaneEndButtons.box).floor().clamp(
+              1,
+              3,
+            );
+            final ends = buttons * PaneEndButtons.box;
+            final start = min(this.start, max(0.0, box.maxWidth - ends));
             final room = box.maxWidth - start - ends;
             final folds = shown != null && room < _least(context, shown);
+            // Under its own box and the gap after it, the source button
+            // folds too.
+            final source =
+                shown != null && shown.switches && room >= _button + _gap;
             return Row(
               children: [
                 SizedBox(width: start),
                 Expanded(
                   child: shown == null
                       ? const SizedBox.shrink()
-                      : _file(context, shown, folds: folds),
+                      : _file(
+                          context,
+                          shown,
+                          folds: folds,
+                          source: source,
+                          gap: room >= _gap,
+                        ),
                 ),
                 _ends(
                   context,
                   t,
+                  buttons: buttons,
                   folded: [
-                    if (shown != null && folds) ..._folded(context, shown),
+                    if (shown != null && folds)
+                      ..._folded(context, shown, source: !source),
                   ],
                 ),
               ],
@@ -108,8 +135,16 @@ class FilesBar extends StatelessWidget {
     return _pathLeast + (count + (shown.switches ? 1 : 0)) * _button;
   }
 
-  /// The shown file's path and buttons, but those [folds] puts in the ⋯.
-  Widget _file(BuildContext context, ShownFile shown, {required bool folds}) {
+  /// The shown file's path and buttons, but those [folds] puts in the ⋯:
+  /// the source button too without [source], and the gap after them
+  /// without [gap].
+  Widget _file(
+    BuildContext context,
+    ShownFile shown, {
+    required bool folds,
+    required bool source,
+    required bool gap,
+  }) {
     final actions = shown.actions(context);
     return Row(
       children: [
@@ -124,7 +159,7 @@ class FilesBar extends StatelessWidget {
             ),
           ),
         ),
-        if (shown.switches)
+        if (source)
           SourceButton(
             source: shown.source.value,
             onChanged: (on) => shown.showSource(on: on),
@@ -146,13 +181,24 @@ class FilesBar extends StatelessWidget {
             onTap: shown.reveal,
           ),
         ],
-        const SizedBox(width: 8),
+        if (gap) const SizedBox(width: _gap),
       ],
     );
   }
 
-  /// The file's buttons as the ⋯'s rows, when they fold.
-  List<MenuEntry> _folded(BuildContext context, ShownFile shown) => [
+  /// The file's buttons as the ⋯'s rows, when they fold: its [source]
+  /// button's first, when that folds too.
+  List<MenuEntry> _folded(
+    BuildContext context,
+    ShownFile shown, {
+    required bool source,
+  }) => [
+    if (source)
+      MenuEntry(
+        SourceButton.tooltip(source: shown.source.value),
+        line: LineIcon.source,
+        onPick: () => shown.showSource(on: !shown.source.value),
+      ),
     for (final (icon, tooltip, _, onTap) in shown.actions(context))
       MenuEntry(tooltip, icon: icon, onPick: onTap),
     MenuEntry(
@@ -166,6 +212,7 @@ class FilesBar extends StatelessWidget {
   Widget _ends(
     BuildContext context,
     Tokens t, {
+    required int buttons,
     required List<MenuEntry> folded,
   }) {
     final tree = daemon.daemonApi >= filesApi;
@@ -174,28 +221,30 @@ class FilesBar extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconTap.line(
-          LineIcon.collapseAll,
-          tooltip: 'Collapse all folders',
-          size: _icon,
-          padding: pad,
-          color: t.text,
-          onTap: canCollapseFolders(chat, daemon)
-              ? folderTreeOf(chat).collapseAll
-              : null,
-        ),
-        IconTap.line(
-          LineIcon.fileTree,
-          tooltip: withKey(
-            on ? 'Hide file tree' : 'Show file tree',
-            keyLabel(fileTreeKey),
+        if (buttons > 2)
+          IconTap.line(
+            LineIcon.collapseAll,
+            tooltip: 'Collapse all folders',
+            size: _icon,
+            padding: pad,
+            color: t.text,
+            onTap: canCollapseFolders(chat, daemon)
+                ? folderTreeOf(chat).collapseAll
+                : null,
           ),
-          size: _icon,
-          padding: pad,
-          color: t.text,
-          lit: on,
-          onTap: tree ? () => toggleFileTree(chat) : null,
-        ),
+        if (buttons > 1)
+          IconTap.line(
+            LineIcon.fileTree,
+            tooltip: withKey(
+              on ? 'Hide file tree' : 'Show file tree',
+              keyLabel(fileTreeKey),
+            ),
+            size: _icon,
+            padding: pad,
+            color: t.text,
+            lit: on,
+            onTap: tree ? () => toggleFileTree(chat) : null,
+          ),
         // Under it, ending under its right edge, as Claude's does.
         TrailingMenus(
           child: MenuIcon.line(
