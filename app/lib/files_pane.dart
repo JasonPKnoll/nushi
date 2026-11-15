@@ -7,6 +7,7 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/file_filter.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/keys.dart';
+import 'package:nushi/pane_title.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/preview.dart';
 import 'package:nushi/settings.dart';
@@ -49,6 +50,10 @@ class FilesPane extends StatefulWidget {
 }
 
 class _FilesPaneState extends State<FilesPane> {
+  /// Under this the top row has no room for its icon and a few letters of
+  /// its name beside its two buttons: the buttons alone.
+  static const _wordsFrom = 120.0;
+
   late final FolderTree _tree = folderTreeOf(widget.chat);
   final _query = TextEditingController();
   final _field = FocusNode(debugLabel: 'files filter');
@@ -174,42 +179,53 @@ class _FilesPaneState extends State<FilesPane> {
         PaneHeader(
           inset: 14,
           end: 8,
-          child: Row(
-            spacing: 6,
-            children: [
-              Icon(Icons.folder_outlined, size: 14, color: t.textSecondary),
-              Text('Files', style: theme.ui(t.text, weight: FontWeight.w500)),
-              Expanded(
-                child: Text(
-                  baseName(widget.chat.folder),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.code(t.textMuted, size: 12),
+          // Narrowed for a narrow window (ADR 0123), it shortens its words,
+          // then keeps its buttons alone, never cut.
+          child: LayoutBuilder(
+            builder: (context, box) => Row(
+              spacing: 6,
+              children: [
+                if (box.maxWidth >= _wordsFrom) ...[
+                  Icon(Icons.folder_outlined, size: 14, color: t.textSecondary),
+                  Expanded(
+                    child: PaneTitle(
+                      gap: 6,
+                      title: Text(
+                        'Files',
+                        style: theme.ui(t.text, weight: FontWeight.w500),
+                      ),
+                      caption: Text(
+                        baseName(widget.chat.folder),
+                        style: theme.code(t.textMuted, size: 12),
+                      ),
+                    ),
+                  ),
+                ] else
+                  const Spacer(),
+                ValueListenableBuilder(
+                  valueListenable: filesIgnored,
+                  builder: (context, shown, _) => IconTap(
+                    shown
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    tooltip: shown
+                        ? 'Hide what git ignores'
+                        : 'Show what git ignores',
+                    size: 15,
+                    padding: IconTap.header,
+                    color: shown ? t.text : null,
+                    onTap: () => filesIgnored.value = !shown,
+                  ),
                 ),
-              ),
-              ValueListenableBuilder(
-                valueListenable: filesIgnored,
-                builder: (context, shown, _) => IconTap(
-                  shown
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  tooltip: shown
-                      ? 'Hide what git ignores'
-                      : 'Show what git ignores',
+                IconTap.line(
+                  LineIcon.close,
+                  tooltip: 'Close',
                   size: 15,
                   padding: IconTap.header,
-                  color: shown ? t.text : null,
-                  onTap: () => filesIgnored.value = !shown,
+                  onTap: widget.onClose,
                 ),
-              ),
-              IconTap.line(
-                LineIcon.close,
-                tooltip: 'Close',
-                size: 15,
-                padding: IconTap.header,
-                onTap: widget.onClose,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         Focus(
