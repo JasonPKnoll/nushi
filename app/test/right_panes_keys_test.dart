@@ -679,6 +679,8 @@ void main() {
     counting = false;
     expect(frames, 0);
     expect(find.byType(PreviewPane), findsOneWidget);
+    // The chat holds what it was given: no command running.
+    expect(find.text('npm run dev', skipOffstage: false), findsNothing);
     await closeView(tester, d);
   }, variant: _mac);
 }

@@ -137,7 +137,7 @@ Future<(Daemon, FakeDaemon)> panesApp(
   Object? answer(Object input) => switch (input) {
     GetChatRequest(:final chatId) when chatId == 'c' => GetChatResponse(
       chat: c,
-      items: panesItems,
+      items: items ?? panesItems,
     ),
     GetChatRequest() => GetChatResponse(),
     _ => shellAnswer?.call(input),
