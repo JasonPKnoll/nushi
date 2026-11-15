@@ -296,9 +296,11 @@ void main() {
     expect(row, findsOneWidget);
     final view = tester.getRect(panel);
     expect(view.contains(tester.getCenter(row)), isTrue); // in view
+    final keys = FocusManager.instance.primaryFocus;
     await tester.tap(row);
     await tester.pumpAndSettle();
     expect(d.chats['c']!.shownFile, 'notes/sub.md');
+    expect(FocusManager.instance.primaryFocus, same(keys));
     d.dispose();
   }, variant: _mac);
 
@@ -328,6 +330,7 @@ void main() {
     tester,
   ) async {
     final d = await _app(tester);
+    final keys = FocusManager.instance.primaryFocus;
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyP);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
@@ -369,6 +372,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(box, findsNothing);
     expect(_inPane(find.text('plan.md')), findsOneWidget);
+    // The keys are back where they were: Files, opening, took none.
+    expect(FocusManager.instance.primaryFocus, same(keys));
     // Code isn't an artifact, but ⌘P opens it.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyP);

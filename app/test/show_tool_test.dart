@@ -241,8 +241,12 @@ void main() {
     ) async {
       final asked = <String>[];
       final (fake, d) = await _app(tester, asked: asked);
+      // The keys stay where they were: opening Files takes no focus.
+      final box = FocusManager.instance.primaryFocus;
+      expect(box, isNotNull);
       await _shows(tester, fake, 'docs/report.md');
       expect(find.byType(FileView), findsOneWidget);
+      expect(FocusManager.instance.primaryFocus, same(box));
       expect(find.textContaining('The release report'), findsOneWidget);
       expect(asked, ['docs/report.md']);
       expect(_chat(d).showAsked.value, isNull);
@@ -264,9 +268,12 @@ void main() {
       await _shows(tester, fake, 'docs/report.md');
       expect(find.byType(FileView), findsNothing);
       expect(_chat(d).showAsked.value, isNull);
+      final box = FocusManager.instance.primaryFocus;
+      expect(box, isNotNull);
       await tester.tap(find.text('Preview'));
       await tester.pumpAndSettle();
       expect(find.byType(FileView), findsOneWidget);
+      expect(FocusManager.instance.primaryFocus, same(box));
       d.dispose();
     }, variant: _mac);
 
