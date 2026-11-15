@@ -112,6 +112,12 @@ enum Act {
   chat(key: chatTabKey, menu: ActMenu.view, menuLabel: 'Chat'),
   changes(key: changesTabKey, menu: ActMenu.view, menuLabel: 'Changes'),
   pull(key: pullTabKey, menu: ActMenu.view, menuLabel: 'Pull Request'),
+  previousTab(
+    key: previousTabKey,
+    menu: ActMenu.view,
+    menuLabel: 'Previous Tab',
+  ),
+  nextTab(key: nextTabKey, menu: ActMenu.view, menuLabel: 'Next Tab'),
   sidebar(key: sidebarKey, menu: ActMenu.view, menuLabel: 'Hide Sidebar'),
   // The menu bar's in View, by Previous and Next Chat (main.dart).
   back(key: backKey),
@@ -333,6 +339,18 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
       'Show pull request',
       enabled: shown?.pull != null,
       run: () => tab(.pull),
+    ),
+    AppAction(
+      .previousTab,
+      'Previous tab',
+      enabled: shown != null,
+      run: () => stepTab(shown!, -1),
+    ),
+    AppAction(
+      .nextTab,
+      'Next tab',
+      enabled: shown != null,
+      run: () => stepTab(shown!, 1),
     ),
     AppAction(
       .sidebar,

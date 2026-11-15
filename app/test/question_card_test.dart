@@ -321,4 +321,65 @@ void main() {
     expect(sent, isNull);
     expect(keys, [LogicalKeyboardKey.enter, LogicalKeyboardKey.digit1]);
   });
+
+  testWidgets('⌃Tab and ⌃⇧Tab go past the card to the chat’s tabs', (
+    tester,
+  ) async {
+    var steps = <int>[];
+    await tester.pumpWidget(
+      themed(
+        Shortcuts(
+          shortcuts: const {
+            SingleActivator(LogicalKeyboardKey.tab, control: true): _Step(1),
+            SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
+                _Step(-1),
+          },
+          child: Actions(
+            actions: {
+              _Step: CallbackAction<_Step>(
+                onInvoke: (i) => steps = [...steps, i.step],
+              ),
+            },
+            child: QuestionCard(
+              Item(
+                id: 'q',
+                kind: ItemKind.ITEM_KIND_QUESTION,
+                status: 'pending',
+                fields: [
+                  choice('question_0', 'Color', ['red', 'green']),
+                  choice('question_1', 'Size', ['small', 'big']),
+                ],
+              ),
+              agent: 'Claude',
+              draft: QuestionDraft(),
+              onAnswer: (_) async {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Color?'), findsOneWidget); // focused, on the first
+    for (final shift in [false, true]) {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      if (shift) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      expect(find.text('Color?'), findsOneWidget);
+    }
+    expect(steps, [1, -1]);
+    // Tab alone is still the card's: the next question.
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    expect(find.text('Size?'), findsOneWidget);
+  });
+}
+
+/// A chat's tab step, as `chat_keys.dart`'s.
+class _Step extends Intent {
+  const new(this.step);
+
+  final int step;
 }
