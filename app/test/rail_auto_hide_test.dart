@@ -7,6 +7,7 @@ import 'package:nushi/chat_panes.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/files_pane.dart';
+import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/panes.dart';
@@ -383,6 +384,38 @@ void main() {
     expect(shadowed(SideChat), isTrue);
     expect(shadowed(FilesPane), isFalse);
     expect(shadowed(PreviewPane), isFalse);
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets("tucked, the rail still asks what fills the chat's context "
+      'after a turn, as a shown one does, so it comes back current', (
+    tester,
+  ) async {
+    // The preview needs the rail's room in a chat area of 1100.
+    final (d, fake) = await panesApp(
+      tester,
+      width: windowFor(1100, sidebar: false),
+      open: _openOf([ChatPanes.preview]),
+    );
+    final c = d.chats['c']!
+      // A turn under way: the status the chat list sends.
+      ..listed(ChatStatus(busy: true, canAskContext: true));
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.byType(DetailsPanel), findsNothing);
+    expect(find.byType(DetailsPanel, skipOffstage: false), findsOneWidget);
+    int asked() => fake.calls.whereType<GetContextUsageRequest>().length;
+    expect(asked(), 0, reason: 'busy: not yet');
+    // The turn ends: asked a moment later, once, while tucked.
+    c.listed(ChatStatus(canAskContext: true));
+    await tester.pump(const Duration(seconds: 2));
+    expect(asked(), 1);
+    expect(find.byType(DetailsPanel), findsNothing);
+    // Within the minute, another turn asks nothing more.
+    c
+      ..listed(ChatStatus(busy: true, canAskContext: true))
+      ..listed(ChatStatus(canAskContext: true));
+    await tester.pump(const Duration(seconds: 2));
+    expect(asked(), 1);
     await closeView(tester, d);
   }, variant: _mac);
 
