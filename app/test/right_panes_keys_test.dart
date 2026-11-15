@@ -479,6 +479,19 @@ void main() {
       await closeView(tester, d);
     }, variant: _mac);
 
+    testWidgets('⌃` with the terminal open under it puts it back and shows '
+        'that terminal, never closing it', (tester) async {
+      final d = await expanded(tester);
+      await _terminalKey(tester);
+      expect(find.byTooltip('Expand'), findsOneWidget);
+      expect(find.byType(TerminalPanel), findsOneWidget);
+      expect(terminalChats.value, {'c'});
+      // Shown, ⌃` hides it as ever.
+      await _terminalKey(tester);
+      expect(find.byType(TerminalPanel), findsNothing);
+      await closeView(tester, d);
+    }, variant: _mac);
+
     testWidgets("the palette's Show terminal puts it back and shows the "
         'terminal', (tester) async {
       final d = await expanded(tester, terminal: false);

@@ -131,9 +131,14 @@ class _ChatAreaState extends State<ChatArea> {
   }
 
   /// ⌃`: the terminal shows or hides. Over an expanded browser tab, which
-  /// covers it, the tab is put back first, in the same press.
+  /// covers it, it only shows: the tab is put back, and a terminal open
+  /// under it is shown, not closed unseen ([_terminalShown] puts the tab
+  /// back for one that opens).
   void _toggleTerminal() {
-    if (_expanded.value) _expanded.value = false;
+    if (_expanded.value && terminalChats.value.contains(widget.chat.id)) {
+      _expanded.value = false;
+      return;
+    }
     toggleTerminalOf(widget.chat, _keys);
   }
 
