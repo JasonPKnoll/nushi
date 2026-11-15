@@ -114,11 +114,30 @@ void main() {
     await _palette(tester, 'show details');
     expect(showDetails.value, isTrue);
     expect(_rail, findsNothing);
-    // On Changes there's no details to show or hide.
-    d.chats['c']!.tab.value = ChatTab.changes;
-    await tester.pumpAndSettle();
-    await _palette(tester, 'hide details');
-    expect(showDetails.value, isTrue);
+    // On Changes and on Pull request there's no details to show or hide:
+    // the chat has a linked pull request, so that tab is there.
+    final c = d.chats['c']!
+      ..linkPull(
+        GitHubLink(
+          host: 'github.com',
+          repo: 'afrase/nushi',
+          number: 1240,
+          pull: true,
+        ),
+      );
+    for (final tab in [ChatTab.changes, ChatTab.pull]) {
+      c.tab.value = tab;
+      await tester.pumpAndSettle();
+      expect(c.tab.value, tab);
+      await _palette(tester, 'hide details');
+      expect(showDetails.value, isTrue, reason: '$tab');
+      // Nothing matched, so the palette is still open: closed, the next
+      // tab's opens on that tab.
+      expect(find.text('Nothing matches'), findsOneWidget, reason: '$tab');
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(Palette), findsNothing);
+    }
     await closeView(tester, d);
   }, variant: _mac);
 
