@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/conventions.dart';
@@ -7,16 +6,16 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/edit_bars.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/menu.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/preview.dart';
 import 'package:nushi/preview_entry.dart';
 import 'package:nushi/preview_marks.dart';
-import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/tool_parts.dart' show plainPath;
 
-// A file preview's header (preview_pane.dart): its name or its tabs, Live,
+// A file preview's header (file_view.dart): its name or its tabs, Live,
 // the wrap button, its actions, Show in Finder and Close.
 
 /// What each of the row's buttons takes more than it did (ADR 0122's
@@ -38,9 +37,9 @@ const double _roomyWithPageFrom = 520 + 4 * _wider;
 /// start with, that room is three short names' tabs (ADR 0072).
 const double _gapsFrom = 640 + 4 * _wider;
 
-/// The header's row of `PreviewPane`: the file's [kind] icon and name (a
+/// The header's row of `FileView`: the file's [kind] icon and name (a
 /// click shows it in the Files pane; with several files open, the tabs of
-/// them all, [PreviewTabs]), Live while [watch] keeps it current, the wrap
+/// them all, [PaneTabs]), Live while [watch] keeps it current, the wrap
 /// button while it [wraps], [actions] (a [page]'s Reload and Open in
 /// browser), Show in Finder ([onReveal]) and Close ([onClose]); folded into
 /// a ⋯ where the pane is narrow.
@@ -78,7 +77,7 @@ class PreviewHeader extends StatelessWidget {
   final VoidCallback onReveal;
   final VoidCallback onClose;
 
-  /// The key of its [PreviewTabs] (`PreviewPane.tabsKey`).
+  /// The key of its [PaneTabs] (`FileView.tabsKey`).
   final Key? tabsKey;
 
   @override
@@ -238,7 +237,7 @@ class PreviewHeader extends StatelessWidget {
   /// as a browser tab's title row has it, so the row keeps its shape as
   /// you move between the two.
   Widget _tabs(List<PreviewEntry> open) {
-    final tabs = PreviewTabs(
+    final tabs = PaneTabs(
       key: tabsKey,
       chat: chat,
       tabs: open,
@@ -271,7 +270,7 @@ double previewHeaderEnd(
 /// The one file's name, plain, its absolute path ([tooltip]) in a tooltip:
 /// a click shows it in the Files pane ([showInFiles]) when the file is in
 /// the chat's folder, and does nothing otherwise. Its text sits where a
-/// tab's would ([PreviewTabs]), so a second file opening moves nothing.
+/// tab's would ([PaneTabs]), so a second file opening moves nothing.
 class _Name extends StatelessWidget {
   const new({
     required this.daemon,

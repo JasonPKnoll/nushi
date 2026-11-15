@@ -119,10 +119,10 @@ List<double> fitTabs(List<double> widths, double room) {
 /// The tabs of [tabs], [current] the one showing: plain names that fill the
 /// slot the file name had, so the title row keeps its height and its
 /// controls. Past the room they shrink, then scroll, the showing one brought
-/// into view. Its state outlives the file's view (`PreviewPane.tabsKey`), so
+/// into view. Its state outlives the file's view (`FileView.tabsKey`), so
 /// picking a tab doesn't lose the row's place. A file's tab says its name
 /// in the code face, a browser tab its page's title in the interface's.
-class PreviewTabs extends StatefulWidget {
+class PaneTabs extends StatefulWidget {
   const new({
     required this.chat,
     required this.tabs,
@@ -135,10 +135,10 @@ class PreviewTabs extends StatefulWidget {
   final PreviewEntry current;
 
   @override
-  State<PreviewTabs> createState() => _PreviewTabsState();
+  State<PaneTabs> createState() => _PaneTabsState();
 }
 
-class _PreviewTabsState extends State<PreviewTabs> {
+class _PaneTabsState extends State<PaneTabs> {
   final _scroll = ScrollController();
 
   /// What the row last brought into view for: the tab, how many, the room.

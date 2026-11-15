@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat_area.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_filter.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
@@ -16,7 +17,6 @@ import 'package:nushi/phone/files_screen.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/preview_screen.dart';
 import 'package:nushi/preview_entry.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/tree_rows.dart';
 
@@ -272,7 +272,7 @@ void main() {
     await tester.tap(_row('report.md'));
     await tester.pumpAndSettle();
     expect(d.chats['c']!.previewFile, 'docs/report.md');
-    expect(find.byType(PreviewPane), findsOneWidget);
+    expect(find.byType(FileView), findsOneWidget);
     expect(_view(tester, 'report.md').showing, isTrue);
     // Closed, its listing ends; the tree keeps that it was open.
     await tester.tap(_row('docs'));
@@ -289,7 +289,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_pane, findsNothing);
     final name = find.descendant(
-      of: find.byType(PreviewPane),
+      of: find.byType(FileView),
       matching: find.text('main.dart'),
     );
     await tester.tap(name);
@@ -311,7 +311,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(PreviewPane),
+        of: find.byType(FileView),
         matching: find.text('report.md'),
       ),
     );
@@ -329,7 +329,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(PreviewPane),
+        of: find.byType(FileView),
         matching: find.text('draft.md'),
       ),
     );
@@ -353,7 +353,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(PreviewPane),
+        of: find.byType(FileView),
         matching: find.text('index.md'),
       ),
     );
@@ -371,7 +371,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(PreviewPane),
+        of: find.byType(FileView),
         matching: find.text('notes.md'),
       ),
     );
@@ -596,7 +596,7 @@ void main() {
           pane.left,
           greaterThanOrEqualTo(tester.getRect(find.byType(ChatArea)).left),
         );
-        expect(tester.getRect(find.byType(PreviewPane)).left, pane.right);
+        expect(tester.getRect(find.byType(FileView)).left, pane.right);
         expectTextInside(tester, width);
         await render(tester, find.byType(NushiApp), 'files_${size}_$name');
         await closeView(tester, d);

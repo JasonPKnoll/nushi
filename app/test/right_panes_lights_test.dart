@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat_panes.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/subagent_pane.dart';
@@ -54,7 +54,7 @@ final _firsts = <(String, Type, PanesOpen, List<PaneSpec>)>[
     [ChatPanes.files, ChatPanes.preview],
   ),
   ('subagent', SubagentPane, _open(subagent: true), [ChatPanes.subagent]),
-  ('preview', PreviewPane, _open(previews: 1), [ChatPanes.preview]),
+  ('preview', FileView, _open(previews: 1), [ChatPanes.preview]),
   ('browser', BrowserPane, _open(browser: 1), [ChatPanes.preview]),
 ];
 

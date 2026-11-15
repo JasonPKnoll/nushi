@@ -4,9 +4,9 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/terminal_panel.dart';
@@ -149,7 +149,7 @@ void main() {
     final c = d.chats['c']!;
     final panel = tester.state(find.byType(TerminalPanel));
     final terminal = tester.getRect(find.byType(TerminalPanel));
-    final preview = tester.getRect(find.byType(PreviewPane));
+    final preview = tester.getRect(find.byType(FileView));
     final header = tester.element(find.byType(ChatHeader));
     expect(find.byType(DetailsPanel), findsOneWidget);
 
@@ -158,7 +158,7 @@ void main() {
     expect(tester.state(find.byType(TerminalPanel)), same(panel));
     expect(tester.element(find.byType(ChatHeader)), same(header));
     // On Changes: no pane, no details, the header across the pane.
-    expect(find.byType(PreviewPane), findsNothing);
+    expect(find.byType(FileView), findsNothing);
     expect(find.byType(DetailsPanel), findsNothing);
     final pane = tester.getRect(find.byType(Pane));
     expect(tester.getRect(find.byType(ChatHeader)).width, pane.width);
@@ -171,10 +171,10 @@ void main() {
     expect(tester.state(find.byType(TerminalPanel)), same(panel));
     expect(tester.element(find.byType(ChatHeader)), same(header));
     // The preview is where it was on the first frame: no slide.
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     expect(tester.getRect(find.byType(TerminalPanel)), terminal);
     await tester.pumpAndSettle();
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     await closeView(tester, d);
   }, variant: _mac);
 }

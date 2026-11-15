@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_view.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/transcript.dart';
@@ -95,7 +95,7 @@ void main() {
     // The panes, each at its least, left to right to the pane's right
     // edge, from its top to its bottom, each top row level with the
     // header.
-    final types = [SideChat, FilesPane, PreviewPane];
+    final types = [SideChat, FilesPane, FileView];
     final panes = [for (final t in types) tester.getRect(find.byType(t))];
     for (final (i, w) in [300.0, 200.0, 300.0].indexed) {
       expect(panes[i].width, w);
@@ -112,7 +112,7 @@ void main() {
     expect(panes.first.left, lessThan(header.right));
     expect(_shadowed(tester, SideChat), isTrue);
     expect(_shadowed(tester, FilesPane), isFalse);
-    expect(_shadowed(tester, PreviewPane), isFalse);
+    expect(_shadowed(tester, FileView), isFalse);
     expect(tester.takeException(), isNull);
     await closeView(tester, d);
   }, variant: _mac);
@@ -144,7 +144,7 @@ void main() {
       expect(h.top, area.top, reason: 'at $w');
       expect(
         h.right,
-        lessThanOrEqualTo(tester.getRect(find.byType(PreviewPane)).left),
+        lessThanOrEqualTo(tester.getRect(find.byType(FileView)).left),
       );
       if (files != null) {
         expect((f.left - files.left).abs(), lessThanOrEqualTo(1), reason: '$w');

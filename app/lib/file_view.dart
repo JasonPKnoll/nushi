@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/diagram_page.dart';
@@ -8,11 +7,11 @@ import 'package:nushi/edit_bars.dart';
 import 'package:nushi/file_edit.dart';
 import 'package:nushi/file_text.dart';
 import 'package:nushi/native.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/preview.dart';
 import 'package:nushi/preview_header.dart';
 import 'package:nushi/preview_marks.dart';
 import 'package:nushi/preview_path.dart';
-import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/skills_list.dart';
 import 'package:nushi/source_editor.dart';
 import 'package:nushi/theme/theme.dart';
@@ -22,7 +21,7 @@ import 'package:nushi/web_views.dart';
 /// A file the agent wrote, beside the chat where a subagent's pane opens.
 /// Its header ([PreviewHeader]):
 /// its name (a click shows it in the Files pane; with several files open,
-/// the tabs of them all, [PreviewTabs]), Live while the daemon keeps it
+/// the tabs of them all, [PaneTabs]), Live while the daemon keeps it
 /// current, wrapping the lines or not while it shows a source
 /// ([WrapButton], and ⌥Z with the focus in the pane), Reload (in the app's
 /// own web view) and Open in browser (a page, not a diagram), Show in
@@ -31,7 +30,7 @@ import 'package:nushi/web_views.dart';
 /// click copies, and the source button for a file that renders (not a
 /// diagram with nothing to draw it; ADR 0106). It's one file's view, made
 /// again as its tab shows.
-class PreviewPane extends StatefulWidget {
+class FileView extends StatefulWidget {
   const new({
     required this.chat,
     required this.daemon,
@@ -46,15 +45,15 @@ class PreviewPane extends StatefulWidget {
   final String path; // as the tool row names it
   final VoidCallback onClose;
 
-  /// The key of its [PreviewTabs], from outside a view that's keyed by file,
+  /// The key of its [PaneTabs], from outside a view that's keyed by file,
   /// so the tabs' row outlives it.
   final Key? tabsKey;
 
   @override
-  State<PreviewPane> createState() => _PreviewPaneState();
+  State<FileView> createState() => _FileViewState();
 }
 
-class _PreviewPaneState extends State<PreviewPane> {
+class _FileViewState extends State<FileView> {
   late final _watch = FileWatch(widget.daemon, widget.chat.id, widget.path);
   late final PreviewKind _kind = previewKind(widget.path) ?? PreviewKind.code;
   late final PageHost? _page = _kind.page && _kind != PreviewKind.mermaid

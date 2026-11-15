@@ -11,10 +11,10 @@ import 'package:nushi/chat_files.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panel_widgets.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/widgets.dart';
 
@@ -177,7 +177,7 @@ void main() {
     expect(d.chats['c']!.previewFile, 'docs/img/chart.png');
     expect(
       find.descendant(
-        of: find.byType(PreviewPane),
+        of: find.byType(FileView),
         matching: find.text('chart.png'),
       ),
       findsOneWidget,

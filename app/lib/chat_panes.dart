@@ -10,11 +10,11 @@ import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/edit_bars.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/folder_tree.dart' show filesApi;
 import 'package:nushi/fork_chat.dart';
 import 'package:nushi/preview_entry.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/subagent_pane.dart';
 
@@ -122,7 +122,7 @@ List<SidePane> chatPanes(
           ),
           'subagent' => _taskPane(chat, daemon, id!),
           _ => switch (chat.preview.value!) {
-            PreviewFile(:final path) => PreviewPane(
+            PreviewFile(:final path) => FileView(
               key: ValueKey(path),
               chat: chat,
               daemon: daemon,

@@ -4,10 +4,10 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/transcript.dart';
@@ -290,7 +290,7 @@ void main() {
     await tester.pump();
     expect(tester.getRect(_menu), menu);
     expect(
-      tester.getRect(find.byType(PreviewPane)).left,
+      tester.getRect(find.byType(FileView)).left,
       menu.right + ChatHeader.end,
     );
     await closeView(tester, d);
@@ -304,11 +304,11 @@ void main() {
     final (d, _) = await panesApp(tester, width: width);
     final c = d.chats['c']!..openPreview('PLAN.md');
     await tester.pump();
-    final preview = tester.getRect(find.byType(PreviewPane));
+    final preview = tester.getRect(find.byType(FileView));
     expect(_rail, findsNothing);
     expect(tester.getRect(_menu).right, preview.left - ChatHeader.end);
     await tester.pumpAndSettle();
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     c.preview.value = null;
     await tester.pump();
     expect(_rail, findsOneWidget);

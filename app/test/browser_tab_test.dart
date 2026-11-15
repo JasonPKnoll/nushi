@@ -8,11 +8,11 @@ import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/preview_entry.dart';
-import 'package:nushi/preview_pane.dart';
-import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/theme/theme.dart';
 
 import 'browser_fixture.dart';
@@ -156,11 +156,11 @@ void main() {
       expect(find.byTooltip('New browser tab'), findsNothing);
       c.openBrowserTab('http://localhost:3000');
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewTabs), findsOneWidget);
+      expect(find.byType(PaneTabs), findsOneWidget);
       final plus = find.byTooltip('New browser tab');
       expect(plus, findsOneWidget);
       // Right after the last tab.
-      final tabs = tester.getRect(find.byType(PreviewTabs));
+      final tabs = tester.getRect(find.byType(PaneTabs));
       expect(tester.getRect(plus).left, closeTo(tabs.right + 2, 0.5));
       await tester.tap(plus);
       await tester.pumpAndSettle();
@@ -168,16 +168,13 @@ void main() {
       expect(find.text(browserHint), findsOneWidget);
       // Back on the file's chip: the row keeps its +, as Claude's.
       await tester.tap(
-        find.descendant(
-          of: find.byType(PreviewTabs),
-          matching: find.text('a.md'),
-        ),
+        find.descendant(of: find.byType(PaneTabs), matching: find.text('a.md')),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       expect(
         tester.getRect(plus).left,
-        closeTo(tester.getRect(find.byType(PreviewTabs)).right + 2, 0.5),
+        closeTo(tester.getRect(find.byType(PaneTabs)).right + 2, 0.5),
       );
       await closeView(tester, d);
     }, variant: macOnly);

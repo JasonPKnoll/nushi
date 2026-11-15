@@ -9,9 +9,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
@@ -78,7 +78,7 @@ Future<Daemon> _app(
 }
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(PreviewPane), matching: f);
+    find.descendant(of: find.byType(FileView), matching: f);
 
 void main() {
   setUpAll(loadFonts);

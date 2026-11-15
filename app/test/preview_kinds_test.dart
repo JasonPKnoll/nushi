@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat_files.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/diagram_page.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panes.dart';
@@ -17,7 +18,6 @@ import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/phone/preview_screen.dart';
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/preview_text.dart';
 import 'package:nushi/settings.dart';
@@ -179,7 +179,7 @@ Future<(Daemon, _Host)> _app(
   return (d, host);
 }
 
-Finder get _pane => find.byType(PreviewPane);
+Finder get _pane => find.byType(FileView);
 
 Finder _inPane(Finder f) => find.descendant(of: _pane, matching: f);
 

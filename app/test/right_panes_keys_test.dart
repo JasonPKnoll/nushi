@@ -9,11 +9,11 @@ import 'package:nushi/composer.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/sidebar_button.dart';
@@ -105,11 +105,11 @@ void main() {
       open: _open(previews: 1),
     );
     expect(_rail, findsNothing);
-    final preview = _r(tester, find.byType(PreviewPane));
+    final preview = _r(tester, find.byType(FileView));
     final header = _r(tester, find.byType(ChatHeader));
     await _palette(tester, 'hide details');
     expect(showDetails.value, isFalse);
-    expect(_r(tester, find.byType(PreviewPane)), preview);
+    expect(_r(tester, find.byType(FileView)), preview);
     expect(_r(tester, find.byType(ChatHeader)), header);
     await _palette(tester, 'show details');
     expect(showDetails.value, isTrue);
@@ -298,16 +298,16 @@ void main() {
         width: windowFor(area, sidebar: false),
         open: _open(previews: 1),
       );
-      final preview = _r(tester, find.byType(PreviewPane));
+      final preview = _r(tester, find.byType(FileView));
       final over = preview.top > _r(tester, find.byType(Pane)).top;
       await _terminalKey(tester);
       final terminal = _r(tester, find.byType(TerminalPanel));
       if (over) {
         expect(terminal.right, _r(tester, find.byType(Pane)).right);
-        expect(_r(tester, find.byType(PreviewPane)).bottom, terminal.top);
+        expect(_r(tester, find.byType(FileView)).bottom, terminal.top);
       } else {
         expect(terminal.right, preview.left);
-        expect(_r(tester, find.byType(PreviewPane)), preview);
+        expect(_r(tester, find.byType(FileView)), preview);
       }
       await _terminalKey(tester);
       expect(find.byType(TerminalPanel), findsNothing);
@@ -404,7 +404,7 @@ void main() {
         ('header', find.byType(ChatHeader)),
         ('rail', _rail),
         ('files', find.byType(FilesPane)),
-        ('preview', find.byType(PreviewPane)),
+        ('preview', find.byType(FileView)),
         ('transcript', find.byType(Transcript)),
       ];
       String? region(FocusNode n) {
@@ -685,7 +685,7 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 1));
       final was = resizes(fake);
-      final pane = _r(tester, find.byType(PreviewPane));
+      final pane = _r(tester, find.byType(FileView));
       final drag = await tester.startGesture(
         Offset(pane.left + Resizable.edgeWidth / 2, pane.top + 300),
       );
@@ -709,7 +709,7 @@ void main() {
         open: _open(previews: 1),
       );
       final area = _r(tester, find.byType(Pane));
-      final preview = _r(tester, find.byType(PreviewPane));
+      final preview = _r(tester, find.byType(FileView));
       final terminal = _r(tester, find.byType(TerminalPanel));
       final drag = await tester.startGesture(
         Offset(terminal.center.dx, terminal.top + 2),
@@ -724,7 +724,7 @@ void main() {
         _r(tester, find.byType(TerminalPanel)).height,
         area.height - PaneHeader.height - 160,
       );
-      expect(_r(tester, find.byType(PreviewPane)), preview);
+      expect(_r(tester, find.byType(FileView)), preview);
       await closeView(tester, d);
     }, variant: _mac);
   });
@@ -763,7 +763,7 @@ void main() {
     }
     counting = false;
     expect(frames, 0);
-    expect(find.byType(PreviewPane), findsOneWidget);
+    expect(find.byType(FileView), findsOneWidget);
     // The chat holds what it was given: no command running.
     expect(find.text('npm run dev', skipOffstage: false), findsNothing);
     await closeView(tester, d);

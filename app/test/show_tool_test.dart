@@ -9,12 +9,12 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/chat_files.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/preview_screen.dart';
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/tool_calls.dart';
@@ -241,14 +241,14 @@ void main() {
       final asked = <String>[];
       final (fake, d) = await _app(tester, asked: asked);
       await _shows(tester, fake, 'docs/report.md');
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       expect(find.textContaining('The release report'), findsOneWidget);
       expect(asked, ['docs/report.md']);
       expect(_chat(d).showAsked.value, isNull);
       // Closed, it stays closed until the agent asks again.
       await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       d.dispose();
     }, variant: _mac);
 
@@ -261,11 +261,11 @@ void main() {
         items: [_show('a', 'docs/report.md', text: 'Shown.')],
       );
       await _shows(tester, fake, 'docs/report.md');
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       expect(_chat(d).showAsked.value, isNull);
       await tester.tap(find.text('Preview'));
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       d.dispose();
     }, variant: _mac);
 
@@ -293,24 +293,24 @@ void main() {
       filesChats.value = {'c'};
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       expect(find.byType(DetailsPanel), findsNothing);
       expect(showDetails.value, isTrue);
       await tester.tap(find.byTooltip('Close').last);
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       expect(find.byType(DetailsPanel), findsOneWidget);
       // The side chat too: no room.
       _chat(d).side.value = ChatState('s', '/Users/me')..title = 'Side';
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       expect(_chat(d).showAsked.value, isNull);
       // With the Files pane closed, it fits.
       filesChats.value = {};
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       await closeView(tester, d);
     }, variant: _mac);
 
@@ -321,12 +321,12 @@ void main() {
       await _shows(tester, fake, 'docs/first.md');
       await _shows(tester, fake, 'docs/report.md');
       expect(d.selectedId, 'o');
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       expect(_chat(d).preview.value, isNull);
       d.select('c');
       await tester.pumpAndSettle();
       expect(_chat(d).previewFile, 'docs/report.md');
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       // Once: going away and back doesn't open it again.
       await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
@@ -334,7 +334,7 @@ void main() {
       await tester.pumpAndSettle();
       d.select('c');
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       d.dispose();
     }, variant: _mac);
 
@@ -346,7 +346,7 @@ void main() {
       await tester.pumpAndSettle();
       d.select('c');
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       d.dispose();
     }, variant: _mac);
 
@@ -359,7 +359,7 @@ void main() {
       expect(d.settingsOpen, isNotNull);
       d.closeSettings();
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       d.dispose();
     }, variant: _mac);
 
@@ -406,7 +406,7 @@ void main() {
       expect(_chat(d).preview.value, isNull);
       _chat(d).tab.value = ChatTab.chat;
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(FileView), findsOneWidget);
       d.dispose();
     }, variant: _mac);
 
@@ -438,7 +438,7 @@ void main() {
     testWidgets('a chat the app doesn’t know is nothing', (tester) async {
       final (fake, d) = await _app(tester);
       await _shows(tester, fake, 'docs/report.md', chat: 'nope');
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       d.dispose();
     }, variant: _mac);
 

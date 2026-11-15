@@ -14,17 +14,17 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/palette.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/plain_tabs.dart';
 import 'package:nushi/preview.dart';
 import 'package:nushi/preview_entry.dart';
 import 'package:nushi/preview_marks.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
-import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/tool_calls.dart';
@@ -165,10 +165,10 @@ Future<Daemon> _app(
 }
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(PreviewPane), matching: f);
+    find.descendant(of: find.byType(FileView), matching: f);
 
 Finder _tab(String label) => find.ancestor(
-  of: find.descendant(of: find.byType(PreviewTabs), matching: find.text(label)),
+  of: find.descendant(of: find.byType(PaneTabs), matching: find.text(label)),
   matching: find.byWidgetPredicate(
     (w) => w is SizedBox && w.key is ValueKey<String>,
   ),
@@ -196,7 +196,7 @@ Future<void> _key(
 ScrollPosition _row(WidgetTester tester) => tester
     .state<ScrollableState>(
       find.descendant(
-        of: find.byType(PreviewTabs),
+        of: find.byType(PaneTabs),
         matching: find.byType(Scrollable),
       ),
     )
@@ -210,7 +210,7 @@ Map<String, Rect> _marks(WidgetTester tester) {
   // into ⋯, and a header at the transcript's least folds the tabs.
   Rect? folds(Finder f) => f.evaluate().isEmpty ? null : at(f);
   return {
-    'pane': at(find.byType(PreviewPane)),
+    'pane': at(find.byType(FileView)),
     'title row': at(_inPane(find.byType(PaneHeader))),
     'kind icon': at(_inPane(find.byType(Icon)).first),
     'path line': at(_inPane(find.byType(PathLine))),
@@ -351,7 +351,7 @@ void main() {
     testWidgets('one file: its name, plain, its path in a tooltip; no tabs, '
         'no menu', (tester) async {
       final d = await _app(tester, files: _three.take(1).toList());
-      expect(find.byType(PreviewTabs), findsNothing);
+      expect(find.byType(PaneTabs), findsNothing);
       expect(_inPane(find.text('report.md')), findsOneWidget);
       expect(
         find.descendant(
@@ -424,7 +424,7 @@ void main() {
         _three.forEach(c.openPreview);
         c.openPreview(_three.first);
         await tester.pumpAndSettle();
-        expect(find.byType(PreviewTabs), findsOneWidget);
+        expect(find.byType(PaneTabs), findsOneWidget);
         expect(_marks(tester), one);
         // The name it had is the first tab's, to the pixel.
         final first = tester.getRect(_inPane(find.text('report.md')));
@@ -447,7 +447,7 @@ void main() {
         expect(row.height, 56);
         expect(row.top, header.top);
         expect(row.bottom, header.bottom);
-        expect(header.right, tester.getRect(find.byType(PreviewPane)).left);
+        expect(header.right, tester.getRect(find.byType(FileView)).left);
         final lines = find.descendant(
           of: find.byType(TabFace),
           matching: find.byType(Positioned),
@@ -492,7 +492,7 @@ void main() {
       expect(c.previewNames, ['docs/report.md', 'site/notes.md']);
       expect(c.previewFile, 'site/notes.md');
       await _tap(tester, _closeOf('notes.md'));
-      expect(find.byType(PreviewTabs), findsNothing, reason: 'one left');
+      expect(find.byType(PaneTabs), findsNothing, reason: 'one left');
       expect(_inPane(find.text('report.md')), findsOneWidget);
       d.dispose();
     }, variant: _mac);
@@ -524,11 +524,11 @@ void main() {
       final d = await _app(tester, files: _three);
       final c = d.chats['c']!;
       await _tap(tester, _inPane(find.byTooltip('Close')));
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       expect(c.previewNames, isEmpty);
       c.openPreview('site/notes.md');
       await tester.pumpAndSettle();
-      expect(find.byType(PreviewTabs), findsNothing);
+      expect(find.byType(PaneTabs), findsNothing);
       d.dispose();
     }, variant: _mac);
 
@@ -536,7 +536,7 @@ void main() {
       final d = await _app(tester, files: _three);
       paneWidths.value = {'preview': 700};
       await tester.pumpAndSettle();
-      double width() => tester.getSize(find.byType(PreviewPane)).width;
+      double width() => tester.getSize(find.byType(FileView)).width;
       expect(width(), 700);
       await _tap(tester, _inPane(find.text('notes.md')));
       expect(width(), 700);
@@ -598,7 +598,7 @@ void main() {
       expect(c.previewNames, ['docs/report.md']);
       await _tap(tester, preview('p'));
       expect(c.previewNames, ['docs/report.md', 'docs/plan.md']);
-      expect(find.byType(PreviewTabs), findsOneWidget);
+      expect(find.byType(PaneTabs), findsOneWidget);
       await _tap(tester, preview('r'));
       expect(c.previewNames, hasLength(2));
       expect(c.previewFile, 'docs/report.md');
@@ -638,7 +638,7 @@ void main() {
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(c.previewNames, ['docs/plan.md']);
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
-      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(FileView), findsNothing);
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(c.preview.value, isNull);
       d.dispose();
@@ -698,7 +698,7 @@ void main() {
         width('five-is-a-rather-longer-name-than-four.md'),
         previewTabLeast,
       );
-      final rect = tester.getRect(find.byType(PreviewTabs));
+      final rect = tester.getRect(find.byType(PaneTabs));
       final shown = tester.getRect(_tab('eight.md'));
       expect(shown.right, lessThanOrEqualTo(rect.right + 0.5));
       expect(tester.takeException(), isNull);
@@ -716,10 +716,10 @@ void main() {
       final d = await _app(tester, files: _three);
       paneWidths.value = {'preview': 300};
       await tester.pumpAndSettle();
-      expect(tester.getSize(find.byType(PreviewPane)).width, 300);
+      expect(tester.getSize(find.byType(FileView)).width, 300);
       expect(_inPane(find.byTooltip('More')), findsOneWidget);
       expect(tester.takeException(), isNull);
-      final row = tester.getRect(find.byType(PreviewTabs));
+      final row = tester.getRect(find.byType(PaneTabs));
       expect(row.width, greaterThan(0));
       expect(
         row.right,
@@ -760,12 +760,12 @@ void main() {
 
     testWidgets('picking a tab keeps the row where it is', (tester) async {
       final d = await _app(tester, files: _many, last: true);
-      final before = tester.state(find.byType(PreviewTabs));
+      final before = tester.state(find.byType(PaneTabs));
       final at = _row(tester).pixels;
       expect(at, greaterThan(0));
       await _tap(tester, _inPane(find.text('seven.md')));
       expect(d.chats['c']!.previewFile, 'docs/seven.md');
-      expect(tester.state(find.byType(PreviewTabs)), same(before));
+      expect(tester.state(find.byType(PaneTabs)), same(before));
       expect(_row(tester).pixels, at);
       d.dispose();
     }, variant: _mac);
@@ -777,7 +777,7 @@ void main() {
       expect(_row(tester).pixels, 0);
       c.openPreview(_many.last);
       await tester.pumpAndSettle();
-      final rect = tester.getRect(find.byType(PreviewTabs));
+      final rect = tester.getRect(find.byType(PaneTabs));
       expect(
         tester.getRect(_tab('eight.md')).right,
         lessThanOrEqualTo(rect.right + 0.5),
@@ -791,7 +791,7 @@ void main() {
       final at = row.pixels;
       tester.binding.handlePointerEvent(
         PointerScrollEvent(
-          position: tester.getCenter(find.byType(PreviewTabs)),
+          position: tester.getCenter(find.byType(PaneTabs)),
           scrollDelta: const Offset(0, -120),
         ),
       );

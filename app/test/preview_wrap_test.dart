@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone.dart';
@@ -14,7 +15,6 @@ import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/phone/preview_screen.dart';
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_view.dart';
@@ -103,7 +103,7 @@ Future<Daemon> _app(
 }
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(PreviewPane), matching: f);
+    find.descendant(of: find.byType(FileView), matching: f);
 
 Finder get _wrapButton => _inPane(find.byIcon(Icons.wrap_text));
 
@@ -424,7 +424,7 @@ void main() {
                       maxHeight: 120,
                       child: SizedBox(
                         height: 120,
-                        child: PreviewPane(
+                        child: FileView(
                           chat: c,
                           daemon: d,
                           path: 'src/tea.go',

@@ -6,9 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/editor_find.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/native.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/transcript_find.dart';
 import 'package:nushi/window_drag_linux.dart';
 import 'package:re_editor/re_editor.dart';
@@ -80,7 +80,7 @@ void main() {
     expect(_bar, findsOne);
     expect(find.text('Find in the file'), findsOne);
     expect(
-      find.descendant(of: find.byType(PreviewPane), matching: _bar),
+      find.descendant(of: find.byType(FileView), matching: _bar),
       findsOne,
     );
     expect(chatC(d).find.query, isNull);
@@ -282,7 +282,7 @@ void main() {
       await untilReal(tester, () => editOf(d).highlighted);
       await tester.pumpAndSettle();
       await expectLater(
-        find.byType(PreviewPane),
+        find.byType(FileView),
         matchesGoldenFile('goldens/editor_find_${brightness.name}.png'),
       );
       // The window, wide and narrow, to look at.
@@ -290,7 +290,7 @@ void main() {
         viewport(tester, Size(width, 900), brightness: brightness);
         await tester.pumpAndSettle();
         final bar = tester.getRect(_bar);
-        final pane = tester.getRect(find.byType(PreviewPane));
+        final pane = tester.getRect(find.byType(FileView));
         expect(bar.right, lessThanOrEqualTo(pane.right));
         expect(bar.left, greaterThanOrEqualTo(pane.left));
         expectTextInside(tester, width);

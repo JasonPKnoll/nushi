@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:nushi/browser_address.dart';
 import 'package:nushi/browser_bar.dart';
 import 'package:nushi/browser_menu.dart';
@@ -12,9 +11,9 @@ import 'package:nushi/controls.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/native.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/preview_entry.dart';
-import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/server_logs.dart';
 import 'package:nushi/servers_menu.dart';
 import 'package:nushi/theme/theme.dart';
@@ -76,7 +75,7 @@ class BrowserPane extends StatefulWidget {
   final BrowserTab tab;
   final VoidCallback onClose;
 
-  /// The key of its [PreviewTabs] (`PreviewPane.tabsKey`).
+  /// The key of its [PaneTabs] (`FileView.tabsKey`).
   final Key? tabsKey;
 
   /// Whether it takes the whole chat area, over the transcript (ADR 0094).
@@ -340,7 +339,7 @@ class _BrowserPaneState extends State<BrowserPane> implements BrowserControls {
       spacing: 2,
       children: [
         Flexible(
-          child: PreviewTabs(
+          child: PaneTabs(
             key: widget.tabsKey,
             chat: widget.chat,
             tabs: open.isEmpty ? [_tab] : open,

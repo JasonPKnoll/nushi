@@ -11,12 +11,12 @@ import 'package:nushi/chat_panes.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/sidebar.dart';
@@ -55,7 +55,7 @@ Type _typeOf(PaneSpec p) => switch (p.name) {
   'side' => SideChat,
   'files' => FilesPane,
   'subagent' => SubagentPane,
-  _ => PreviewPane,
+  _ => FileView,
 };
 
 /// The rail shows (drawn: not tucked away).
@@ -199,7 +199,7 @@ void main() {
       'Hide details (tucked away while the panes need the room)',
     );
     final header = tester.getRect(find.byType(ChatHeader));
-    final preview = tester.getRect(find.byType(PreviewPane));
+    final preview = tester.getRect(find.byType(FileView));
     final menu = tester.getRect(find.byTooltip('Chat menu'));
     await tester.tap(_button);
     await tester.pumpAndSettle();
@@ -207,13 +207,13 @@ void main() {
     expect(_tip(tester), 'Show details');
     // Nothing moved.
     expect(tester.getRect(find.byType(ChatHeader)), header);
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     expect(tester.getRect(find.byTooltip('Chat menu')), menu);
     await tester.tap(_button);
     await tester.pumpAndSettle();
     expect(showDetails.value, isTrue);
     expect(_rail(), false);
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     // Room again: they're back. Not wanted, they don't come.
     viewport(tester, Size(width + 200, 900));
     await tester.pumpAndSettle();
@@ -230,7 +230,7 @@ void main() {
     final c = d.chats['c']!;
     c.closePreview(c.preview.value!);
     await tester.pumpAndSettle();
-    expect(find.byType(PreviewPane), findsNothing);
+    expect(find.byType(FileView), findsNothing);
     expect(_rail(), false);
     toggleFiles(c);
     await tester.pumpAndSettle();
@@ -258,7 +258,7 @@ void main() {
       expect(_rail(), !tucked);
       Map<String, Rect> rects() => {
         'header': tester.getRect(find.byType(ChatHeader)),
-        'preview': tester.getRect(find.byType(PreviewPane)),
+        'preview': tester.getRect(find.byType(FileView)),
         'menu': tester.getRect(find.byTooltip('Chat menu')),
         if (!tucked) 'rail': tester.getRect(find.byType(DetailsPanel)),
       };
@@ -557,7 +557,7 @@ void main() {
       open: _openOf([ChatPanes.side, ChatPanes.preview]),
     );
     expect(find.byType(SideChat, skipOffstage: false), findsNothing);
-    expect(find.byType(PreviewPane), findsOneWidget);
+    expect(find.byType(FileView), findsOneWidget);
     expect(_rail(), true);
     await closeView(tester, d);
   }, variant: _mac);
@@ -582,7 +582,7 @@ void main() {
     expect(composerOf('c'), isFalse);
     expect(composerOf('s'), isTrue);
     expect(find.byType(SideChat), findsOneWidget);
-    expect(find.byType(PreviewPane), findsOneWidget);
+    expect(find.byType(FileView), findsOneWidget);
     expect(_rail(), false);
     // The room back without the side chat: the rail shows again, as in an
     // archived chat at this width.
@@ -600,11 +600,11 @@ void main() {
       open: _openOf([ChatPanes.preview]),
     );
     final c = d.chats['c']!;
-    final preview = tester.getRect(find.byType(PreviewPane));
+    final preview = tester.getRect(find.byType(FileView));
     expect(_rail(), false);
     c.tab.value = ChatTab.changes;
     await tester.pump();
-    expect(find.byType(PreviewPane), findsNothing);
+    expect(find.byType(FileView), findsNothing);
     expect(
       find.byType(DetailsPanel, skipOffstage: false),
       findsNothing,
@@ -617,10 +617,10 @@ void main() {
     await tester.pumpAndSettle();
     c.tab.value = ChatTab.chat;
     await tester.pump();
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     expect(_rail(), false);
     await tester.pumpAndSettle();
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     await closeView(tester, d);
   }, variant: _mac);
 
@@ -631,7 +631,7 @@ void main() {
       width: windowFor(1100, sidebar: false),
       open: _openOf([ChatPanes.preview]),
     );
-    final preview = tester.getRect(find.byType(PreviewPane));
+    final preview = tester.getRect(find.byType(FileView));
     d.select('d');
     await tester.pump();
     await tester.pump();
@@ -643,7 +643,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(_rail(), false);
-    expect(tester.getRect(find.byType(PreviewPane)), preview);
+    expect(tester.getRect(find.byType(FileView)), preview);
     await closeView(tester, d);
   }, variant: _mac);
 }

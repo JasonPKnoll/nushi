@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/controls.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/menu.dart';
 import 'package:nushi/palette.dart';
-import 'package:nushi/preview_pane.dart';
-import 'package:nushi/preview_tabs.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/source_editor.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -348,7 +348,7 @@ void main() {
       await mouse.moveTo(
         tester.getCenter(
           find.descendant(
-            of: find.byType(PreviewTabs),
+            of: find.byType(PaneTabs),
             matching: find.text('main.go'),
           ),
         ),
@@ -457,7 +457,7 @@ void main() {
       await untilReal(tester, () => e.highlighted);
       await tester.pumpAndSettle();
       await expectLater(
-        find.byType(PreviewPane),
+        find.byType(FileView),
         matchesGoldenFile('goldens/file_edit_conflict_${brightness.name}.png'),
       );
       for (final width in [1700.0, 720.0]) {

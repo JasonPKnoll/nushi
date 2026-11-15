@@ -15,13 +15,13 @@ import 'package:nushi/chat_panes.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/controls.dart' show MenuField;
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
-import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/slides.dart';
@@ -108,7 +108,7 @@ final List<_Kind> _kinds = [
     name: '3 files',
     open: _open(previews: 3),
     specs: [ChatPanes.preview],
-    types: [PreviewPane],
+    types: [FileView],
   ),
   (
     name: '2 browser tabs',
@@ -278,13 +278,13 @@ void main() {
             );
             // The preview's tabs in its top row; the address and the path
             // under it.
-            if (kind.types.contains(PreviewPane) ||
+            if (kind.types.contains(FileView) ||
                 kind.types.contains(BrowserPane)) {
               final pane = find.byType(kind.types.last);
               final row = _rect(tester, _topRow(pane));
               final tabs = find.descendant(
                 of: pane,
-                matching: find.byType(PreviewTabs),
+                matching: find.byType(PaneTabs),
               );
               // Each kind here has two tabs or more, or a browser's.
               expect(tabs, findsOneWidget);
@@ -504,7 +504,7 @@ void main() {
     expect(tester.takeException(), isNull);
     final area = _rect(tester, find.byType(Pane));
     final panes = [
-      for (final t in [SideChat, FilesPane, PreviewPane])
+      for (final t in [SideChat, FilesPane, FileView])
         _rect(tester, find.byType(t)),
     ];
     expect(panes.first.left, area.left);

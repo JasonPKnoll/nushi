@@ -11,6 +11,7 @@ import 'package:nushi/chat_header.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/markdown.dart' show openWebOutside;
@@ -18,7 +19,6 @@ import 'package:nushi/native.dart';
 import 'package:nushi/outside_page.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/preview_entry.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_view.dart';
@@ -116,21 +116,21 @@ void main() {
     d.chats['c']!.openPreview('site/index.html');
     await tester.pumpAndSettle();
     expect(opened, isEmpty); // shown, not opened
-    expect(_in<PreviewPane>(find.text('index.html')), findsWidgets);
-    expect(_in<PreviewPane>(find.text(outsideNote)), findsOneWidget);
-    expect(_in<PreviewPane>(find.byTooltip('Reload')), findsNothing);
-    expect(_in<PreviewPane>(find.byTooltip('Open in browser')), findsOne);
+    expect(_in<FileView>(find.text('index.html')), findsWidgets);
+    expect(_in<FileView>(find.text(outsideNote)), findsOneWidget);
+    expect(_in<FileView>(find.byTooltip('Reload')), findsNothing);
+    expect(_in<FileView>(find.byTooltip('Open in browser')), findsOne);
     await render(tester, find.byType(NushiApp), 'outside_preview_1700');
     await tester.tap(_openButton);
     await tester.pumpAndSettle();
     expect(opened, [Uri.file('/Users/me/nushi/site/index.html')]);
-    await tester.tap(_in<PreviewPane>(find.byType(SourceButton)));
+    await tester.tap(_in<FileView>(find.byType(SourceButton)));
     await tester.pumpAndSettle();
     expect(
-      _in<PreviewPane>(find.textContaining('The Still Kettle')),
+      _in<FileView>(find.textContaining('The Still Kettle')),
       findsOneWidget,
     );
-    expect(_in<PreviewPane>(find.byType(SourceView)), findsOneWidget);
+    expect(_in<FileView>(find.byType(SourceView)), findsOneWidget);
     await closeView(tester, d);
   }, variant: linuxOnly);
 
@@ -143,7 +143,7 @@ void main() {
     d.chats['c']!.openPreview('site/index.html');
     await tester.pumpAndSettle();
     await render(tester, find.byType(NushiApp), 'outside_preview_rail_1700');
-    final pane = tester.getRect(find.byType(PreviewPane));
+    final pane = tester.getRect(find.byType(FileView));
     final rail = tester.getRect(find.byType(DetailsPanel));
     expect(pane.left, rail.right);
     expect(pane.right, tester.getRect(find.byType(Pane)).right);
@@ -174,7 +174,7 @@ void main() {
     d.chats['c']!.openPreview('site/index.html');
     await tester.pumpAndSettle();
     await render(tester, find.byType(NushiApp), 'outside_preview_720');
-    final pane = tester.getRect(find.byType(PreviewPane));
+    final pane = tester.getRect(find.byType(FileView));
     final button = tester.getRect(_openButton);
     expect(
       pane.contains(button.topLeft) && pane.contains(button.bottomRight),
@@ -208,7 +208,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(_in<PreviewPane>(find.byTooltip('Open in browser')));
+    await tester.tap(_in<FileView>(find.byTooltip('Open in browser')));
     await tester.pumpAndSettle();
     expect(find.textContaining('No default browser is set'), findsOneWidget);
     await closeView(tester, d);
@@ -220,7 +220,7 @@ void main() {
     final (_, d) = await _app(tester);
     d.chats['c']!.openPreview('docs/menu.pdf');
     await tester.pumpAndSettle();
-    expect(_in<PreviewPane>(find.text(outsideNote)), findsOneWidget);
+    expect(_in<FileView>(find.text(outsideNote)), findsOneWidget);
     expect(find.text('Open it on your Mac to see it.'), findsNothing);
     await tester.tap(_openButton);
     await tester.pumpAndSettle();
@@ -234,9 +234,9 @@ void main() {
     final (_, d) = await _app(tester);
     d.chats['c']!.openPreview('docs/flow.mmd');
     await tester.pumpAndSettle();
-    expect(_in<PreviewPane>(find.byType(SourceButton)), findsNothing);
-    expect(_in<PreviewPane>(find.textContaining('Plan --> Build')), findsOne);
-    expect(_in<PreviewPane>(find.byTooltip('Open in browser')), findsNothing);
+    expect(_in<FileView>(find.byType(SourceButton)), findsNothing);
+    expect(_in<FileView>(find.textContaining('Plan --> Build')), findsOne);
+    expect(_in<FileView>(find.byTooltip('Open in browser')), findsNothing);
     await closeView(tester, d);
   }, variant: linuxOnly);
 

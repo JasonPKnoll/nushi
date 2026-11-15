@@ -14,13 +14,13 @@ import 'package:nushi/composer.dart';
 import 'package:nushi/composer_plus.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/message_actions.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/pickers.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/theme/theme.dart';
@@ -808,7 +808,7 @@ void main() {
           file: 'docs/login-report.md',
         );
         // The column's composer clear of the preview beside it.
-        final preview = tester.getRect(find.byType(PreviewPane));
+        final preview = tester.getRect(find.byType(FileView));
         expect(_box(tester).right, lessThan(preview.left));
         await render(
           tester,
