@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/settings.dart';
 import 'package:nushi/source_editor.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -236,6 +237,31 @@ void main() {
     expect(e.controller.selection.extent.offset, 2);
     await endEditor(tester, d);
   }, variant: onMac);
+
+  for (final (indent, size) in [('    ', 4), ('  ', 2)]) {
+    testWidgets('in a file indenting with $size spaces Tab steps $size, '
+        'whatever the tab size', (tester) async {
+      tabSize.value = 8;
+      final source = 'def brew(tea):\n${indent}pour(tea)\n\nend\n';
+      final (d, _) = await openEditor(
+        tester,
+        {'brew.py': utf8.encode(source)},
+        open: const ['brew.py'],
+      );
+      final e = editOf(d, 'brew.py');
+      expect(e.tabs, isFalse);
+      await tester.tap(find.byType(CodeEditor));
+      await tester.pump();
+      e.controller.selection = const CodeLineSelection.collapsed(
+        index: 2,
+        offset: 0,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(e.text.split('\n')[2], indent);
+      await endEditor(tester, d);
+    }, variant: onMac);
+  }
 
   testWidgets('a read-only file shows why', (tester) async {
     final (d, fake) = await openEditor(
