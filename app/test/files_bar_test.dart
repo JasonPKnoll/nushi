@@ -358,6 +358,7 @@ void main() {
       'Word wrap',
       'Indent guides',
       'Show whitespace',
+      'Scroll past end',
       'Tab size',
     ]);
     expect(_checked('Show file tree'), isTrue);
@@ -365,6 +366,7 @@ void main() {
     expect(_checked('Word wrap'), isTrue);
     expect(_checked('Indent guides'), isTrue);
     expect(_checked('Show whitespace'), isFalse);
+    expect(_checked('Scroll past end'), isFalse);
     expect(
       tester.widget<MenuItemButton>(_menuRow('Collapse all folders')).onPressed,
       isNull,
@@ -413,8 +415,8 @@ void main() {
     ('light', Tokens.light),
   ]) {
     testWidgets('the ⋯ open over the pane, $name', (tester) async {
-      viewport(tester, const Size(560, 440));
-      final (d, _) = await panesApp(tester, width: 560, height: 440);
+      final (d, _) = await panesApp(tester, width: 1700);
+      viewport(tester, const Size(560, 500));
       final c = d.chats['c']!;
       filesChats.value = {'c'};
       await tester.pumpWidget(
@@ -426,7 +428,7 @@ void main() {
               alignment: Alignment.topRight,
               child: SizedBox(
                 width: 520,
-                height: 440,
+                height: 500,
                 child: FilesPane(chat: c, daemon: d, onClose: () {}),
               ),
             ),

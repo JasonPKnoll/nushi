@@ -36,6 +36,7 @@ class SourceView extends StatefulWidget {
     this.wrap = true,
     this.tabSize = defaultTabSize,
     this.guides = false,
+    this.pastEnd = false,
   });
 
   final String text;
@@ -49,6 +50,10 @@ class SourceView extends StatefulWidget {
   /// Whether its indent guides are drawn (the Mac's Files pane's Indent
   /// guides).
   final bool guides;
+
+  /// Whether it scrolls on past its last line, to the top (the Mac's Files
+  /// pane's Scroll past end).
+  final bool pastEnd;
 
   @override
   State<SourceView> createState() => _SourceViewState();
@@ -264,38 +269,54 @@ class _SourceViewState extends State<SourceView> {
     int level(int i) => widget.guides
         ? (_levels ??= indentLevels(_lines, widget.tabSize))[i]
         : 0;
+    // Scrolled past the end, the last line can come to the top.
+    EdgeInsets padded(double viewport) {
+      final pad = widget.padding ?? EdgeInsets.zero;
+      if (!widget.pastEnd) return pad;
+      return pad.copyWith(
+        bottom: pastEndPadding(
+          viewport,
+          _lineHeight,
+          top: pad.top,
+          bottom: pad.bottom,
+        ),
+      );
+    }
+
     if (widget.wrap) {
       return SelectionArea(
         child: SelectionContainer(
           delegate: _wholeWrapped,
-          child: ListView.builder(
-            key: _wrapped,
-            controller: _down,
-            padding: widget.padding,
-            itemCount: _lines.length,
-            itemBuilder: (context, i) => Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SelectionContainer.disabled(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 14),
-                    child: Text(number(i), style: gutter),
-                  ),
-                ),
-                Expanded(
-                  child: _Line(
-                    Text.rich(
-                      text(i),
-                      strutStyle: strut,
-                      selectionColor: Colors.transparent,
+          child: LayoutBuilder(
+            builder: (context, box) => ListView.builder(
+              key: _wrapped,
+              controller: _down,
+              padding: padded(box.maxHeight),
+              itemCount: _lines.length,
+              itemBuilder: (context, i) => Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SelectionContainer.disabled(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Text(number(i), style: gutter),
                     ),
-                    whole: _lines[i],
-                    column: char,
-                    level: level(i),
-                    step: step,
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: _Line(
+                      Text.rich(
+                        text(i),
+                        strutStyle: strut,
+                        selectionColor: Colors.transparent,
+                      ),
+                      whole: _lines[i],
+                      column: char,
+                      level: level(i),
+                      step: step,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -330,7 +351,7 @@ class _SourceViewState extends State<SourceView> {
                       controller: _down,
                       padding: EdgeInsets.only(
                         top: pad.top,
-                        bottom: pad.bottom,
+                        bottom: padded(box.maxHeight).bottom,
                       ),
                       itemExtent: _lineHeight,
                       itemCount: _lines.length,

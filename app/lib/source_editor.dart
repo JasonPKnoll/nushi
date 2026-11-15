@@ -151,53 +151,77 @@ class _SourceEditorState extends State<SourceEditor> {
     final t = theme.t;
     final code = theme.code(t.text, size: 12);
     final gutter = theme.code(t.textMuted, size: 12);
+    // A line as re_editor draws it (no text scaling): Scroll past end's
+    // room under the last one.
+    final line = (TextPainter(
+      text: TextSpan(text: '0', style: code),
+      textDirection: TextDirection.ltr,
+    )..layout());
+    final lineHeight = line.height;
+    line.dispose();
     final editor = ListenableBuilder(
-      listenable: Listenable.merge([widget.edit, _find.roomAbove]),
-      builder: (context, _) => CodeEditor(
-        controller: widget.edit.controller,
-        findController: _find.marking,
-        focusNode: _focus,
-        scrollController: _scroll,
-        readOnly: widget.edit.readOnly != null,
-        wordWrap: widget.wrap,
-        autocompleteSymbols: false,
-        chunkAnalyzer: const NonCodeChunkAnalyzer(),
-        shortcutsActivatorsBuilder: const _EditorKeys(),
-        shortcutOverrideActions: widget.edit.tabs ? _tabActions : null,
-        padding: EdgeInsets.only(
-          left: 14,
-          top:
-              widget.padding.top + (_find.roomAbove.value ? FindBar.height : 0),
-          right: widget.padding.right,
-          bottom: widget.padding.bottom,
-        ),
-        style: CodeEditorStyle(
-          fontFamily: code.fontFamily,
-          fontFamilyFallback: code.fontFamilyFallback,
-          fontSize: code.fontSize,
-          fontHeight: code.height,
-          textColor: t.text,
-          backgroundColor: t.base,
-          selectionColor: DefaultSelectionStyle.of(context).selectionColor,
-          cursorColor: t.text,
-          cursorWidth: 1.5,
-          cursorLineColor: t.base,
-          // A find's matches; the current one is the selection, as the
-          // transcript's (TextMarks) are.
-          highlightColor: t.needs.withValues(alpha: 0.3),
-        ),
-        indicatorBuilder: (context, controller, chunks, notifier) {
-          _lines.follow(notifier);
-          return Padding(
-            key: _gutter,
-            padding: EdgeInsets.only(left: widget.padding.left),
-            child: DefaultCodeLineNumber(
-              controller: controller,
-              notifier: notifier,
-              minNumberCount: 1,
-              textStyle: gutter,
-              focusedTextStyle: gutter.copyWith(color: t.textSecondary),
+      listenable: Listenable.merge([
+        widget.edit,
+        _find.roomAbove,
+        scrollPastEnd,
+      ]),
+      builder: (context, _) => LayoutBuilder(
+        builder: (context, box) {
+          final top =
+              widget.padding.top + (_find.roomAbove.value ? FindBar.height : 0);
+          return CodeEditor(
+            controller: widget.edit.controller,
+            findController: _find.marking,
+            focusNode: _focus,
+            scrollController: _scroll,
+            readOnly: widget.edit.readOnly != null,
+            wordWrap: widget.wrap,
+            autocompleteSymbols: false,
+            chunkAnalyzer: const NonCodeChunkAnalyzer(),
+            shortcutsActivatorsBuilder: const _EditorKeys(),
+            shortcutOverrideActions: widget.edit.tabs ? _tabActions : null,
+            padding: EdgeInsets.only(
+              left: 14,
+              top: top,
+              right: widget.padding.right,
+              bottom: scrollPastEnd.value
+                  ? pastEndPadding(
+                      box.maxHeight,
+                      lineHeight,
+                      top: top,
+                      bottom: widget.padding.bottom,
+                    )
+                  : widget.padding.bottom,
             ),
+            style: CodeEditorStyle(
+              fontFamily: code.fontFamily,
+              fontFamilyFallback: code.fontFamilyFallback,
+              fontSize: code.fontSize,
+              fontHeight: code.height,
+              textColor: t.text,
+              backgroundColor: t.base,
+              selectionColor: DefaultSelectionStyle.of(context).selectionColor,
+              cursorColor: t.text,
+              cursorWidth: 1.5,
+              cursorLineColor: t.base,
+              // A find's matches; the current one is the selection, as the
+              // transcript's (TextMarks) are.
+              highlightColor: t.needs.withValues(alpha: 0.3),
+            ),
+            indicatorBuilder: (context, controller, chunks, notifier) {
+              _lines.follow(notifier);
+              return Padding(
+                key: _gutter,
+                padding: EdgeInsets.only(left: widget.padding.left),
+                child: DefaultCodeLineNumber(
+                  controller: controller,
+                  notifier: notifier,
+                  minNumberCount: 1,
+                  textStyle: gutter,
+                  focusedTextStyle: gutter.copyWith(color: t.textSecondary),
+                ),
+              );
+            },
           );
         },
       ),

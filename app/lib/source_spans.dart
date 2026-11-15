@@ -10,6 +10,17 @@ import 'package:nushi/theme/theme.dart';
 /// for its source and its editor alike (ADR 0096).
 const defaultTabSize = 4;
 
+/// The room under a source's last line with Scroll past end on (Claude
+/// desktop's and VS Code's): scrolled to its end, the last line [line]
+/// high sits at the top of a [viewport] high view, under its [top] inset;
+/// never less than the [bottom] inset it has otherwise.
+double pastEndPadding(
+  double viewport,
+  double line, {
+  required double top,
+  required double bottom,
+}) => max(bottom, viewport - line - top);
+
 /// What one column of [style] advances: a character of the code font,
 /// which is monospaced, as [scaler] draws it.
 double columnWidth(TextStyle style, TextScaler scaler) {

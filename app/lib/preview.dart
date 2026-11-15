@@ -341,6 +341,7 @@ class PreviewBody extends StatelessWidget {
     this.readOnly,
     this.tabSize = defaultTabSize,
     this.guides = false,
+    this.pastEnd = false,
   });
 
   final FileWatch watch;
@@ -366,6 +367,9 @@ class PreviewBody extends StatelessWidget {
   /// Whether a source draws its indent guides: the Mac's setting; never on
   /// the phone.
   final bool guides;
+
+  /// Whether a source scrolls on past its last line: the Mac's setting.
+  final bool pastEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -447,6 +451,7 @@ class PreviewBody extends StatelessWidget {
                 wrap: wrap,
                 tabSize: tabSize,
                 guides: guides,
+                pastEnd: pastEnd,
               );
               final why = readOnly?.call();
               if (why == null || why.isEmpty) return view;

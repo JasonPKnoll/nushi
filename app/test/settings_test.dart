@@ -72,6 +72,7 @@ final _saved = <String, Object?>{
   'previewTabs': false,
   'tabSize': 8,
   'indentGuides': false,
+  'scrollPastEnd': true,
   'dismissedUpdate': '0.1.17',
   'fromANewerApp': {'kept': true},
   'worktrees': ['/a'],
@@ -125,6 +126,7 @@ List<ValueNotifier<Object?>> get _all => [
   previewTabs,
   tabSize,
   indentGuides,
+  scrollPastEnd,
   dismissedUpdate,
 ];
 
@@ -152,9 +154,10 @@ void main() {
     expect(previewTabs.value, isFalse);
     expect(tabSize.value, 8);
     expect(indentGuides.value, isFalse);
+    expect(scrollPastEnd.value, isTrue);
     // A built-in named by its id is the theme shown (ADR 0086).
     expect(colorTheme.value, 'tokyo-night');
-    expect(_all.map((p) => p.value), hasLength(46)); // each made
+    expect(_all.map((p) => p.value), hasLength(47)); // each made
     showDetails.value = true;
     await pumpEventQueue();
     expect(readSaved(), {

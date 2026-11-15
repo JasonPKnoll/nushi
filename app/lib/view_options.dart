@@ -87,12 +87,24 @@ final whitespaceOption = ViewToggle(
   paletteOff: 'Show whitespace in Files',
 );
 
+/// Scroll past end: a source scrolls on until its last line is at the top.
+final scrollPastEndOption = ViewToggle(
+  act: Act.scrollPastEnd,
+  pref: scrollPastEnd,
+  label: 'Scroll past end',
+  viewOn: 'Don’t Scroll Past End',
+  viewOff: 'Scroll Past End',
+  paletteOn: 'Don’t scroll past the end in Files',
+  paletteOff: 'Scroll past the end in Files',
+);
+
 /// The view options that are on or off, in the ⋯'s order.
 final List<ViewToggle> viewToggles = [
   previewTabsOption,
   wrapOption,
   indentGuidesOption,
   whitespaceOption,
+  scrollPastEndOption,
 ];
 
 /// Those of [viewToggles] about how a source shows, a group of the ⋯.

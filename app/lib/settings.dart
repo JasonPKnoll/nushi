@@ -20,7 +20,7 @@ import 'package:nushi/tile_picture.dart';
 /// changed files show flat and diffs unified, which chats show their
 /// terminals and their Files pane, whether it lists ignored files and
 /// shows its tree and on which side, whether its clicks open preview tabs,
-/// its tab size and indent guides, the
+/// its tab size, indent guides and scrolling past the end, the
 /// terminal's font, the app's and code's fonts, whether the chat takes the
 /// whole width,
 /// whether the sidebar is hidden, the Jira task list's groups and assignee
@@ -89,6 +89,11 @@ final Pref<bool> previewTabs = _plain('previewTabs', true);
 /// Whether the Files pane's source and editor draw indent guides (on at
 /// first, as Claude desktop's): a faint line down each indent level.
 final Pref<bool> indentGuides = _plain('indentGuides', true);
+
+/// Whether the Files pane's source and editor scroll on past their last
+/// line, until it's at the top (off at first), as Claude desktop's Scroll
+/// past end.
+final Pref<bool> scrollPastEnd = _plain('scrollPastEnd', false);
 
 /// The columns between tab stops in the Files pane's source and editor
 /// (ADR 0096): 2, 4 (at first) or 8, Claude desktop's Tab size. Anything

@@ -141,6 +141,7 @@ enum Act {
   wrap(shows: wrapKey, menu: ActMenu.view, menuLabel: 'Wrap Lines'),
   indentGuides(menu: ActMenu.view, menuLabel: 'Show Indent Guides'),
   whitespace(menu: ActMenu.view, menuLabel: 'Show Whitespace'),
+  scrollPastEnd(menu: ActMenu.view, menuLabel: 'Scroll Past End'),
   // View › Tab Size's submenu, its values' rows.
   tabSize2(menu: ActMenu.view, menuLabel: 'Tab Size'),
   tabSize4,
