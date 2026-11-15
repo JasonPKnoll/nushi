@@ -104,8 +104,8 @@ void main() {
 
         // Named for the sidebar and the platform too, so neither run
         // writes over another's.
-        final named =
-            '${sidebar ? 'sidebar' : 'nosidebar'}_${defaultTargetPlatform.name}';
+        final shown = sidebar ? 'sidebar' : 'nosidebar';
+        final named = '${shown}_${defaultTargetPlatform.name}';
 
         for (final (w, shows) in [
           (rail + 1, true),
