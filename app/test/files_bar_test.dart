@@ -271,20 +271,24 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('with Files closed, ⇧⌘Y opens it with its tree, from the '
-      'Changes tab too', (tester) async {
-    final (d, _) = await panesApp(tester, width: 1700, details: false);
-    final c = d.chats['c']!;
-    filesTree.value = false;
-    c.tab.value = ChatTab.changes;
-    await tester.pumpAndSettle();
-    await _treeKeys(tester);
-    expect(c.tab.value, ChatTab.chat);
-    expect(filesChats.value, {'c'});
-    expect(filesTree.value, isTrue);
-    expect(find.byType(FilesTree), findsOneWidget);
-    await closeView(tester, d);
-  }, variant: _both);
+  for (final was in [true, false]) {
+    testWidgets('with Files closed, ⇧⌘Y opens it with its tree, from the '
+        'Changes tab too, the tree’s pref $was before', (tester) async {
+      final (d, _) = await panesApp(tester, width: 1700, details: false);
+      final c = d.chats['c']!;
+      filesTree.value = was;
+      c.tab.value = ChatTab.changes;
+      await tester.pumpAndSettle();
+      await _treeKeys(tester);
+      expect(c.tab.value, ChatTab.chat);
+      expect(filesChats.value, {'c'});
+      // Set on, not flipped: on before, it stays on.
+      expect(filesTree.value, isTrue);
+      expect(readSaved()['filesTree'], isTrue);
+      expect(find.byType(FilesTree), findsOneWidget);
+      await closeView(tester, d);
+    }, variant: _both);
+  }
 
   testWidgets('hiding the tree lets Files come beside a window too narrow '
       'for it with its tree', (tester) async {
