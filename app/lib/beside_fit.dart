@@ -1,19 +1,25 @@
 import 'dart:math';
 
 /// A pane that can open beside a view: its [name] (its remembered
-/// width's), the width it opens at until dragged, and its least and most.
+/// width's), the width it opens at until dragged, its least and most, and
+/// whether it's [wide].
 class PaneSpec {
   const new(
     this.name, {
     required this.initial,
     required this.min,
     required this.cap,
+    this.wide = false,
   });
 
   final String name;
   final double initial;
   final double min;
   final double cap;
+
+  /// It's dragged as wide as it's wanted (a subagent's pane, the preview):
+  /// beside it the view keeps a smaller least (`chatFit`).
+  final bool wide;
 
   /// Its width as remembered in [widths] (`paneWidths`), or [initial],
   /// within its least and most.

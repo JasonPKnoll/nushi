@@ -34,12 +34,14 @@ abstract final class ChatPanes {
     initial: 264,
     min: 220,
     cap: double.infinity,
+    wide: true,
   );
   static const preview = PaneSpec(
     'preview',
     initial: 560,
     min: 300,
     cap: double.infinity,
+    wide: true,
   );
 }
 
@@ -70,10 +72,7 @@ BesideFit chatFit({
   required bool wantRail,
   Map<String, double> live = const {},
 }) {
-  final wide = panes.any(
-    (p) =>
-        p.name == ChatPanes.subagent.name || p.name == ChatPanes.preview.name,
-  );
+  final wide = panes.any((p) => p.wide);
   return besideFit(
     room: room,
     panes: panes,

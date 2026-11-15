@@ -83,8 +83,7 @@ const List<ThresholdRow> thresholdRows = [
   ),
 ];
 
-bool _wide(List<PaneSpec> panes) =>
-    panes.contains(_sub) || panes.contains(_preview);
+bool _wide(List<PaneSpec> panes) => panes.any((p) => p.wide);
 
 double _sum(List<PaneSpec> panes) => panes.fold(0.0, (w, p) => w + p.initial);
 

@@ -333,11 +333,8 @@ class _ChatAreaState extends State<ChatArea> {
             onExpand: () => _expanded.value = !_expanded.value,
           )
         : const <SidePane>[];
-    // Either is dragged as wide as it's wanted.
-    final wide = panes.any(
-      (p) =>
-          p.name == ChatPanes.subagent.name || p.name == ChatPanes.preview.name,
-    );
+    // One is dragged as wide as it's wanted (PaneSpec.wide).
+    final wide = panes.any((p) => p.wide);
     return Beside(
       scene: tab,
       head: head,

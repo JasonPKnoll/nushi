@@ -1,6 +1,8 @@
 import 'dart:math';
 
+import 'package:flutter/widgets.dart' show SizedBox;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/beside.dart' show SidePane;
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_panes.dart';
@@ -28,6 +30,16 @@ void main() {
     live: live,
     wantRail: wantRail,
   );
+
+  test('the panes dragged as wide as wanted say so on their spec', () {
+    expect(ChatPanes.subagent.wide, isTrue);
+    expect(ChatPanes.preview.wide, isTrue);
+    expect(ChatPanes.side.wide, isFalse);
+    expect(ChatPanes.files.wide, isFalse);
+    // A SidePane made of a spec carries it, which the chat area reads.
+    final pane = SidePane.of(ChatPanes.subagent, child: const SizedBox());
+    expect(pane.wide, isTrue);
+  });
 
   test('the thresholds, worked out from the constants, are the table', () {
     // A changed constant fails here loudly, not as a geometry test far off.

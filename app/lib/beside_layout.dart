@@ -13,7 +13,13 @@ class SidePane extends PaneSpec {
   /// One of [spec]'s sizes, showing [child].
   new of(PaneSpec spec, {required this.child})
     : fixed = false,
-      super(spec.name, initial: spec.initial, min: spec.min, cap: spec.cap);
+      super(
+        spec.name,
+        initial: spec.initial,
+        min: spec.min,
+        cap: spec.cap,
+        wide: spec.wide,
+      );
 
   /// A pane of one [width], with no edge to drag: the details panel
   /// (ADR 0092), which shows or hides only.
