@@ -20,6 +20,7 @@ import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/side_chat.dart';
+import 'package:nushi/slides.dart';
 import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/theme/theme.dart';
@@ -464,4 +465,28 @@ void main() {
     expect(tester.takeException(), isNull);
     await closeView(tester, d);
   }, variant: _mac);
+
+  testWidgets('a notice floats centred on the whole chat pane, under the '
+      "header's row, a pane open beside the chat (ADR 0123's known "
+      'overlap with its address row)', (tester) async {
+    browserFakes();
+    final (d, _) = await panesApp(tester, width: 1700, open: _open(browser: 1));
+    d
+      ..notice = 'Didn’t start Claude in site'
+      ..listChanged();
+    await tester.pumpAndSettle();
+    final bar = _rect(
+      tester,
+      find
+          .ancestor(
+            of: find.textContaining('start Claude in site'),
+            matching: find.byType(FloatBar),
+          )
+          .first,
+    );
+    final area = _rect(tester, find.byType(Pane));
+    expect(bar.center.dx, closeTo(area.center.dx, 1));
+    expect(bar.top, greaterThan(_rect(tester, find.byType(ChatHeader)).bottom));
+    await closeView(tester, d);
+  }, variant: _both);
 }
