@@ -334,9 +334,12 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
       shown?.shownTab == ChatTab.changes
           ? 'Find in changes'
           : 'Find in the chat',
+      // Not under a pane expanded over the transcript, where its bar
+      // would open unseen.
       enabled:
           shown != null &&
-          (shown.shownTab == ChatTab.chat || shown.shownTab == ChatTab.changes),
+          (shown.shownTab == ChatTab.chat && shown.covered == null ||
+              shown.shownTab == ChatTab.changes),
       run: () => shown!.shownTab == ChatTab.changes
           ? shown.changesFind.open()
           : shown.find.open(),

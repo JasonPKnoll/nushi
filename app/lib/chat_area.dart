@@ -64,9 +64,13 @@ class _ChatAreaState extends State<ChatArea> {
   /// Where ⌃` and the keys stay when what had the focus goes.
   final _keys = FocusNode(skipTraversal: true);
 
+  /// Tells its chat what covers it ([ChatState.covered]).
+  void _covered() => widget.chat.covered = _cover.value;
+
   @override
   void initState() {
     super.initState();
+    _cover.addListener(_covered);
     // A chat opens on the tab it was left on (ChatState.tab), but on its
     // transcript when it needs you: what it asks is there.
     if (widget.chat.phase == ChatPhase.waiting) _tab.value = ChatTab.chat;
@@ -120,6 +124,7 @@ class _ChatAreaState extends State<ChatArea> {
       widget.chat.panelFits = ChatState.fitsAlways;
     }
     _pull.unfollow();
+    if (widget.chat.covered == _cover.value) widget.chat.covered = null;
     _cover.dispose();
     _inFiles.dispose();
     typesThrough.remove(_keys);

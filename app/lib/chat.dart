@@ -445,6 +445,11 @@ class ChatState extends ChangeNotifier {
   /// null while it's closed. In the app's memory only.
   final serverLogs = ValueNotifier<ServerEntry?>(null);
 
+  /// The side pane expanded over its whole chat pane (ADR 0094, 0123), as
+  /// its chat area has it; null with none, or no area showing it. What
+  /// works on the transcript (its find) waits while one covers it.
+  String? covered;
+
   /// Shows [path] in its Files pane (ADR 0123), the one way a file opens:
   /// the pane opens on the Chat tab if it's closed, on the tab of the same
   /// file if it has one, however each is named ([relativeIn]), or a new one

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
+import 'package:nushi/chat_panes.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/editor_find.dart';
@@ -352,5 +353,40 @@ void main() {
     expect(_expand, findsOneWidget);
     expect(tester.getRect(find.byType(FilesPane)), beside);
     await endEditor(tester, d);
+  }, variant: macOnly);
+
+  testWidgets('⌘F under an expanded pane leaves the hidden transcript’s '
+      'find shut; collapsed, it opens', (tester) async {
+    final (d, _) = await panesApp(
+      tester,
+      width: 1700,
+      open: (
+        side: false,
+        files: true,
+        subagent: false,
+        command: false,
+        previews: 1,
+        browser: 0,
+      ),
+    );
+    final c = d.chats['c']!;
+    Future<void> find0() async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+    }
+
+    await _tap(tester, _expand);
+    expect(c.covered, ChatPanes.files.name);
+    await find0();
+    expect(c.find.query, isNull);
+    expect(_collapse, findsOneWidget);
+    await _tap(tester, _collapse);
+    expect(c.covered, isNull);
+    expect(c.find.query, isNull, reason: 'no bar left open');
+    await find0();
+    expect(c.find.query, '');
+    await closeView(tester, d);
   }, variant: macOnly);
 }
