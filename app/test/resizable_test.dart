@@ -80,6 +80,57 @@ void main() {
     await tester.pump(const Duration(seconds: 2)); // the width's saved
   });
 
+  testWidgets('narrowed for the chat, the rest take back what a pane '
+      'dragged narrower gives, as it is dragged (ADR 0123)', (tester) async {
+    // 920 less the chat's 360: Files keeps its 260, the preview gives 260.
+    tester.view.physicalSize = const Size(920, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: const NushiTheme(Tokens.dark).toThemeData(),
+        home: Beside(
+          main: const SizedBox.expand(key: Key('main')),
+          least: 360,
+          panes: [
+            SidePane(
+              'files',
+              initial: 260,
+              min: 200,
+              cap: 480,
+              child: const SizedBox.expand(key: Key('files body')),
+            ),
+            SidePane(
+              'preview',
+              initial: 560,
+              min: 300,
+              cap: double.infinity,
+              child: const SizedBox.expand(key: Key('pane')),
+            ),
+          ],
+        ),
+      ),
+    );
+    double of(String key) => tester.getSize(find.byKey(Key(key))).width;
+    expect([of('files body'), of('pane')], [260, 300]);
+    final drag = await tester.startGesture(
+      tester.getTopLeft(find.byKey(const Key('files body'))) +
+          const Offset(2, 100),
+    );
+    await drag.moveBy(const Offset(20, 0)); // the slop
+    await tester.pump();
+    await drag.moveBy(const Offset(40, 0));
+    await tester.pump();
+    // Mid-drag: the preview has the 40 back, the chat still its 360.
+    expect([of('files body'), of('pane')], [220, 340]);
+    expect(of('main'), 360);
+    await drag.up();
+    await tester.pump();
+    expect([of('files body'), of('pane')], [220, 340]);
+    expect(paneWidths.value, {'files': 220});
+    await tester.pump(const Duration(seconds: 2)); // the width's saved
+  });
+
   testWidgets('over the chat, a pane is at its least and its edge stops '
       'there', (tester) async {
     // 600 less the chat's 360 is under the pane's least: it lies over it.

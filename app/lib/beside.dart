@@ -129,9 +129,11 @@ class _BesideState extends State<Beside> {
   bool _drags(String name) =>
       name != widget.cover && widget.panes.any((p) => p.name == name);
 
-  /// The room as last laid out, and whether the rail showed in it.
+  /// The room as last laid out, whether the rail showed in it, and the
+  /// panes' widths ([besideFit]'s) in it.
   double _room = 0;
   bool _rail = false;
+  Map<String, double> _fitted = const {};
 
   /// Holds the focus while it's in the rail.
   final _railFocus = FocusNode(skipTraversal: true, canRequestFocus: false);
@@ -168,14 +170,21 @@ class _BesideState extends State<Beside> {
   );
 
   /// A pane's edge is dragged to [width] (null: let go): the rail shows or
-  /// tucks as the room it leaves says, and nothing else is built again.
+  /// tucks as the room it leaves says, and the rest, narrowed for the
+  /// transcript, take back what it gives (ADR 0123); otherwise nothing is
+  /// built again.
   void _dragged(String name, double? width) {
     if (width == null || !_drags(name)) {
       _live.remove(name);
     } else {
       _live[name] = width;
     }
-    if (mounted && _fit(_room).rail != _rail) setState(() {});
+    if (!mounted) return;
+    final fit = _fit(_room);
+    final moved = fit.widths.entries.any(
+      (e) => e.key != name && e.value != _fitted[e.key],
+    );
+    if (fit.rail != _rail || moved) setState(() {});
   }
 
   @override
@@ -186,6 +195,7 @@ class _BesideState extends State<Beside> {
         final room = _room = box.maxWidth;
         _live.removeWhere((name, _) => !_drags(name));
         final fit = _fit(room);
+        _fitted = fit.widths;
         final scene = widget.scene;
         final details = widget.details;
         final panes = widget.panes;
