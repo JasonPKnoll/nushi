@@ -1,0 +1,113 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/daemon.dart';
+import 'package:nushi/files_pane.dart';
+import 'package:nushi/settings.dart';
+import 'package:nushi/theme/theme.dart';
+
+import 'harness.dart';
+import 'panes_app.dart';
+
+// The Files pane squeezed (ADR 0123): in a narrow window the panes lie over
+// the transcript and narrow alike, well under their least, so the pane's
+// rows fold what they can't hold, and nothing overflows down to 100.
+
+const _both = TargetPlatformVariant({
+  TargetPlatform.macOS,
+  TargetPlatform.linux,
+});
+
+/// The errors reported while [body] runs, as text.
+Future<List<String>> _errors(Future<void> Function() body) async {
+  final errors = <String>[];
+  final was = FlutterError.onError;
+  FlutterError.onError = (d) => errors.add(d.toString());
+  try {
+    await body();
+  } finally {
+    FlutterError.onError = was;
+  }
+  return errors;
+}
+
+/// What [error] says went wrong, and where.
+String _what(String error) => error
+    .split('\n')
+    .where((l) => l.contains('overflowed') || l.contains('.dart:'))
+    .take(2)
+    .join(' ');
+
+/// [d]'s chat c's Files pane alone, [width] wide, with Expand.
+Future<void> _pane(WidgetTester tester, Daemon d, double width) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: const NushiTheme(Tokens.dark).toThemeData(),
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: width,
+            height: 500,
+            child: FilesPane(
+              chat: d.chats['c']!,
+              daemon: d,
+              onClose: () {},
+              onExpand: () {},
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// The files open in each case: none, one, two.
+const _opens = <List<String>>[
+  [],
+  ['PLAN.md'],
+  ['PLAN.md', 'NOTES.md'],
+];
+
+/// The tree as each case has it: on its side, or hidden.
+const _trees = <(bool, TreeSide)>[
+  (true, TreeSide.right),
+  (true, TreeSide.left),
+  (false, TreeSide.automatic),
+];
+
+/// Steps the pane from 500 down to 100 in each case, and gives the errors
+/// that name [file] (all of them without it).
+Future<List<String>> _sweep(WidgetTester tester, {String? file}) async {
+  final (d, _) = await panesApp(tester, width: 1700);
+  viewport(tester, const Size(600, 600));
+  final c = d.chats['c']!;
+  final found = <String>[];
+  for (final (shown, side) in _trees) {
+    for (final open in _opens) {
+      filesTree.value = shown;
+      filesTreeSide.value = side;
+      c.files.closeAll();
+      open.forEach(c.openInFiles);
+      for (var w = 500.0; w >= 100; w -= 10) {
+        final errors = await _errors(() => _pane(tester, d, w));
+        final at = 'tree $shown ${side.name}, ${open.length} open, $w';
+        found.addAll([
+          for (final e in errors)
+            if (file == null || e.contains(file)) '$at: ${_what(e)}',
+        ]);
+      }
+    }
+  }
+  filesTree.value = true;
+  filesTreeSide.value = TreeSide.automatic;
+  await closeView(tester, d);
+  return found;
+}
+
+void main() {
+  testWidgets('the top row folds, and never overflows', (tester) async {
+    expect(await _sweep(tester, file: 'files_top_row.dart'), isEmpty);
+  }, variant: _both);
+}

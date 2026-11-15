@@ -23,7 +23,9 @@ import 'package:nushi/widgets.dart' show Hover;
 /// ✕, or with two or more open their tabs ([PaneTabs], ADR 0070); Live
 /// while the daemon keeps the file current; at its right end Expand (while
 /// [onExpand] is given) and ×, which hides the pane and keeps its tabs
-/// ([PaneEndButtons]). With no file open, Files alone.
+/// ([PaneEndButtons]). With no file open, Files alone. Squeezed, the row
+/// folds from what stays ([_Fold]): Files goes first, then the kind's icon
+/// and Live, then the name, then Expand, so × always fits.
 class FilesTopRow extends StatelessWidget {
   const new({
     required this.chat,
@@ -49,12 +51,33 @@ class FilesTopRow extends StatelessWidget {
   final bool expanded;
   final VoidCallback? onExpand;
 
-  /// Under this the row has no room for its name beside the file's: the
-  /// file's name, or its tabs, alone.
-  static const _wordsFrom = 120.0;
-
   /// The room between Files and the file's name or tabs.
   static const _titleGap = 16.0;
+
+  /// The kind's icon and the gap after it.
+  static const double _kindRoom = 14 + 6;
+
+  /// The least the one file's name keeps: its ✕'s box.
+  static const double _nameLeast = _Name.closeBox;
+
+  /// The gap before the end's buttons.
+  static const _endGap = 8.0;
+
+  /// [text]'s width in [style], as a [Text] here draws it.
+  static double _width(BuildContext context, String text, TextStyle style) {
+    final p = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: DefaultTextStyle.of(context).style.merge(style),
+      ),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = p.width.ceilToDouble();
+    p.dispose();
+    return width;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,9 +107,23 @@ class FilesTopRow extends StatelessWidget {
                 watch.file == null &&
                 watch.error.isEmpty;
             final live = watch?.live ?? false;
+            final fold = _Fold(
+              room: box.maxWidth,
+              words: _width(context, 'Files', theme.ui(t.text)) + _titleGap,
+              marks:
+                  (shown == null ? 0 : _kindRoom) +
+                  (live || coming
+                      ? 8 +
+                            LiveMark.dot +
+                            LiveMark.gap +
+                            _width(context, 'Live', theme.ui(t.done, size: 12))
+                      : 0),
+              name: shown != null && open.length < 2 ? _nameLeast : 0,
+              ends: _endGap + (onExpand == null ? 1 : 2) * PaneEndButtons.box,
+            );
             return Row(
               children: [
-                if (box.maxWidth >= _wordsFrom) ...[
+                if (fold.words) ...[
                   tooltip(
                     context,
                     plainPath(chat.folder),
@@ -98,7 +135,7 @@ class FilesTopRow extends StatelessWidget {
                   ),
                   const SizedBox(width: _titleGap),
                 ],
-                if (shown != null) ...[
+                if (shown != null && fold.marks) ...[
                   // The shown file's kind, before its name or the tabs, so
                   // the first name stays put as a second file opens.
                   Icon(shown.kind.icon, size: 14, color: t.textSecondary),
@@ -107,6 +144,7 @@ class FilesTopRow extends StatelessWidget {
                 Expanded(
                   child: switch (shown) {
                     null => const SizedBox.shrink(),
+                    _ when !fold.name => const SizedBox.shrink(),
                     final shown when open.length > 1 => PaneTabs(
                       key: tabsKey,
                       chat: chat,
@@ -125,7 +163,7 @@ class FilesTopRow extends StatelessWidget {
                     ),
                   },
                 ),
-                if (live || coming)
+                if ((live || coming) && fold.marks)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: Visibility.maintain(
@@ -133,10 +171,10 @@ class FilesTopRow extends StatelessWidget {
                       child: LiveMark(version: watch?.file),
                     ),
                   ),
-                const SizedBox(width: 8),
+                if (fold.expand) const SizedBox(width: _endGap),
                 PaneEndButtons(
                   expanded: expanded,
-                  onExpand: onExpand,
+                  onExpand: fold.expand ? onExpand : null,
                   onClose: onClose,
                 ),
               ],
@@ -146,6 +184,30 @@ class FilesTopRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What a [FilesTopRow] of a room keeps, from what its parts need: Files'
+/// words, the kind's icon and Live (marks), the one file's name's
+/// least and the ends' buttons. Each folds in that order as the room
+/// goes, so the row never needs more than its × ([PaneEndButtons.box]).
+final class _Fold {
+  new({
+    required double room,
+    required double words,
+    required double marks,
+    required double name,
+    required double ends,
+  }) : words = room >= words + marks + name + ends,
+       marks = room >= marks + name + ends,
+       name = room >= name + ends,
+       expand = room >= ends;
+
+  final bool words;
+  final bool marks;
+  final bool name;
+
+  /// Expand and the gap before it; without it, × alone.
+  final bool expand;
 }
 
 /// The one open file's name, plain (in italics while its tab is
@@ -167,6 +229,9 @@ class _Name extends StatefulWidget {
   final ChatState chat;
   final String path;
   final String tooltip;
+
+  /// Its ✕'s box, which stays however little room it has.
+  static const closeBox = 18.0;
 
   @override
   State<_Name> createState() => _NameState();
@@ -229,7 +294,7 @@ class _NameState extends State<_Name> {
             ),
           ),
           SizedBox(
-            width: 18,
+            width: _Name.closeBox,
             child: EditedMark(
               chat: chat,
               path: path,

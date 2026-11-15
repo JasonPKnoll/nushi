@@ -46,6 +46,10 @@ class LiveMark extends StatefulWidget {
   final double size;
   final Object? version;
 
+  /// Its dot's side, and the gap between the dot and Live.
+  static const dot = 6.0;
+  static const gap = 5.0;
+
   @override
   State<LiveMark> createState() => _LiveMarkState();
 }
@@ -103,13 +107,13 @@ class _LiveMarkState extends State<LiveMark>
       'Updates as the file changes',
       Row(
         mainAxisSize: MainAxisSize.min,
-        spacing: 5,
+        spacing: LiveMark.gap,
         children: [
           ScaleTransition(
             scale: _grow,
             child: Container(
-              width: 6,
-              height: 6,
+              width: LiveMark.dot,
+              height: LiveMark.dot,
               decoration: BoxDecoration(color: t.done, shape: BoxShape.circle),
             ),
           ),
