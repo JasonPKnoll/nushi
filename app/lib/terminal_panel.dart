@@ -64,36 +64,58 @@ class TerminalButton extends StatelessWidget {
   );
 }
 
-/// A chat's view with its terminal panel under it while open, its height a
-/// draggable edge. ⌃` shows or hides the panel, which slides up and down.
-class TerminalArea extends StatefulWidget {
+/// ⌃` for a chat's area: [onToggle] shows or hides the terminal panel.
+/// [focus] is a node here that takes no Tab: what keeps the keys working
+/// when what had the focus goes (the panel hidden, the details rail tucked
+/// away; ADR 0123).
+class TerminalKeys extends StatelessWidget {
+  const new({
+    required this.focus,
+    required this.onToggle,
+    required this.child,
+    super.key,
+  });
+
+  final FocusNode focus;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => CallbackShortcuts(
+    bindings: {toggleTerminalKey: onToggle},
+    child: Focus(focusNode: focus, child: child),
+  );
+}
+
+/// Shows or hides [chat]'s terminal panel, none for an archived chat;
+/// hiding it takes the focus out of the panel, so [keep] takes it for ⌃`.
+void toggleTerminalOf(ChatState chat, FocusNode keep) {
+  if (chat.archived) return;
+  if (terminalChats.value.contains(chat.id)) keep.requestFocus();
+  toggleTerminal(chat.id);
+}
+
+/// A chat's terminal panel, under its view while open, its height a
+/// draggable edge; it slides up and down as it shows and hides.
+class TerminalFoot extends StatefulWidget {
   const new({
     required this.chat,
     required this.daemon,
     required this.onChanges,
-    required this.child,
+    required this.onHide,
     super.key,
   });
 
   final ChatState chat;
   final Daemon daemon;
   final VoidCallback onChanges; // shows the Changes view
-  final Widget child;
+  final VoidCallback onHide;
 
   @override
-  State<TerminalArea> createState() => _TerminalAreaState();
+  State<TerminalFoot> createState() => _TerminalFootState();
 }
 
-class _TerminalAreaState extends State<TerminalArea> {
-  final _focus = FocusNode(skipTraversal: true);
-
-  void _toggle() {
-    if (widget.chat.archived) return;
-    // Hiding takes the focus out of the panel; keep it here for ⌃`.
-    if (terminalChats.value.contains(widget.chat.id)) _focus.requestFocus();
-    toggleTerminal(widget.chat.id);
-  }
-
+class _TerminalFootState extends State<TerminalFoot> {
   // A file the Changes view lists (in Commits: what's uncommitted) shows
   // there.
   Future<bool> _showChange(String path) async {
@@ -114,50 +136,33 @@ class _TerminalAreaState extends State<TerminalArea> {
   }
 
   @override
-  void dispose() {
-    _focus.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-    bindings: {toggleTerminalKey: _toggle},
-    child: Focus(
-      focusNode: _focus,
-      child: ValueListenableBuilder(
-        valueListenable: terminalChats,
-        builder: (context, open, _) => LayoutBuilder(
-          builder: (context, box) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: widget.child),
-              // It slides up as it shows and down as it hides, laid out at
-              // its own height throughout: its terminal's size (the PTY's)
-              // changes once, not every frame. The chat above gets shorter
-              // as it rises, which costs only its viewport.
-              BarSlide(
-                down: false,
-                fade: false,
-                enter: Motion.enter,
-                child: open.contains(widget.chat.id) && !widget.chat.archived
-                    ? Resizable(
-                        name: 'terminal',
-                        initial: 260,
-                        min: 100,
-                        max: box.maxHeight - 160,
-                        top: true,
-                        child: TerminalPanel(
-                          chatId: widget.chat.id,
-                          terms: widget.daemon.terminals,
-                          onHide: _toggle,
-                          showChange: _showChange,
-                        ),
-                      )
-                    : null,
-              ),
-            ],
-          ),
-        ),
+  Widget build(BuildContext context) => ValueListenableBuilder(
+    valueListenable: terminalChats,
+    // As high as it's let be, less room for the view over it.
+    builder: (context, open, _) => LayoutBuilder(
+      // It slides up as it shows and down as it hides, laid out at its own
+      // height throughout: its terminal's size (the PTY's) changes once,
+      // not every frame. The chat above gets shorter as it rises, which
+      // costs only its viewport.
+      builder: (context, box) => BarSlide(
+        down: false,
+        fade: false,
+        enter: Motion.enter,
+        child: open.contains(widget.chat.id) && !widget.chat.archived
+            ? Resizable(
+                name: 'terminal',
+                initial: 260,
+                min: 100,
+                max: box.maxHeight - 160,
+                top: true,
+                child: TerminalPanel(
+                  chatId: widget.chat.id,
+                  terms: widget.daemon.terminals,
+                  onHide: widget.onHide,
+                  showChange: _showChange,
+                ),
+              )
+            : null,
       ),
     ),
   );

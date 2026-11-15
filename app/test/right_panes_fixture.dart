@@ -3,6 +3,8 @@ import 'package:nushi/chat_panes.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/details_panel.dart';
 
+export 'panes_app.dart';
+
 /// A set of panes open beside a chat, and where its room (the chat area,
 /// A) holds the details rail beside them and holds them beside the
 /// transcript, at their default widths (ADR 0123's table). The numbers are

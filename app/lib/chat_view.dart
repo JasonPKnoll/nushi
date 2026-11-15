@@ -4,51 +4,32 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nushi/attached_files.dart';
-import 'package:nushi/background_commands.dart';
-import 'package:nushi/beside.dart';
-import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_column.dart';
 import 'package:nushi/chat_menu.dart';
-import 'package:nushi/chat_panes.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/composer_parts.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/details_panel.dart';
-import 'package:nushi/edit_bars.dart';
-import 'package:nushi/files_pane.dart';
-import 'package:nushi/folder_tree.dart';
-import 'package:nushi/fork_chat.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/github_link_chip.dart';
 import 'package:nushi/github_view.dart' show showItem;
 import 'package:nushi/new_chat.dart';
-import 'package:nushi/preview.dart';
-import 'package:nushi/preview_entry.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/review_cards.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/side_chat.dart';
-import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/transcript.dart';
 import 'package:nushi/transcript_find.dart';
 import 'package:nushi/turn_status.dart';
 import 'package:nushi/widgets.dart';
 
-/// A chat's transcript with the composer under it, and beside them its
-/// side chat, a subagent's pane and [details], each when open. Escape
-/// stops a running turn. What's being written, and the side chat, belong
-/// to the chat (its draft and side), so they outlive the view.
+/// A chat's transcript with the composer under it, and its find bar.
+/// Escape stops a running turn. What's being written belongs to the chat
+/// (its draft), so it outlives the view. The panes beside it, its details
+/// and its terminal are the chat area's (`ChatArea`, ADR 0123).
 class ChatView extends StatefulWidget {
-  const new({
-    required this.chat,
-    required this.daemon,
-    super.key,
-    this.details,
-    this.onPull,
-  });
+  const new({required this.chat, required this.daemon, super.key, this.onPull});
 
   final ChatState chat;
   final Daemon daemon;
@@ -56,20 +37,18 @@ class ChatView extends StatefulWidget {
   /// Opens the chat's Pull request tab.
   final VoidCallback? onPull;
 
-  /// The chat's details, at the transcript's right while they show.
-  final Widget? details;
-
-  /// The narrowest the transcript gets beside a panel.
+  /// The narrowest the transcript gets beside a pane alone (the side chat,
+  /// the Files pane): narrower, they lie over it.
   static const minWidth = 556.0;
 
   /// The narrowest the transcript gets beside the details panel: the
   /// window that held the old 264-point panel beside [minWidth] still
   /// holds the 320-point one (ADR 0092), with the window's margins now
-  /// around the pane (ADR 0111).
+  /// around the pane (ADR 0111). Narrower, the panel hides.
   static const leastBesideDetails = 484.0;
 
   /// The narrowest the transcript gets beside a pane dragged as wide as
-  /// it's wanted (a subagent's, or the preview).
+  /// it's wanted (a subagent's, or the preview), with the details or not.
   static const leastBesideWide = 360.0;
 
   @override
@@ -78,16 +57,6 @@ class ChatView extends StatefulWidget {
 
 class _ChatViewState extends State<ChatView> {
   bool _dragging = false; // files are dragged over the chat
-
-  /// The preview's tabs: each file's view is made again as it shows, and
-  /// the row moves to the new one with its place kept.
-  final GlobalKey<State> _previewTabs = GlobalKey();
-
-  /// Whether the browser tab showing takes the whole area, over the
-  /// transcript (its Expand, ADR 0094). It lasts while a browser tab shows:
-  /// a file's tab, the browser hidden, another chat or the Changes tab
-  /// (this view gone) put it back.
-  bool _expanded = false;
 
   Future<void> _ask(String selection) =>
       askAside(context, widget.daemon, widget.chat, selection);
@@ -213,133 +182,7 @@ class _ChatViewState extends State<ChatView> {
         ),
       ),
     );
-    return Previews(
-      open: chat.openPreview,
-      browse: (url) => chat.openBrowserTab('$url'),
-      browseFits: () => chat.previewFits(),
-      current: chat.preview,
-      name: (path) => relativeIn(chat.folder, path),
-      child: ListenableBuilder(
-        listenable: Listenable.merge([
-          chat.pane,
-          chat.preview,
-          chat.side,
-          chat.sideHidden,
-          filesChats,
-        ]),
-        builder: (context, _) => _beside(transcript),
-      ),
-    );
-  }
-
-  /// The transcript, and beside it, left to right: the side chat, a
-  /// subagent's or background command's pane (or a file's preview in its
-  /// place), and [ChatView.details], each when open, at its own remembered
-  /// width, each closed on its own; each slides in and out ([Beside]).
-  Widget _beside(Widget transcript) {
-    final chat = widget.chat;
-    final side = chat.archived || chat.sideHidden.value
-        ? null
-        : chat.side.value;
-    final id = chat.pane.value;
-    final preview = id == null ? chat.preview.value : null;
-    if (preview is! BrowserTab) _expanded = false;
-    final files = filesOpen(chat) && widget.daemon.daemonApi >= filesApi;
-    // Either is dragged as wide as it's wanted.
-    final wide = id != null || preview != null;
-    final details = widget.details;
-    return Beside(
-      main: transcript,
-      // The text's column glides as a pane opens or closes beside it.
-      columnSides: (width) => chatSides(context, width),
-      // Beside the details it keeps less, so the panes lie over it where
-      // they did by the 264-point panel (ADR 0092).
-      least: wide
-          ? ChatView.leastBesideWide
-          : details != null
-          ? ChatView.leastBesideDetails
-          : ChatView.minWidth,
-      cover: _expanded ? 'preview' : null,
-      panes: [
-        if (side != null)
-          SidePane.of(
-            ChatPanes.side,
-            child: SideChat(
-              key: ValueKey(side.id),
-              side: side,
-              daemon: widget.daemon,
-              onHide: () => chat.sideHidden.value = true,
-              onClose: () => unawaited(endSide(context, widget.daemon, chat)),
-              onKeep: () => unawaited(keepSide(context, widget.daemon, chat)),
-            ),
-          ),
-        if (files)
-          SidePane.of(
-            ChatPanes.files,
-            child: FilesPane(
-              chat: chat,
-              daemon: widget.daemon,
-              onClose: () => toggleFiles(chat),
-            ),
-          ),
-        if (id != null) SidePane.of(ChatPanes.subagent, child: _pane(id)),
-        if (preview != null)
-          SidePane.of(
-            ChatPanes.preview,
-            child: switch (preview) {
-              PreviewFile(:final path) => PreviewPane(
-                key: ValueKey(path),
-                chat: chat,
-                daemon: widget.daemon,
-                path: path,
-                tabsKey: _previewTabs,
-                onClose: () => unawaited(closePreviewSaving(context, chat)),
-              ),
-              final BrowserTab tab => BrowserPane(
-                key: ObjectKey(tab),
-                chat: chat,
-                tab: tab,
-                daemon: widget.daemon,
-                tabsKey: _previewTabs,
-                onClose: () => unawaited(closePreviewSaving(context, chat)),
-                expanded: _expanded,
-                onExpand: () => setState(() => _expanded = !_expanded),
-              ),
-            },
-          ),
-      ],
-      details: details == null
-          ? null
-          : SidePane.fixed(
-              'details',
-              width: DetailsPanel.width,
-              child: details,
-            ),
-    );
-  }
-
-  /// A subagent's or background command's pane.
-  Widget _pane(String id) {
-    final chat = widget.chat;
-    void onClose() => chat.pane.value = null;
-    // Keyed: another subagent's pane is its own, its unsent text too.
-    return chat.withRunning.any(
-          (it) => it.id == id && it.hasBackgroundCommand(),
-        )
-        ? BackgroundCommandPane(
-            key: ValueKey(id),
-            chat: chat,
-            daemon: widget.daemon,
-            id: id,
-            onClose: onClose,
-          )
-        : SubagentPane(
-            key: ValueKey(id),
-            chat: chat,
-            daemon: widget.daemon,
-            id: id,
-            onClose: onClose,
-          );
+    return transcript;
   }
 }
 

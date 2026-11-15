@@ -178,6 +178,7 @@ class Previews extends InheritedWidget {
   @override
   bool updateShouldNotify(Previews oldWidget) =>
       (oldWidget.open == null) != (open == null) ||
+      (oldWidget.browse == null) != (browse == null) ||
       oldWidget.current != current;
 }
 

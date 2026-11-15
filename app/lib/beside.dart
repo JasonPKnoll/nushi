@@ -38,9 +38,11 @@ class SidePane extends PaneSpec {
 
 /// [main] with [panes] beside it, left to right, and [details] at the
 /// right, each resizable but a [SidePane.fixed] one, which has a hairline
-/// at its left instead of an edge to drag. When [main] would get narrower
-/// than [least], the panes lie over it, by the details, rather than beside
-/// it: the details stay, and so does [main]'s width under the panes.
+/// at its left instead of an edge to drag; [head] over all of them,
+/// [PaneHeader.height] high, and [foot] under them (the chat's header and
+/// its terminal). When [main] would get narrower than [least], the panes
+/// lie over it, by the details, rather than beside it: the details stay,
+/// and so does [main]'s width under the panes.
 ///
 /// A pane slides its full width in from the right as it opens and out as
 /// it closes ([Presence], [paneSlide]); one closing keeps its place until
@@ -50,6 +52,10 @@ class SidePane extends PaneSpec {
 /// where that text's column lies in it (the chat's); so do the
 /// panes that stay but move (the side chat, as the preview right of it
 /// closes), and so does [main] as the sidebar comes and goes.
+///
+/// A new [scene] (another of the chat's tabs) is a new set of [main], its
+/// panes and details: they're there at once, with no slide, while [head]
+/// and [foot] stay the same widgets (a terminal keeps its shell).
 ///
 /// The pane named [cover] takes the whole of it, over the rest (an expanded
 /// browser tab, ADR 0094): they stay laid out where they were, keeping
@@ -61,17 +67,23 @@ class Beside extends StatefulWidget {
     required this.least,
     required this.panes,
     super.key,
+    this.head,
+    this.foot,
     this.details,
     this.columnSides,
     this.cover,
+    this.scene,
   });
 
   final Widget main;
+  final Widget? head;
+  final Widget? foot;
   final double least;
   final List<SidePane> panes;
   final SidePane? details;
   final EdgeInsets Function(double width)? columnSides;
   final String? cover;
+  final Object? scene;
 
   @override
   State<Beside> createState() => _BesideState();
@@ -100,11 +112,25 @@ class _BesideState extends State<Beside> {
   final _tokens = <String, Object>{};
 
   @override
+  void didUpdateWidget(Beside old) {
+    super.didUpdateWidget(old);
+    if (widget.scene == old.scene) return;
+    // Another scene: what it shows is there at once, as at the first build.
+    _seen.clear();
+    _shown = {};
+    _tokens.clear();
+    _at.clear();
+    _widths.clear();
+    _built = false;
+  }
+
+  @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) => ValueListenableBuilder(
       valueListenable: paneWidths,
       builder: (context, _, _) {
         final room = box.maxWidth;
+        final scene = widget.scene;
         final details = widget.details;
         final panes = widget.panes;
         final detailsWidth = details?.width ?? 0;
@@ -157,7 +183,7 @@ class _BesideState extends State<Beside> {
                 child: p.child,
               );
         Widget pane(String slot, Widget? child) => LayoutId(
-          key: ValueKey(slot),
+          key: ValueKey((scene, slot)),
           id: slot,
           child: under(
             slot,
@@ -189,8 +215,22 @@ class _BesideState extends State<Beside> {
           child: child,
         );
         final children = [
+          // First in the tree, as they were above and below the rest: they
+          // never lie over what's after them.
+          if (widget.head case final head?)
+            LayoutId(
+              key: const ValueKey(_Slot.head),
+              id: _Slot.head,
+              child: head,
+            ),
+          if (widget.foot case final foot?)
+            LayoutId(
+              key: const ValueKey(_Slot.foot),
+              id: _Slot.foot,
+              child: foot,
+            ),
           LayoutId(
-            key: const ValueKey(_Slot.main),
+            key: ValueKey((scene, _Slot.main)),
             id: _Slot.main,
             child: under(
               '',
@@ -234,7 +274,7 @@ class _BesideState extends State<Beside> {
         // moves in the list.
         if (cover != null) {
           final top = children.indexWhere(
-            (c) => c.key == ValueKey<String>(cover),
+            (c) => c.key == ValueKey((scene, cover)),
           );
           children.add(children.removeAt(top));
         }
@@ -258,7 +298,7 @@ class _BesideState extends State<Beside> {
   );
 }
 
-enum _Slot { main }
+enum _Slot { main, head, foot }
 
 /// Lays the details at the right, the panes left of them, and the main
 /// view in what's left; when that would be under [least], it runs under
@@ -286,39 +326,58 @@ class _Beside extends MultiChildLayoutDelegate {
 
   @override
   void performLayout(Size size) {
+    final width = size.width;
+    final head = hasChild(_Slot.head) ? PaneHeader.height : 0.0;
+    if (head > 0) {
+      layoutChild(_Slot.head, BoxConstraints.tight(Size(width, head)));
+      positionChild(_Slot.head, Offset.zero);
+    }
+    var foot = 0.0;
+    if (hasChild(_Slot.foot)) {
+      foot = layoutChild(
+        _Slot.foot,
+        BoxConstraints(
+          minWidth: width,
+          maxWidth: width,
+          maxHeight: max(0, size.height - head),
+        ),
+      ).height;
+      positionChild(_Slot.foot, Offset(0, size.height - foot));
+    }
+    final height = max(0.0, size.height - head - foot);
     final tall = BoxConstraints(
-      maxWidth: size.width,
-      minHeight: size.height,
-      maxHeight: size.height,
+      maxWidth: width,
+      minHeight: height,
+      maxHeight: height,
     );
-    var right = size.width;
+    var right = width;
     if (details case final d?) {
       right -= layoutChild(d, tall).width;
-      positionChild(d, Offset(at[d] = right, 0));
+      positionChild(d, Offset(at[d] = right, head));
     }
     var x = right;
     for (final p in panes.reversed) {
       if (p == cover) {
         // It fills it all; the rest keep the room they had beside it, so
         // nothing under it is laid out anew.
-        layoutChild(p, BoxConstraints.tight(size));
-        positionChild(p, Offset.zero);
+        layoutChild(p, BoxConstraints.tight(Size(width, height)));
+        positionChild(p, Offset(0, head));
         x -= widths[p] ?? 0;
         continue;
       }
       x -= widths[p] = layoutChild(p, tall).width;
-      positionChild(p, Offset(at[p] = x, 0));
+      positionChild(p, Offset(at[p] = x, head));
     }
     final main = x >= least ? x : right;
     for (final g in going) {
       layoutChild(g, tall);
-      positionChild(g, Offset(at[g] ?? size.width, 0));
+      positionChild(g, Offset(at[g] ?? width, head));
     }
     layoutChild(
       _Slot.main,
-      BoxConstraints.tightFor(width: max(0, main), height: size.height),
+      BoxConstraints.tightFor(width: max(0, main), height: height),
     );
-    positionChild(_Slot.main, Offset.zero);
+    positionChild(_Slot.main, Offset(0, head));
   }
 
   @override

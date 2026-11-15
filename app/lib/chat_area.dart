@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:nushi/beside.dart';
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/changes_view.dart';
 import 'package:nushi/chat.dart';
+import 'package:nushi/chat_column.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_panes.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/panes.dart' show Pane;
+import 'package:nushi/preview.dart';
+import 'package:nushi/preview_entry.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_tab.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/terminal_panel.dart';
 
 /// A chat in the main area (ADR 0111): one pane of its header across all
-/// of it and, under that, its transcript, its
-/// folder's changes or its pull request, with the terminal below. Its
-/// details are inside the pane, a column at the transcript's right, so the
+/// of it and, under that, its transcript, its folder's changes or its pull
+/// request, with the terminal below. Beside the transcript are its side
+/// panes ([chatPanes]) and its details, a column at the right, so the
 /// header and its buttons are where they were whether the details show or
-/// not.
+/// not; they're all laid out by one [Beside] (ADR 0123), which keeps the
+/// header and the terminal as the tabs change.
 class ChatArea extends StatefulWidget {
   const new(this.chat, this.daemon, {super.key});
 
@@ -40,6 +45,19 @@ class _ChatAreaState extends State<ChatArea> {
   double _width = double.infinity;
   bool _panel = false;
 
+  /// The preview's tabs: each file's view is made again as it shows, and
+  /// the row moves to the new one with its place kept.
+  final GlobalKey<State> _previewTabs = GlobalKey();
+
+  /// Whether the browser tab showing takes the whole area, over the
+  /// transcript (its Expand, ADR 0094). It lasts while a browser tab shows
+  /// on the Chat tab: a file's tab, the browser hidden, a subagent's pane,
+  /// another chat (another area) or another tab put it back.
+  final _expanded = ValueNotifier<bool>(false);
+
+  /// Where ⌃` and the keys stay when what had the focus goes.
+  final _keys = FocusNode(skipTraversal: true);
+
   @override
   void initState() {
     super.initState();
@@ -48,8 +66,11 @@ class _ChatAreaState extends State<ChatArea> {
     if (widget.chat.phase == ChatPhase.waiting) _tab.value = ChatTab.chat;
     widget.chat.addListener(_showFile);
     widget.chat.preview.addListener(_showPreview);
+    widget.chat.preview.addListener(_collapse);
+    widget.chat.pane.addListener(_collapse);
     widget.chat.showAsked.addListener(_showAsked);
     _tab.addListener(_showAsked);
+    _tab.addListener(_collapse);
     // After this frame: the panes beside the transcript aren't built yet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _showAsked();
@@ -61,15 +82,34 @@ class _ChatAreaState extends State<ChatArea> {
   void dispose() {
     widget.chat.removeListener(_showFile);
     widget.chat.preview.removeListener(_showPreview);
+    widget.chat.preview.removeListener(_collapse);
+    widget.chat.pane.removeListener(_collapse);
     widget.chat.showAsked.removeListener(_showAsked);
     _tab.removeListener(_showAsked);
+    _tab.removeListener(_collapse);
     // Gone, it has no room to say; the chat shows nowhere until it's back.
     if (widget.chat.previewFits == _previewFits) {
       widget.chat.previewFits = ChatState.fitsAlways;
     }
     _pull.unfollow();
+    _expanded.dispose();
+    _keys.dispose();
     super.dispose();
   }
+
+  /// Whether a browser tab shows beside the transcript, so it can expand.
+  bool get _browsing =>
+      widget.chat.shownTab == ChatTab.chat &&
+      widget.chat.pane.value == null &&
+      widget.chat.preview.value is BrowserTab;
+
+  /// What shows is no longer a browser tab on the Chat tab: it's put back.
+  void _collapse() {
+    if (!_browsing) _expanded.value = false;
+  }
+
+  /// ⌃`: the terminal shows or hides.
+  void _toggleTerminal() => toggleTerminalOf(widget.chat, _keys);
 
   /// A file's preview opened (from Artifacts, or ⌘P) shows beside the chat.
   void _showPreview() {
@@ -121,73 +161,156 @@ class _ChatAreaState extends State<ChatArea> {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, box) => ListenableBuilder(
-      listenable: Listenable.merge([showDetails, _tab]),
-      builder: (context, _) {
-        final show = showDetails.value;
-        // The panel goes when the chat would get too narrow.
-        final fits =
-            box.maxWidth >= DetailsPanel.width + ChatView.leastBesideDetails;
-        widget.chat.panelFits = fits;
-        // The pull request's tab goes with its link.
-        final tab = widget.chat.shownTab;
-        final panel = show && fits && tab == ChatTab.chat;
-        _width = box.maxWidth;
-        _panel = panel;
-        widget.chat.previewFits = _previewFits;
-        final area = Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListenableBuilder(
-              listenable: widget.chat,
-              builder: (context, _) => ChatHeader(
-                widget.chat,
-                widget.daemon,
-                tab: widget.chat.shownTab,
-                onTab: (t) => _tab.value = t,
-                panel: panel,
-                onPanel: fits && tab == ChatTab.chat
-                    ? () => showDetails.value = !show
-                    : null,
-              ),
-            ),
-            Expanded(
-              child: TerminalArea(
-                chat: widget.chat,
+    builder: (context, box) {
+      _width = box.maxWidth;
+      final chat = widget.chat;
+      return Pane(
+        child: TerminalKeys(
+          focus: _keys,
+          onToggle: _toggleTerminal,
+          child: ListenableBuilder(
+            listenable: Listenable.merge([showDetails, _tab]),
+            builder: (context, _) {
+              final show = showDetails.value;
+              // The panel goes when the chat would get too narrow.
+              final fits =
+                  box.maxWidth >=
+                  DetailsPanel.width + ChatView.leastBesideDetails;
+              chat.panelFits = fits;
+              // The pull request's tab goes with its link.
+              final tab = chat.shownTab;
+              final onChat = tab == ChatTab.chat;
+              final panel = show && fits && onChat;
+              _panel = panel;
+              chat.previewFits = _previewFits;
+              // Made here, once a change of these, so a pane opening or
+              // closing doesn't build them again.
+              final head = ListenableBuilder(
+                listenable: chat,
+                builder: (context, _) => ChatHeader(
+                  chat,
+                  widget.daemon,
+                  tab: chat.shownTab,
+                  onTab: (t) => _tab.value = t,
+                  panel: panel,
+                  onPanel: fits && onChat
+                      ? () => showDetails.value = !show
+                      : null,
+                ),
+              );
+              final main = switch (tab) {
+                ChatTab.changes => ChangesView(
+                  chat: chat,
+                  daemon: widget.daemon,
+                ),
+                ChatTab.pull => PullTab(
+                  chat: chat,
+                  daemon: widget.daemon,
+                  onChat: () => _tab.value = ChatTab.chat,
+                ),
+                ChatTab.chat => ChatView(
+                  chat: chat,
+                  daemon: widget.daemon,
+                  onPull: () => _tab.value = ChatTab.pull,
+                ),
+              };
+              final foot = TerminalFoot(
+                chat: chat,
                 daemon: widget.daemon,
                 onChanges: () => _tab.value = ChatTab.changes,
-                child: switch (tab) {
-                  ChatTab.changes => ChangesView(
-                    chat: widget.chat,
-                    daemon: widget.daemon,
+                onHide: _toggleTerminal,
+              );
+              final details = panel
+                  ? SidePane.fixed(
+                      'details',
+                      width: DetailsPanel.width,
+                      child: DetailsPanel(
+                        // It follows the chat it was made for.
+                        key: ObjectKey(chat),
+                        chat: chat,
+                        daemon: widget.daemon,
+                        onChanges: () => _tab.value = ChatTab.changes,
+                        onPull: () => _tab.value = ChatTab.pull,
+                      ),
+                    )
+                  : null;
+              return Previews(
+                // Only the transcript's rows open a preview or a tab.
+                open: onChat ? chat.openPreview : null,
+                browse: onChat ? (url) => chat.openBrowserTab('$url') : null,
+                browseFits: () => chat.previewFits(),
+                current: chat.preview,
+                name: (path) => relativeIn(chat.folder, path),
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([
+                    chat.pane,
+                    chat.preview,
+                    chat.side,
+                    chat.sideHidden,
+                    filesChats,
+                    _expanded,
+                  ]),
+                  builder: (context, _) => _beside(
+                    context,
+                    tab: tab,
+                    head: head,
+                    main: main,
+                    foot: foot,
+                    details: details,
                   ),
-                  ChatTab.pull => PullTab(
-                    chat: widget.chat,
-                    daemon: widget.daemon,
-                    onChat: () => _tab.value = ChatTab.chat,
-                  ),
-                  ChatTab.chat => ChatView(
-                    chat: widget.chat,
-                    daemon: widget.daemon,
-                    onPull: () => _tab.value = ChatTab.pull,
-                    details: panel
-                        ? DetailsPanel(
-                            // It follows the chat it was made for.
-                            key: ObjectKey(widget.chat),
-                            chat: widget.chat,
-                            daemon: widget.daemon,
-                            onChanges: () => _tab.value = ChatTab.changes,
-                            onPull: () => _tab.value = ChatTab.pull,
-                          )
-                        : null,
-                  ),
-                },
-              ),
-            ),
-          ],
-        );
-        return Pane(child: area);
-      },
-    ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    },
   );
+
+  /// [main] with the chat's panes and [details] beside it (on the Chat
+  /// tab), [head] over them and [foot] under them.
+  Widget _beside(
+    BuildContext context, {
+    required ChatTab tab,
+    required Widget head,
+    required Widget main,
+    required Widget foot,
+    required SidePane? details,
+  }) {
+    final chat = widget.chat;
+    final onChat = tab == ChatTab.chat;
+    final panes = onChat
+        ? chatPanes(
+            context,
+            chat,
+            widget.daemon,
+            tabsKey: _previewTabs,
+            expanded: _expanded.value && _browsing,
+            onExpand: () => _expanded.value = !_expanded.value,
+          )
+        : const <SidePane>[];
+    // Either is dragged as wide as it's wanted.
+    final wide = panes.any(
+      (p) =>
+          p.name == ChatPanes.subagent.name || p.name == ChatPanes.preview.name,
+    );
+    return Beside(
+      scene: tab,
+      head: head,
+      main: main,
+      foot: foot,
+      // The text's column glides as a pane opens or closes beside it.
+      columnSides: onChat ? (width) => chatSides(context, width) : null,
+      // Beside the details it keeps less, so the panes lie over it where
+      // they did by the 264-point panel (ADR 0092).
+      least: wide
+          ? ChatView.leastBesideWide
+          : details != null
+          ? ChatView.leastBesideDetails
+          : ChatView.minWidth,
+      cover: _expanded.value && _browsing ? 'preview' : null,
+      panes: panes,
+      details: details,
+    );
+  }
 }

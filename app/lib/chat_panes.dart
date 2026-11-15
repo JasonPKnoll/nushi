@@ -1,10 +1,22 @@
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
+import 'package:nushi/background_commands.dart';
+import 'package:nushi/beside.dart';
 import 'package:nushi/beside_fit.dart';
+import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/edit_bars.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/folder_tree.dart' show filesApi;
+import 'package:nushi/fork_chat.dart';
+import 'package:nushi/preview_entry.dart';
+import 'package:nushi/preview_pane.dart';
+import 'package:nushi/side_chat.dart';
+import 'package:nushi/subagent_pane.dart';
 
 /// The panes that open beside a chat's transcript, left to right, each at
 /// the width it opens at until dragged and its least and most: the side
@@ -72,4 +84,85 @@ BesideFit chatFit({
     railLeast: wide ? ChatView.leastBesideWide : ChatView.leastBesideDetails,
     rail: DetailsPanel.width,
   );
+}
+
+/// The panes open beside [chat]'s transcript, left to right ([openPanes]),
+/// each at its own remembered width and closed on its own: the side chat,
+/// the Files pane, a subagent's or background command's pane (or a file's
+/// preview or a browser tab in its place). The preview's tabs row is
+/// [tabsKey]'s, so it outlives each file's view; a browser tab is
+/// [expanded] over all of it (ADR 0094) and [onExpand] toggles that.
+List<SidePane> chatPanes(
+  BuildContext context,
+  ChatState chat,
+  Daemon daemon, {
+  required GlobalKey tabsKey,
+  required bool expanded,
+  required VoidCallback onExpand,
+}) {
+  final side = chat.side.value;
+  final id = chat.pane.value;
+  return [
+    for (final spec in openPanes(chat, daemon))
+      SidePane.of(
+        spec,
+        child: switch (spec.name) {
+          'side' => SideChat(
+            key: ValueKey(side!.id),
+            side: side,
+            daemon: daemon,
+            onHide: () => chat.sideHidden.value = true,
+            onClose: () => unawaited(endSide(context, daemon, chat)),
+            onKeep: () => unawaited(keepSide(context, daemon, chat)),
+          ),
+          'files' => FilesPane(
+            chat: chat,
+            daemon: daemon,
+            onClose: () => toggleFiles(chat),
+          ),
+          'subagent' => _taskPane(chat, daemon, id!),
+          _ => switch (chat.preview.value!) {
+            PreviewFile(:final path) => PreviewPane(
+              key: ValueKey(path),
+              chat: chat,
+              daemon: daemon,
+              path: path,
+              tabsKey: tabsKey,
+              onClose: () => unawaited(closePreviewSaving(context, chat)),
+            ),
+            final BrowserTab tab => BrowserPane(
+              key: ObjectKey(tab),
+              chat: chat,
+              tab: tab,
+              daemon: daemon,
+              tabsKey: tabsKey,
+              onClose: () => unawaited(closePreviewSaving(context, chat)),
+              expanded: expanded,
+              onExpand: onExpand,
+            ),
+          },
+        },
+      ),
+  ];
+}
+
+/// A subagent's or background command's pane. Keyed: another subagent's
+/// pane is its own, its unsent text too.
+Widget _taskPane(ChatState chat, Daemon daemon, String id) {
+  void onClose() => chat.pane.value = null;
+  return chat.withRunning.any((it) => it.id == id && it.hasBackgroundCommand())
+      ? BackgroundCommandPane(
+          key: ValueKey(id),
+          chat: chat,
+          daemon: daemon,
+          id: id,
+          onClose: onClose,
+        )
+      : SubagentPane(
+          key: ValueKey(id),
+          chat: chat,
+          daemon: daemon,
+          id: id,
+          onClose: onClose,
+        );
 }

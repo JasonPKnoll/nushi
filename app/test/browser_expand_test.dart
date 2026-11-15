@@ -2,10 +2,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/browser_pane.dart';
-import 'package:nushi/chat_view.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/panes.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 
@@ -37,9 +37,16 @@ void main() {
     expect(find.byType(Composer), findsOneWidget);
     await tester.tap(_expand);
     await tester.pumpAndSettle();
+    // The chat area under its header (the terminal shut).
+    final pane = tester.getRect(find.byType(Pane));
     expect(
       tester.getRect(find.byType(BrowserPane)),
-      tester.getRect(find.byType(ChatView)),
+      Rect.fromLTRB(
+        pane.left,
+        pane.top + PaneHeader.height,
+        pane.right,
+        pane.bottom,
+      ),
     );
     // Hidden: not drawn, not reached.
     expect(find.byType(Composer), findsNothing);
