@@ -461,9 +461,10 @@ class ChatState extends ChangeNotifier {
     sawFile(path);
   }
 
-  /// Shows [entry], one of its file or browser tabs.
+  /// Shows [entry], one of its file or browser tabs: a click on its tab,
+  /// which doesn't keep a provisional one (a double click does, ADR 0070).
   void showTab(PreviewEntry entry) => switch (entry) {
-    PreviewFile(:final path) => openInFiles(path),
+    PreviewFile(:final path) => openInFiles(path, keep: false),
     final BrowserTab b => showBrowserTab(b),
   };
 

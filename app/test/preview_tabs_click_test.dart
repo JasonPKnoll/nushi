@@ -192,6 +192,42 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
+  testWidgets('one click on its tab shows it and leaves it provisional, '
+      'so the next click in the tree takes its place', (tester) async {
+    final (d, _) = await panesApp(
+      tester,
+      width: 1700,
+      details: false,
+      open: _files,
+    );
+    final c = d.chats['c']!
+      ..openInFiles('PLAN.md')
+      ..openInFiles('NOTES.md', keep: false);
+    await tester.pumpAndSettle();
+    const notes = PreviewFile('NOTES.md');
+    // Another tab, then back to it: a click on each, well apart.
+    await tester.tap(_top('PLAN.md'));
+    await tester.pump(_slow);
+    expect(c.files.shown.value, const PreviewFile('PLAN.md'));
+    await tester.tap(_top('NOTES.md'));
+    await tester.pump(_slow);
+    expect(c.files.shown.value, notes);
+    expect(c.files.provisional.value, notes);
+    expect(_italic(tester, 'NOTES.md'), isTrue);
+    // A click on it as it shows.
+    await tester.tap(_top('NOTES.md'));
+    await tester.pump(_slow);
+    expect(c.files.provisional.value, notes);
+    // The tree's next click takes its place.
+    await tester.tap(_row('README.md'));
+    await tester.pumpAndSettle();
+    expect(c.files.tabs.value, const [
+      PreviewFile('PLAN.md'),
+      PreviewFile('README.md'),
+    ]);
+    await closeView(tester, d);
+  }, variant: _mac);
+
   testWidgets('with Preview tabs off, every click keeps its tab', (
     tester,
   ) async {
