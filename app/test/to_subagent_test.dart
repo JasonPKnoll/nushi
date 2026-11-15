@@ -57,6 +57,9 @@ final _items = [
 ];
 
 void main() {
+  // The real fonts: the header beside a pane is sized for them.
+  setUpAll(loadFonts);
+
   testWidgets('a message for a subagent shows in its pane, with how the '
       'agent passed it on', (tester) async {
     viewport(tester, const Size(1400, 700));

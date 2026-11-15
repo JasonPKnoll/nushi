@@ -425,9 +425,14 @@ class Glide extends StatefulWidget {
     super.key,
     this.sides,
     this.clip = false,
+    this.scene,
   });
 
   final Object? token;
+
+  /// A change of it, with [token]'s, is a new scene (another of a chat's
+  /// tabs): it's drawn where it is at once.
+  final Object? scene;
   final EdgeInsets Function(double width)? sides;
   final bool clip;
   final Widget child;
@@ -448,7 +453,11 @@ class _GlideState extends State<Glide> with SingleTickerProviderStateMixin {
   @override
   void didUpdateWidget(Glide old) {
     super.didUpdateWidget(old);
-    if (widget.token == old.token || reduceMotion(context)) return;
+    if (widget.token == old.token ||
+        widget.scene != old.scene ||
+        reduceMotion(context)) {
+      return;
+    }
     _armed++;
     _run.forward(from: 0).ignore();
   }

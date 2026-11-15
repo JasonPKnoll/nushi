@@ -25,3 +25,5 @@ The owner wants to look at more than one file at a time. A first build (3b39a57,
 - A permanent side column of open files: rejected by the owner; it takes room from every view for a list that's usually one file.
 - A second row under the pane's title: it would change the pane's height with the number of files, moving what's under it.
 - An overflow menu for what doesn't fit: more controls in a thin row, for what scrolling already does.
+
+**Amendment (2026-11-15):** the preview pane runs the chat pane's full height, right of the details panel, so its title row with the tabs is level with the chat's header, the window's top row, not under it ([ADR 0123](0123-side-panes-right-of-the-rail.md)). Still one row.

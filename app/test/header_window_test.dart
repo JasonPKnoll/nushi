@@ -107,15 +107,26 @@ void main() {
       final header = tester.getRect(find.byType(ChatHeader));
       final menu = tester.getRect(find.byTooltip('Chat menu'));
       expect(menu.right, header.right - ChatHeader.end);
-      // The header is the main pane's top, the window's margin in,
-      // across the details too where they show: they're under it.
+      // The header is the main pane's top, the window's margin in, across
+      // the details too where they show: they're under it. The preview,
+      // beside them, ends it (ADR 0123); over the transcript, at 720, it's
+      // under it.
       final pane = tester.getRect(find.byType(Pane));
-      expect(header.right, pane.right);
       expect(pane.right, width - NushiTheme.windowPad);
+      final beside = preview && width > 720;
+      final right = beside
+          ? tester.getRect(find.byType(PreviewPane)).left
+          : pane.right;
+      expect(header.right, right);
+      if (preview) {
+        final shown = tester.getRect(find.byType(PreviewPane));
+        expect(shown.right, pane.right);
+        expect(shown.top, beside ? pane.top : header.bottom);
+      }
       if (find.byType(DetailsPanel).evaluate().isNotEmpty) {
         final details = tester.getRect(find.byType(DetailsPanel));
         expect(details.top, header.bottom);
-        expect(details.right, pane.right);
+        expect(details.right, right);
       }
       expect(header.top, NushiTheme.windowPad);
       expect(header.height, 56);

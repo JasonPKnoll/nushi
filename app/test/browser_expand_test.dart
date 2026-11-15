@@ -37,16 +37,10 @@ void main() {
     expect(find.byType(Composer), findsOneWidget);
     await tester.tap(_expand);
     await tester.pumpAndSettle();
-    // The chat area under its header (the terminal shut).
-    final pane = tester.getRect(find.byType(Pane));
+    // The whole chat area, its header and terminal too (ADR 0123).
     expect(
       tester.getRect(find.byType(BrowserPane)),
-      Rect.fromLTRB(
-        pane.left,
-        pane.top + PaneHeader.height,
-        pane.right,
-        pane.bottom,
-      ),
+      tester.getRect(find.byType(Pane)),
     );
     // Hidden: not drawn, not reached.
     expect(find.byType(Composer), findsNothing);

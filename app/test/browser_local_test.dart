@@ -8,12 +8,16 @@ import 'package:nushi/settings.dart';
 import 'package:nushi/web_page.dart' show PageNavigation;
 
 import 'browser_fixture.dart';
+import 'fake_daemon.dart' show loadFonts;
 import 'harness.dart';
 
 // A browser tab's block on this Mac and the local network (ADR 0094): which
 // hosts are local, the content rules WebKit gets, and where a page's own
 // navigation may go.
 void main() {
+  // The real fonts: the header beside a pane is sized for them.
+  setUpAll(loadFonts);
+
   test('local hosts: loopback, the private ranges, link-local, .local', () {
     for (final h in [
       'localhost',

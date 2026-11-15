@@ -9,58 +9,42 @@ import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
 
-/// A pane beside a view, as its [PaneSpec] says, and what it shows.
-class SidePane extends PaneSpec {
-  new(
-    super.name, {
-    required super.initial,
-    required super.min,
-    required super.cap,
-    required this.child,
-  }) : fixed = false;
+part 'beside_layout.dart';
 
-  /// One of [spec]'s sizes, showing [child].
-  new of(PaneSpec spec, {required this.child})
-    : fixed = false,
-      super(spec.name, initial: spec.initial, min: spec.min, cap: spec.cap);
-
-  /// A pane of one [width], with no edge to drag: the details panel
-  /// (ADR 0092), which shows or hides only.
-  new fixed(super.name, {required double width, required this.child})
-    : fixed = true,
-      super(initial: width, min: width, cap: width);
-
-  final bool fixed;
-  final Widget child;
-
-  double get width => fixed ? initial : saved(paneWidths.value);
-}
-
-/// [main] with [panes] beside it, left to right, and [details] at the
-/// right, each resizable but a [SidePane.fixed] one, which has a hairline
-/// at its left instead of an edge to drag; [head] over all of them,
+/// A chat's room, left to right (ADR 0123): [main], the [details] rail
+/// while it's wanted (a [SidePane.fixed], a hairline at its left), and
+/// [panes], each resizable; [head] over [main] and the rail,
 /// [PaneHeader.height] high, and [foot] under them (the chat's header and
-/// its terminal). When [main] would get narrower than [least], the panes
-/// lie over it, by the details, rather than beside it: the details stay,
-/// and so does [main]'s width under the panes.
+/// its terminal). The panes run its full height, their own top rows level
+/// with [head].
+///
+/// How the room is shared is [besideFit]'s: when [main] would keep less
+/// than [railLeast] beside the rail, the rail tucks itself away (kept,
+/// not drawn; never saved, as it's still wanted), and when [main] would
+/// keep less than [least] beside the panes alone, they lie over it, under
+/// [head], [head] and [foot] then across all of it. A pane's edge, dragged
+/// while the panes are beside [main], stops where [main] keeps [least];
+/// the rail tucks and comes back as the edge moves.
 ///
 /// A pane slides its full width in from the right as it opens and out as
-/// it closes ([Presence], [paneSlide]); one closing keeps its place until
-/// it's gone, taking no pointer or focus, while the rest are laid out at
-/// once where they go. [main] is laid out once at its new width and drawn
+/// it closes ([Presence], [paneSlide]), and so does the rail as it's shown,
+/// hidden, tucked or brought back; one going keeps its place until it's
+/// gone, taking no pointer or focus, while the rest are laid out at once
+/// where they go. [main] is laid out once at its new width and drawn
 /// gliding there ([Glide]) from where its text was, [columnSides] saying
-/// where that text's column lies in it (the chat's); so do the
-/// panes that stay but move (the side chat, as the preview right of it
-/// closes), and so does [main] as the sidebar comes and goes.
+/// where that text's column lies in it (the chat's); so do the panes that
+/// stay but move, and [head]'s trailing buttons ([Beside.glideOf]). The
+/// rail tucked with the focus in it gives the focus to [keep].
 ///
 /// A new [scene] (another of the chat's tabs) is a new set of [main], its
 /// panes and details: they're there at once, with no slide, while [head]
 /// and [foot] stay the same widgets (a terminal keeps its shell).
 ///
-/// The pane named [cover] takes the whole of it, over the rest (an expanded
-/// browser tab, ADR 0094): they stay laid out where they were, keeping
-/// their state, but draw nothing and take no pointer or focus, so the pane
-/// is the same widget throughout and its page doesn't load again.
+/// The pane named [cover] takes the whole of it, over the rest, [head] and
+/// [foot] too (an expanded browser tab, ADR 0094): they stay laid out where
+/// they were, keeping their state, but draw nothing and take no pointer or
+/// focus, so the pane is the same widget throughout and its page doesn't
+/// load again.
 class Beside extends StatefulWidget {
   const new({
     required this.main,
@@ -70,20 +54,40 @@ class Beside extends StatefulWidget {
     this.head,
     this.foot,
     this.details,
+    double? railLeast,
     this.columnSides,
     this.cover,
     this.scene,
-  });
+    this.keep,
+  }) : railLeast = railLeast ?? least;
 
   final Widget main;
   final Widget? head;
   final Widget? foot;
   final double least;
+  final double railLeast;
   final List<SidePane> panes;
   final SidePane? details;
   final EdgeInsets Function(double width)? columnSides;
   final String? cover;
   final Object? scene;
+  final FocusNode? keep;
+
+  /// What [head]'s trailing part glides by: it changes as the panes beside
+  /// it come and go (and the rail and the sidebar), so a [Glide] given it
+  /// slides with them; null outside a [Beside].
+  static Object? glideOf(BuildContext context) => _scope(context)?.glide;
+
+  /// The [Beside.scene] [head] is in: a [Glide] given it jumps when it
+  /// changes, as the rest do.
+  static Object? sceneOf(BuildContext context) => _scope(context)?.scene;
+
+  /// Whether the rail is wanted but tucked away for the panes' room.
+  static bool railHeldOf(BuildContext context) =>
+      _scope(context)?.held ?? false;
+
+  static _BesideScope? _scope(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_BesideScope>();
 
   @override
   State<Beside> createState() => _BesideState();
@@ -91,7 +95,8 @@ class Beside extends StatefulWidget {
 
 class _BesideState extends State<Beside> {
   /// Every pane it has shown, so one closing keeps its place in the
-  /// children (and its state) as it goes; a gone one is nothing.
+  /// children (and its state) as it goes; a gone one is nothing. The
+  /// rail's name is in it once it was wanted.
   final _seen = <String>{};
 
   /// What showed in the last build.
@@ -100,8 +105,9 @@ class _BesideState extends State<Beside> {
   /// Whether it was built before: what it shows at first doesn't slide.
   bool _built = false;
 
-  /// Each pane's x as last laid out: where one closing stays.
-  final _at = <String, double>{};
+  /// Each pane's rect, and the rail's, as last laid out: where one going
+  /// stays, laid out as it was.
+  final _at = <String, Rect>{};
 
   /// Each pane's width as last laid out beside [Beside.main]: what one
   /// over all ([Beside.cover]) leaves the rest.
@@ -110,6 +116,16 @@ class _BesideState extends State<Beside> {
   /// Each pane's [Glide] token, changed only while it stays shown: a pane
   /// coming in slides, it doesn't glide.
   final _tokens = <String, Object>{};
+
+  /// The widths of the panes being dragged, as their edges say.
+  final _live = <String, double>{};
+
+  /// The room as last laid out, and whether the rail showed in it.
+  double _room = 0;
+  bool _rail = false;
+
+  /// Holds the focus while it's in the rail.
+  final _railFocus = FocusNode(skipTraversal: true, canRequestFocus: false);
 
   @override
   void didUpdateWidget(Beside old) {
@@ -121,7 +137,36 @@ class _BesideState extends State<Beside> {
     _tokens.clear();
     _at.clear();
     _widths.clear();
+    _live.clear();
     _built = false;
+  }
+
+  @override
+  void dispose() {
+    _railFocus.dispose();
+    super.dispose();
+  }
+
+  BesideFit _fit(double room) => besideFit(
+    room: room,
+    panes: widget.panes,
+    saved: paneWidths.value,
+    live: _live,
+    wantRail: widget.details != null,
+    least: widget.least,
+    railLeast: widget.railLeast,
+    rail: widget.details?.width ?? 0,
+  );
+
+  /// A pane's edge is dragged to [width] (null: let go): the rail shows or
+  /// tucks as the room it leaves says, and nothing else is built again.
+  void _dragged(String name, double? width) {
+    if (width == null) {
+      _live.remove(name);
+    } else {
+      _live[name] = width;
+    }
+    if (mounted && _fit(_room).rail != _rail) setState(() {});
   }
 
   @override
@@ -129,19 +174,25 @@ class _BesideState extends State<Beside> {
     builder: (context, box) => ValueListenableBuilder(
       valueListenable: paneWidths,
       builder: (context, _, _) {
-        final room = box.maxWidth;
+        final room = _room = box.maxWidth;
+        final fit = _fit(room);
         final scene = widget.scene;
         final details = widget.details;
         final panes = widget.panes;
-        final detailsWidth = details?.width ?? 0;
-        final panesWidth = panes.fold(0.0, (w, p) => w + p.width);
-        final over = room - detailsWidth - panesWidth < widget.least;
+        final over = fit.over;
+        final rail = fit.rail;
+        // The rail going with the focus in it: the keys stay with [keep].
+        if (_rail && !rail && _railFocus.hasFocus) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) widget.keep?.requestFocus();
+          });
+        }
+        _rail = rail;
         final t = NushiTheme.of(context).t;
-        final shown = [...panes, ?details];
-        final now = {for (final p in shown) p.name};
-        // What glides: the panes open, and the sidebar, which moves
-        // everything here sideways.
-        final token = [for (final p in shown) p.name, sidebarShut].join(',');
+        final now = {for (final p in panes) p.name, if (rail) ?details?.name};
+        // What glides: what's open beside [main], whether the panes lie
+        // over it, and the sidebar, which moves everything sideways.
+        final token = [...now, if (over) 'over', sidebarShut].join(',');
         for (final slot in now) {
           if (_shown.contains(slot)) _tokens[slot] = token;
           _tokens.putIfAbsent(slot, () => token);
@@ -149,55 +200,39 @@ class _BesideState extends State<Beside> {
         final built = _built;
         _built = true;
         _seen.addAll(now);
+        if (details != null) _seen.add(details.name);
         _shown = now;
-        final cover = now.contains(widget.cover) ? widget.cover : null;
+        final cover = panes.any((p) => p.name == widget.cover)
+            ? widget.cover
+            : null;
         // Under the pane over all: kept, but not drawn or reached.
-        Widget under(String slot, Widget child) => ExcludeFocus(
+        Widget under(Object slot, Widget child) => ExcludeFocus(
           excluding: cover != null && slot != cover,
           child: Offstage(
             offstage: cover != null && slot != cover,
             child: child,
           ),
         );
-        Widget resizable(SidePane p, double most) => p.fixed
-            ? SizedBox(
-                key: ValueKey(p.name),
-                width: p.width,
-                // Over the pane, whose own fill would hide it.
-                child: DecoratedBox(
-                  position: DecorationPosition.foreground,
-                  decoration: BoxDecoration(
-                    border: Border(left: BorderSide(color: t.line)),
-                  ),
-                  child: p.child,
-                ),
-              )
-            : Resizable(
-                key: ValueKey(p.name),
-                name: p.name,
-                initial: p.initial,
-                min: p.min,
-                max: min(p.cap, most),
-                left: true,
-                locked: p.name == cover,
-                child: p.child,
-              );
-        Widget pane(String slot, Widget? child) => LayoutId(
-          key: ValueKey((scene, slot)),
-          id: slot,
-          child: under(
-            slot,
-            Glide(
+        Widget slide(String slot, Widget? child, {bool shown = true}) => under(
+          slot,
+          FocusTraversalGroup(
+            child: Glide(
               token: _tokens[slot],
               child: Presence(
-                // What showed as the view came is there; what opens after
-                // slides in.
+                // What showed as the view came is there; what opens
+                // after slides in.
                 arrives: built,
+                shown: shown,
                 child: child,
                 builder: (_, run, c) => paneSlide(run, c),
               ),
             ),
           ),
+        );
+        Widget pane(String slot, Widget? child) => LayoutId(
+          key: ValueKey((scene, slot)),
+          id: slot,
+          child: slide(slot, child),
         );
         Widget backed(Widget child, {required bool shadow}) => DecoratedBox(
           decoration: BoxDecoration(
@@ -214,6 +249,7 @@ class _BesideState extends State<Beside> {
           ),
           child: child,
         );
+        final railName = details?.name ?? _BesideState._railName;
         final children = [
           // First in the tree, as they were above and below the rest: they
           // never lie over what's after them.
@@ -221,53 +257,91 @@ class _BesideState extends State<Beside> {
             LayoutId(
               key: const ValueKey(_Slot.head),
               id: _Slot.head,
-              child: head,
+              child: under(
+                _Slot.head,
+                FocusTraversalGroup(
+                  child: _BesideScope(
+                    glide: token,
+                    scene: scene,
+                    held: details != null && !rail,
+                    child: head,
+                  ),
+                ),
+              ),
             ),
           if (widget.foot case final foot?)
             LayoutId(
               key: const ValueKey(_Slot.foot),
               id: _Slot.foot,
-              child: foot,
+              child: under(_Slot.foot, FocusTraversalGroup(child: foot)),
             ),
           LayoutId(
             key: ValueKey((scene, _Slot.main)),
             id: _Slot.main,
             child: under(
-              '',
-              Glide(
-                token: token,
-                sides: widget.columnSides,
-                // Its foot is its full width: cut at its left as it
-                // glides, it doesn't lie over the sidebar.
-                clip: true,
-                child: widget.main,
+              _Slot.main,
+              FocusTraversalGroup(
+                child: Glide(
+                  token: token,
+                  sides: widget.columnSides,
+                  // Its foot is its full width: cut at its left as it
+                  // glides, it doesn't lie over the sidebar.
+                  clip: true,
+                  child: widget.main,
+                ),
               ),
             ),
           ),
-          // Those closing: over the main view, under the rest.
+          // The rail: kept while it's tucked away for room, gone only once
+          // it's not wanted. Under the panes, which it slides out under.
+          if (_seen.contains(railName))
+            LayoutId(
+              key: ValueKey((scene, railName)),
+              id: railName,
+              child: Focus(
+                focusNode: _railFocus,
+                child: slide(
+                  railName,
+                  shown: rail,
+                  details == null
+                      ? null
+                      : SizedBox(
+                          key: ValueKey(details.name),
+                          width: details.width,
+                          // Over the rail, whose own fill would hide it.
+                          child: DecoratedBox(
+                            position: DecorationPosition.foreground,
+                            decoration: BoxDecoration(
+                              border: Border(left: BorderSide(color: t.line)),
+                            ),
+                            child: details.child,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          // Those closing: over the main view and the rail, under the rest.
           for (final s in _seen)
-            if (!now.contains(s)) pane(s, null),
+            if (!now.contains(s) && s != railName) pane(s, null),
           // Beside, a pane leaves [main] its least width; over it, a
-          // strip of it. One with no cap can be dragged on over it. Over
-          // it, the first one's shadow falls on it.
+          // strip of it. Over it, the first one's shadow falls on it.
           for (final (i, p) in panes.indexed)
             pane(
               p.name,
               backed(
-                resizable(
-                  p,
-                  room -
-                      detailsWidth -
-                      (panesWidth - p.width) -
-                      (over || p.cap.isInfinite ? 48 : widget.least),
+                Resizable(
+                  key: ValueKey(p.name),
+                  name: p.name,
+                  initial: p.initial,
+                  min: p.min,
+                  max: fit.most[p.name]!,
+                  left: true,
+                  locked: p.name == cover,
+                  onDrag: (w) => _dragged(p.name, w),
+                  child: p.child,
                 ),
                 shadow: over && i == 0,
               ),
-            ),
-          if (details != null)
-            pane(
-              details.name,
-              resizable(details, room - (over ? 0 : panesWidth) - widget.least),
             ),
         ];
         // The pane over all is drawn last; keyed, it keeps its state as it
@@ -280,12 +354,14 @@ class _BesideState extends State<Beside> {
         }
         return CustomMultiChildLayout(
           delegate: _Beside(
-            widget.least,
             panes: [for (final p in panes) p.name],
-            details: details?.name,
+            rail: _seen.contains(railName) ? railName : null,
+            railShown: rail,
+            railWidth: details?.width ?? 0,
+            over: over,
             going: [
               for (final s in _seen)
-                if (!now.contains(s)) s,
+                if (!now.contains(s) && s != railName) s,
             ],
             at: _at,
             widths: _widths,
@@ -296,90 +372,7 @@ class _BesideState extends State<Beside> {
       },
     ),
   );
-}
 
-enum _Slot { main, head, foot }
-
-/// Lays the details at the right, the panes left of them, and the main
-/// view in what's left; when that would be under [least], it runs under
-/// the panes instead. Those [going] stay where they were ([at], which it
-/// keeps up to date). Measured as laid out, so a pane being resized moves
-/// the rest with it.
-class _Beside extends MultiChildLayoutDelegate {
-  new(
-    this.least, {
-    required this.panes,
-    required this.details,
-    required this.going,
-    required this.at,
-    required this.widths,
-    this.cover,
-  });
-
-  final double least;
-  final List<String> panes; // left to right
-  final String? details;
-  final List<String> going;
-  final Map<String, double> at;
-  final Map<String, double> widths; // each pane's, as last laid out beside
-  final String? cover; // the pane over all, the whole of it
-
-  @override
-  void performLayout(Size size) {
-    final width = size.width;
-    final head = hasChild(_Slot.head) ? PaneHeader.height : 0.0;
-    if (head > 0) {
-      layoutChild(_Slot.head, BoxConstraints.tight(Size(width, head)));
-      positionChild(_Slot.head, Offset.zero);
-    }
-    var foot = 0.0;
-    if (hasChild(_Slot.foot)) {
-      foot = layoutChild(
-        _Slot.foot,
-        BoxConstraints(
-          minWidth: width,
-          maxWidth: width,
-          maxHeight: max(0, size.height - head),
-        ),
-      ).height;
-      positionChild(_Slot.foot, Offset(0, size.height - foot));
-    }
-    final height = max(0.0, size.height - head - foot);
-    final tall = BoxConstraints(
-      maxWidth: width,
-      minHeight: height,
-      maxHeight: height,
-    );
-    var right = width;
-    if (details case final d?) {
-      right -= layoutChild(d, tall).width;
-      positionChild(d, Offset(at[d] = right, head));
-    }
-    var x = right;
-    for (final p in panes.reversed) {
-      if (p == cover) {
-        // It fills it all; the rest keep the room they had beside it, so
-        // nothing under it is laid out anew.
-        layoutChild(p, BoxConstraints.tight(Size(width, height)));
-        positionChild(p, Offset(0, head));
-        x -= widths[p] ?? 0;
-        continue;
-      }
-      x -= widths[p] = layoutChild(p, tall).width;
-      positionChild(p, Offset(at[p] = x, head));
-    }
-    final main = x >= least ? x : right;
-    for (final g in going) {
-      layoutChild(g, tall);
-      positionChild(g, Offset(at[g] ?? width, head));
-    }
-    layoutChild(
-      _Slot.main,
-      BoxConstraints.tightFor(width: max(0, main), height: height),
-    );
-    positionChild(_Slot.main, Offset(0, head));
-  }
-
-  @override
-  bool shouldRelayout(_Beside old) => true; // cheap: a few panes
+  /// The rail's slot while no rail is wanted: its last name.
+  static const _railName = 'details';
 }

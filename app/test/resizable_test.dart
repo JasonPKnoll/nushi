@@ -28,10 +28,29 @@ void main() {
   double width(WidgetTester tester) =>
       tester.getSize(find.byKey(const Key('pane'))).width;
 
-  testWidgets('a pane with no cap drags on over the chat, to a strip of it', (
+  testWidgets('beside the chat, a pane with no cap stops where the chat '
+      'keeps its least (ADR 0123)', (tester) async {
+    tester.view.physicalSize = const Size(1400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(beside(double.infinity));
+    final drag = await tester.startGesture(edge(tester));
+    await drag.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    await drag.moveBy(const Offset(-1300, 0));
+    await tester.pump();
+    expect(width(tester), 1400 - 360);
+    await drag.up();
+    await tester.pump();
+    expect(width(tester), 1400 - 360);
+    await tester.pump(const Duration(seconds: 2)); // the width's saved
+  });
+
+  testWidgets('over the chat, a pane with no cap drags on to a strip of it', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1400, 800);
+    // 700 less the pane's 560 leaves the chat under 360: it lies over it.
+    tester.view.physicalSize = const Size(700, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(beside(double.infinity));
@@ -42,7 +61,7 @@ void main() {
     await tester.pump();
     await drag.up();
     await tester.pump();
-    expect(width(tester), 1400 - 48);
+    expect(width(tester), 700 - 48);
     await tester.pump(const Duration(seconds: 2)); // the width's saved
   });
 

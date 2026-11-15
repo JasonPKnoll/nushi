@@ -237,7 +237,10 @@ class _BrowserPaneState extends State<BrowserPane> implements BrowserControls {
     final pane = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Expanded, it's at the window's top left: with the sidebar hidden
+        // its tabs start past the traffic lights, as a header's do.
         PaneHeader(
+          plain: widget.expanded,
           inset: previewChipInset,
           end: previewChipInset,
           child: Row(

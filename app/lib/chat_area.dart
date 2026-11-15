@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:nushi/beside.dart';
-import 'package:nushi/beside_fit.dart';
 import 'package:nushi/changes_view.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_column.dart';
@@ -17,12 +16,13 @@ import 'package:nushi/pull_tab.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/terminal_panel.dart';
 
-/// A chat in the main area (ADR 0111): one pane of its header across all
-/// of it and, under that, its transcript, its folder's changes or its pull
-/// request, with the terminal below. Beside the transcript are its side
-/// panes ([chatPanes]) and its details, a column at the right, so the
-/// header and its buttons are where they were whether the details show or
-/// not; they're all laid out by one [Beside] (ADR 0123), which keeps the
+/// A chat in the main area (ADR 0111, 0123): one pane of its transcript, its
+/// folder's changes or its pull request, its details rail at the
+/// transcript's right, its header over the two and its terminal under
+/// them, and right of all of those its side panes ([chatPanes]), each the
+/// pane's full height. The header and its buttons stay where they are as
+/// the details show and hide; the rail tucks itself away when the panes
+/// need its room. All of it is laid out by one [Beside], which keeps the
 /// header and the terminal as the tabs change.
 class ChatArea extends StatefulWidget {
   const new(this.chat, this.daemon, {super.key});
@@ -40,10 +40,9 @@ class _ChatAreaState extends State<ChatArea> {
   /// Its pull request, looked for while the chat shows (for the tab).
   late final ChatPull _pull;
 
-  /// The area's width and whether the details panel shows, as last built:
-  /// what the preview's room is worked out from when the agent asks.
+  /// The area's width, as last built: what the preview's and the
+  /// details' room is worked out from when asked.
   double _width = double.infinity;
-  bool _panel = false;
 
   /// The preview's tabs: each file's view is made again as it shows, and
   /// the row moves to the new one with its place kept.
@@ -91,6 +90,9 @@ class _ChatAreaState extends State<ChatArea> {
     if (widget.chat.previewFits == _previewFits) {
       widget.chat.previewFits = ChatState.fitsAlways;
     }
+    if (widget.chat.panelFits == _panelFits) {
+      widget.chat.panelFits = ChatState.fitsAlways;
+    }
     _pull.unfollow();
     _expanded.dispose();
     _keys.dispose();
@@ -108,8 +110,12 @@ class _ChatAreaState extends State<ChatArea> {
     if (!_browsing) _expanded.value = false;
   }
 
-  /// ⌃`: the terminal shows or hides.
-  void _toggleTerminal() => toggleTerminalOf(widget.chat, _keys);
+  /// ⌃`: the terminal shows or hides. Over an expanded browser tab, which
+  /// covers it, the tab is put back first, in the same press.
+  void _toggleTerminal() {
+    if (_expanded.value) _expanded.value = false;
+    toggleTerminalOf(widget.chat, _keys);
+  }
 
   /// A file's preview opened (from Artifacts, or ⌘P) shows beside the chat.
   void _showPreview() {
@@ -138,20 +144,33 @@ class _ChatAreaState extends State<ChatArea> {
   }
 
   /// Whether the preview opens beside the transcript and leaves it
-  /// [ChatView.leastBesideWide], as `Beside` works it out ([besideFit]):
-  /// the details panel, the side chat and the Files pane each take their
-  /// widths (a subagent's pane doesn't: the preview takes its place). It is
-  /// read when asked, since a side chat or the Files pane opens without
-  /// building this area again.
-  bool _previewFits() => !besideFit(
-    room: _width - (_panel ? DetailsPanel.width : 0),
+  /// [ChatView.leastBesideWide], as [Beside] works it out ([chatFit]): the
+  /// side chat and the Files pane take their widths (a subagent's pane
+  /// doesn't: the preview takes its place), and the details rail tucks
+  /// itself away for it. It is read when asked, since a side chat or the
+  /// Files pane opens without building this area again.
+  bool _previewFits() => !chatFit(
+    room: _width,
     panes: openPanes(widget.chat, widget.daemon, preview: true),
     saved: paneWidths.value,
     wantRail: false,
-    least: ChatView.leastBesideWide,
-    railLeast: ChatView.leastBesideWide,
-    rail: DetailsPanel.width,
   ).over;
+
+  /// Whether the details rail has room to show beside the transcript and
+  /// the panes open now, at their saved widths: the window is wide enough
+  /// for it (ADR 0092), and the panes leave it room (ADR 0123).
+  bool _panelFits() =>
+      _width >= _railFrom &&
+      chatFit(
+        room: _width,
+        panes: openPanes(widget.chat, widget.daemon),
+        saved: paneWidths.value,
+        wantRail: true,
+      ).rail;
+
+  /// The narrowest chat area with room for the details at all (ADR 0092).
+  static const double _railFrom =
+      DetailsPanel.width + ChatView.leastBesideDetails;
 
   /// A file to show (ChatState.showFile, from a review's finding) shows in
   /// the Changes view.
@@ -172,17 +191,17 @@ class _ChatAreaState extends State<ChatArea> {
             listenable: Listenable.merge([showDetails, _tab]),
             builder: (context, _) {
               final show = showDetails.value;
-              // The panel goes when the chat would get too narrow.
-              final fits =
-                  box.maxWidth >=
-                  DetailsPanel.width + ChatView.leastBesideDetails;
-              chat.panelFits = fits;
+              // The panel goes when the chat would get too narrow, and
+              // its button with it; beside panes that need its room it's
+              // tucked away, still wanted (ADR 0123).
+              final fits = box.maxWidth >= _railFrom;
+              chat
+                ..panelFits = _panelFits
+                ..previewFits = _previewFits;
               // The pull request's tab goes with its link.
               final tab = chat.shownTab;
               final onChat = tab == ChatTab.chat;
               final panel = show && fits && onChat;
-              _panel = panel;
-              chat.previewFits = _previewFits;
               // Made here, once a change of these, so a pane opening or
               // closing doesn't build them again.
               final head = ListenableBuilder(
@@ -299,15 +318,14 @@ class _ChatAreaState extends State<ChatArea> {
       head: head,
       main: main,
       foot: foot,
+      keep: _keys,
       // The text's column glides as a pane opens or closes beside it.
       columnSides: onChat ? (width) => chatSides(context, width) : null,
-      // Beside the details it keeps less, so the panes lie over it where
-      // they did by the 264-point panel (ADR 0092).
-      least: wide
-          ? ChatView.leastBesideWide
-          : details != null
-          ? ChatView.leastBesideDetails
-          : ChatView.minWidth,
+      // The least the transcript keeps beside the panes, and beside the
+      // details too (ADR 0092): narrower, the rail tucks away, and
+      // narrower than that the panes lie over it ([chatFit]).
+      least: wide ? ChatView.leastBesideWide : ChatView.minWidth,
+      railLeast: wide ? ChatView.leastBesideWide : ChatView.leastBesideDetails,
       cover: _expanded.value && _browsing ? 'preview' : null,
       panes: panes,
       details: details,

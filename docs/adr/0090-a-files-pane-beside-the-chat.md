@@ -25,3 +25,5 @@ The roadmap's Files view wanted "a file tree of the chat's folder to open any fi
 - A header tab, as Changes is: it would take the chat's place, where the point is to see the files beside it.
 - The app reading the folder (`Directory.watch`): the phone can't, and every path the daemon checks would be checked twice.
 - A whole-folder listing up front: a repository with node_modules would send hundreds of thousands of names.
+
+**Amendment (2026-11-15):** the Files pane, with the other side panes, is right of the details panel and runs the chat pane's full height, its top row level with the chat's header ([ADR 0123](0123-side-panes-right-of-the-rail.md)); it's still left of the preview.

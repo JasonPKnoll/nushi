@@ -431,18 +431,20 @@ void main() {
       }, variant: _mac);
     }
 
-    // The pane lies under the chat header, not beside it: the two rows share
-    // a height and an edge, and each row's lines stop on its own border.
+    // The pane lies beside the chat header, its top row level with it (ADR
+    // 0123): the two rows share a height and a line, and each row's lines
+    // stop on its own border.
     for (final count in [1, 3]) {
-      testWidgets('the title row is the header’s height, right under it, '
+      testWidgets('the title row is the header’s height, level with it, '
           '$count open', (tester) async {
         final d = await _app(tester, files: _three.take(count).toList());
         final header = tester.getRect(find.byType(ChatHeader));
         final row = tester.getRect(_inPane(find.byType(PaneHeader)));
         expect(header.height, 56);
         expect(row.height, 56);
-        expect(row.top, header.bottom);
-        expect(row.bottom, header.bottom + 56);
+        expect(row.top, header.top);
+        expect(row.bottom, header.bottom);
+        expect(header.right, tester.getRect(find.byType(PreviewPane)).left);
         final lines = find.descendant(
           of: find.byType(TabFace),
           matching: find.byType(Positioned),

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_files.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/details_panel.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone_app.dart';
@@ -268,10 +269,12 @@ void main() {
       d.dispose();
     }, variant: _mac);
 
-    // A laptop's chat area, 1468 wide, holds the preview beside the details
-    // but not beside the Files pane too (ADR 0068: never over the box).
-    testWidgets('with the details and the Files pane open, the transcript '
-        'stays; the row opens it', (tester) async {
+    // A laptop's chat area, 1460 wide, holds the preview beside the Files
+    // pane, the details tucking away for it (ADR 0123), but not beside the
+    // side chat too (ADR 0068: never over the box).
+    testWidgets('with the details and the Files pane open, it opens and the '
+        'details tuck away; with the side chat too, the transcript stays and '
+        'the row opens it', (tester) async {
       final (fake, d) = await _app(
         tester,
         size: const Size(1728, 1000),
@@ -286,6 +289,17 @@ void main() {
       showDetails.value = true;
       await tester.pumpAndSettle();
       filesChats.value = {'c'};
+      await tester.pumpAndSettle();
+      await _shows(tester, fake, 'docs/report.md');
+      expect(find.byType(PreviewPane), findsOneWidget);
+      expect(find.byType(DetailsPanel), findsNothing);
+      expect(showDetails.value, isTrue);
+      await tester.tap(find.byTooltip('Close').last);
+      await tester.pumpAndSettle();
+      expect(find.byType(PreviewPane), findsNothing);
+      expect(find.byType(DetailsPanel), findsOneWidget);
+      // The side chat too: no room.
+      _chat(d).side.value = ChatState('s', '/Users/me')..title = 'Side';
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
       expect(find.byType(PreviewPane), findsNothing);

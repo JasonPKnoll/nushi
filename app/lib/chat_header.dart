@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:nushi/agent_mark.dart';
 import 'package:nushi/app_actions.dart';
+import 'package:nushi/beside.dart';
 import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_colors.dart';
@@ -13,17 +14,20 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/github_parts.dart';
+import 'package:nushi/github_view.dart' show showItem;
 import 'package:nushi/jira_view.dart';
 import 'package:nushi/keys.dart';
 import 'package:nushi/menu.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/phase_pill.dart';
 import 'package:nushi/pickers.dart' show ConfigNames;
+import 'package:nushi/pull_states.dart' show GitHubLinkRef;
 import 'package:nushi/pulls_chip.dart';
 import 'package:nushi/review.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/sidebar_button.dart';
+import 'package:nushi/slides.dart';
 import 'package:nushi/status.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/theme/theme.dart';
@@ -56,7 +60,7 @@ class ChatHeader extends StatelessWidget {
   final Daemon daemon;
   final ChatTab tab;
   final ValueChanged<ChatTab> onTab;
-  final bool panel; // the details panel shows
+  final bool panel; // the details panel is wanted (it may be tucked away)
   final VoidCallback? onPanel; // shows or hides it; null when it can't show
 
   /// How far its row is in from its pane's left edge, the transcript's
@@ -245,215 +249,240 @@ class ChatHeader extends StatelessWidget {
             child: Row(
               children: [
                 // What leads moves with the sidebar's edge as it slides;
-                // the rest stays put.
-                SidebarFollow(
-                  shut: shut,
+                // the rest stays put. It takes what the rest leaves, its
+                // title cut short when even its folds leave too little (a
+                // header beside a pane dragged wide, ADR 0123).
+                Expanded(
+                  child: SidebarFollow(
+                    shut: shut,
+                    child: Row(
+                      children: [
+                        if (shut)
+                          if (chat.color case final color?) ...[
+                            ColorChip(color, named: true),
+                            const SizedBox(width: _dotRoom - ColorChip.width),
+                          ],
+                        Flexible(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: titleMax),
+                            child: _renaming
+                                ? RenameField(
+                                    chat: chat,
+                                    daemon: daemon,
+                                    style: titleStyle,
+                                    onDone: () => _renaming = false,
+                                  )
+                                : GestureDetector(
+                                    onDoubleTap: () => _renaming = true,
+                                    child: Text(
+                                      chat.shownTitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: titleStyle,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        if (chat.jiraKey.isNotEmpty && !folds.links) ...[
+                          SizedBox(width: gap),
+                          PillLink(
+                            chat.jiraKey,
+                            mono: true,
+                            tooltip: 'Show ${chat.jiraKey} in Jira',
+                            onTap: () =>
+                                showIssue(daemon, chat.jiraSite, chat.jiraKey),
+                          ),
+                        ],
+                        if (chat.github case final link?
+                            when !link.pull && !folds.links) ...[
+                          SizedBox(width: gap),
+                          GitHubChip(
+                            key: ValueKey(link.id),
+                            daemon: daemon,
+                            link: link,
+                          ),
+                        ],
+                        if ((chat.pull != null || chat.pulls.isNotEmpty) &&
+                            !folds.links) ...[
+                          SizedBox(width: gap),
+                          PullsChip(
+                            daemon,
+                            chat,
+                            badges: badges,
+                            onShow: () => onTab(ChatTab.pull),
+                          ),
+                        ],
+                        SizedBox(width: group),
+                        tooltip(
+                          context,
+                          folds.name ? chat.agentName : '',
+                          AgentMark(chat.agent, size: 18, ink: t.text),
+                        ),
+                        if (!folds.name) ...[
+                          const SizedBox(width: 7),
+                          Text(
+                            chat.agentName,
+                            style: theme.ui(t.text, weight: FontWeight.w500),
+                          ),
+                        ],
+                        if (modelName != null && !folds.model) ...[
+                          SizedBox(width: gap),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: modelMax),
+                            child: Text(
+                              modelName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: meta,
+                            ),
+                          ),
+                        ],
+                        SizedBox(width: gap),
+                        // Its state as a pill, the dot alone once the word
+                        // folds (its tooltip says it).
+                        if (chat.archived)
+                          const PhasePill(ChatPhase.archived)
+                        else if (folds.word)
+                          tooltip(
+                            context,
+                            phaseWord(chat.phase, t).$1,
+                            ChatDot(chat: chat),
+                          )
+                        else
+                          PhasePill(chat.phase, lead: ChatDot(chat: chat)),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(width: around * 2),
+                // The rest ends where the panes beside the chat start: it
+                // glides with them as they come and go (ADR 0123).
+                Glide(
+                  token: Beside.glideOf(context),
+                  scene: Beside.sceneOf(context),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (shut)
-                        if (chat.color case final color?) ...[
-                          ColorChip(color, named: true),
-                          const SizedBox(width: _dotRoom - ColorChip.width),
-                        ],
-                      ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: titleMax),
-                        child: _renaming
-                            ? RenameField(
-                                chat: chat,
-                                daemon: daemon,
-                                style: titleStyle,
-                                onDone: () => _renaming = false,
-                              )
-                            : GestureDetector(
-                                onDoubleTap: () => _renaming = true,
-                                child: Text(
-                                  chat.shownTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: titleStyle,
-                                ),
+                      if (chat.side.value != null && chat.sideHidden.value) ...[
+                        SideChip(chat),
+                        SizedBox(width: gap),
+                      ],
+                      if (folds.tabs)
+                        MenuField(
+                          compact: true,
+                          tooltip: _stepTabs,
+                          entries: [
+                            for (final (each, label) in _tabs(chat))
+                              MenuEntry(
+                                each == ChatTab.changes && comments > 0
+                                    ? '$label $comments'
+                                    : label,
+                                detail: keyLabel(tabKey(each)),
+                                checked: each == tab,
+                                onPick: () => onTab(each),
                               ),
-                      ),
-                      if (chat.jiraKey.isNotEmpty) ...[
-                        SizedBox(width: gap),
-                        PillLink(
-                          chat.jiraKey,
-                          mono: true,
-                          tooltip: 'Show ${chat.jiraKey} in Jira',
-                          onTap: () =>
-                              showIssue(daemon, chat.jiraSite, chat.jiraKey),
-                        ),
-                      ],
-                      if (chat.github case final link? when !link.pull) ...[
-                        SizedBox(width: gap),
-                        GitHubChip(
-                          key: ValueKey(link.id),
-                          daemon: daemon,
-                          link: link,
-                        ),
-                      ],
-                      if (chat.pull != null || chat.pulls.isNotEmpty) ...[
-                        SizedBox(width: gap),
-                        PullsChip(
-                          daemon,
-                          chat,
-                          badges: badges,
-                          onShow: () => onTab(ChatTab.pull),
-                        ),
-                      ],
-                      SizedBox(width: group),
-                      tooltip(
-                        context,
-                        folds.name ? chat.agentName : '',
-                        AgentMark(chat.agent, size: 18, ink: t.text),
-                      ),
-                      if (!folds.name) ...[
-                        const SizedBox(width: 7),
-                        Text(
-                          chat.agentName,
-                          style: theme.ui(t.text, weight: FontWeight.w500),
-                        ),
-                      ],
-                      if (modelName != null && !folds.model) ...[
-                        SizedBox(width: gap),
-                        ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: modelMax),
-                          child: Text(
-                            modelName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: meta,
+                          ],
+                          label: Text(
+                            _tabs(chat).firstWhere((s) => s.$1 == tab).$2 +
+                                (tab == ChatTab.changes && comments > 0
+                                    ? ' $comments'
+                                    : ''),
                           ),
-                        ),
-                      ],
-                      SizedBox(width: gap),
-                      // Its state as a pill, the dot alone once the word
-                      // folds (its tooltip says it).
-                      if (chat.archived)
-                        const PhasePill(ChatPhase.archived)
-                      else if (folds.word)
-                        tooltip(
-                          context,
-                          phaseWord(chat.phase, t).$1,
-                          ChatDot(chat: chat),
                         )
                       else
-                        PhasePill(chat.phase, lead: ChatDot(chat: chat)),
+                        Segmented(
+                          value: tab,
+                          segments: _tabs(chat),
+                          badges: {
+                            if (comments > 0) ChatTab.changes: '$comments',
+                          },
+                          onChanged: onTab,
+                          roomy: true,
+                          tooltip: (t) => '${keyLabel(tabKey(t))}   $_stepTabs',
+                        ),
+                      SizedBox(width: roomy ? NushiTheme.barGap : 6),
+                      // In the order of what they show, the terminal under
+                      // the chat, then the Files pane, the preview's browser
+                      // tab and the details panel beside it, left to right.
+                      if (!folds.buttons) ...[
+                        TerminalButton(chat: chat, daemon: daemon),
+                        if (roomy) const SizedBox(width: NushiTheme.iconGap),
+                        if (_files) ...[
+                          FilesButton(chat: chat),
+                          if (roomy) const SizedBox(width: NushiTheme.iconGap),
+                        ],
+                        if (!folds.browser) ...[
+                          BrowserButton(chat: chat),
+                          if (roomy) const SizedBox(width: NushiTheme.iconGap),
+                        ],
+                      ],
+                      if (!folds.buttons && !folds.panel) ...[
+                        IconTap.line(
+                          LineIcon.details,
+                          tooltip: onPanel == null
+                              ? 'The window is too narrow'
+                              : !panel
+                              ? 'Show details'
+                              : Beside.railHeldOf(context)
+                              ? 'Hide details (tucked away while the '
+                                    'panes need the room)'
+                              : 'Hide details',
+                          padding: IconTap.header,
+                          lit: panel,
+                          onTap: onPanel,
+                        ),
+                        if (roomy) const SizedBox(width: NushiTheme.iconGap),
+                      ],
+                      MenuIcon.line(
+                        LineIcon.more,
+                        tooltip: 'Chat menu',
+                        padding: IconTap.header,
+                        filter: false,
+                        entries: [
+                          if (folds.links) ...[
+                            ..._linkEntries,
+                            MenuEntry.divider,
+                          ],
+                          if (folds.browser && !folds.buttons) ...[
+                            _browserEntry,
+                            MenuEntry.divider,
+                          ],
+                          if (folds.buttons) ...[
+                            if (!chat.archived)
+                              MenuEntry(
+                                terminalChats.value.contains(chat.id)
+                                    ? 'Hide terminal'
+                                    : 'Show terminal',
+                                shortcut: keyLabel(toggleTerminalKey),
+                                line: LineIcon.terminal,
+                                onPick: () => toggleTerminal(chat.id),
+                              ),
+                            if (_files)
+                              MenuEntry(
+                                filesShown(chat) ? 'Hide files' : 'Show files',
+                                shortcut: keyLabel(filesKey),
+                                line: LineIcon.folder,
+                                onPick: () => showOrHideFiles(chat),
+                              ),
+                            _browserEntry,
+                            if (onPanel case final toggle?)
+                              MenuEntry(
+                                panel ? 'Hide details' : 'Show details',
+                                line: LineIcon.details,
+                                onPick: toggle,
+                              ),
+                            MenuEntry.divider,
+                          ],
+                          ...chatMenu(
+                            context,
+                            chat,
+                            daemon,
+                            onRename: () => _renaming = true,
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                ),
-                SizedBox(width: around),
-                const Spacer(),
-                SizedBox(width: around),
-                if (chat.side.value != null && chat.sideHidden.value) ...[
-                  SideChip(chat),
-                  SizedBox(width: gap),
-                ],
-                if (folds.tabs)
-                  MenuField(
-                    compact: true,
-                    tooltip: _stepTabs,
-                    entries: [
-                      for (final (each, label) in _tabs(chat))
-                        MenuEntry(
-                          each == ChatTab.changes && comments > 0
-                              ? '$label $comments'
-                              : label,
-                          detail: keyLabel(tabKey(each)),
-                          checked: each == tab,
-                          onPick: () => onTab(each),
-                        ),
-                    ],
-                    label: Text(
-                      _tabs(chat).firstWhere((s) => s.$1 == tab).$2 +
-                          (tab == ChatTab.changes && comments > 0
-                              ? ' $comments'
-                              : ''),
-                    ),
-                  )
-                else
-                  Segmented(
-                    value: tab,
-                    segments: _tabs(chat),
-                    badges: {if (comments > 0) ChatTab.changes: '$comments'},
-                    onChanged: onTab,
-                    roomy: true,
-                    tooltip: (t) => '${keyLabel(tabKey(t))}   $_stepTabs',
-                  ),
-                SizedBox(width: roomy ? NushiTheme.barGap : 6),
-                // In the order of what they show, the terminal under the
-                // chat, then the Files pane, the preview's browser tab and
-                // the details panel beside it, left to right.
-                if (!folds.buttons) ...[
-                  TerminalButton(chat: chat, daemon: daemon),
-                  if (roomy) const SizedBox(width: NushiTheme.iconGap),
-                  if (_files) ...[
-                    FilesButton(chat: chat),
-                    if (roomy) const SizedBox(width: NushiTheme.iconGap),
-                  ],
-                  if (!folds.browser) ...[
-                    BrowserButton(chat: chat),
-                    if (roomy) const SizedBox(width: NushiTheme.iconGap),
-                  ],
-                ],
-                if (!folds.buttons && !folds.panel) ...[
-                  IconTap.line(
-                    LineIcon.details,
-                    tooltip: onPanel == null
-                        ? 'The window is too narrow'
-                        : panel
-                        ? 'Hide details'
-                        : 'Show details',
-                    padding: IconTap.header,
-                    lit: panel,
-                    onTap: onPanel,
-                  ),
-                  if (roomy) const SizedBox(width: NushiTheme.iconGap),
-                ],
-                MenuIcon.line(
-                  LineIcon.more,
-                  tooltip: 'Chat menu',
-                  padding: IconTap.header,
-                  filter: false,
-                  entries: [
-                    if (folds.browser && !folds.buttons) ...[
-                      _browserEntry,
-                      MenuEntry.divider,
-                    ],
-                    if (folds.buttons) ...[
-                      if (!chat.archived)
-                        MenuEntry(
-                          terminalChats.value.contains(chat.id)
-                              ? 'Hide terminal'
-                              : 'Show terminal',
-                          shortcut: keyLabel(toggleTerminalKey),
-                          line: LineIcon.terminal,
-                          onPick: () => toggleTerminal(chat.id),
-                        ),
-                      if (_files)
-                        MenuEntry(
-                          filesShown(chat) ? 'Hide files' : 'Show files',
-                          shortcut: keyLabel(filesKey),
-                          line: LineIcon.folder,
-                          onPick: () => showOrHideFiles(chat),
-                        ),
-                      _browserEntry,
-                      if (onPanel case final toggle?)
-                        MenuEntry(
-                          panel ? 'Hide details' : 'Show details',
-                          line: LineIcon.details,
-                          onPick: toggle,
-                        ),
-                      MenuEntry.divider,
-                    ],
-                    ...chatMenu(
-                      context,
-                      chat,
-                      daemon,
-                      onRename: () => _renaming = true,
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -491,6 +520,25 @@ class ChatHeader extends StatelessWidget {
   }
 
   /// The browser's button as a row of ⋯, once it folds there.
+  /// The Jira key and the GitHub chips, folded into ⋯.
+  List<MenuEntry> get _linkEntries => [
+    if (chat.jiraKey.isNotEmpty)
+      MenuEntry(
+        'Show ${chat.jiraKey} in Jira',
+        onPick: () => showIssue(daemon, chat.jiraSite, chat.jiraKey),
+      ),
+    if (chat.github case final link? when !link.pull)
+      MenuEntry(
+        'Show #${link.number} from GitHub',
+        onPick: () => showItem(daemon, link.asRef, pull: false),
+      ),
+    if (chat.pull case final link?)
+      MenuEntry(
+        'Show pull request #${link.number}',
+        onPick: () => onTab(ChatTab.pull),
+      ),
+  ];
+
   MenuEntry get _browserEntry => MenuEntry(
     BrowserButton.tooltip(shown: chat.browserShown),
     line: LineIcon.globe,
@@ -558,6 +606,7 @@ typedef HeaderFolds = ({
   bool panel,
   bool tabs,
   bool buttons,
+  bool links,
   bool any,
   double saved,
   double more,
@@ -615,6 +664,9 @@ HeaderFolds headerFolds(
     ('word', 106.0),
     ('tabs', (pull ? 160.0 : 72.0) + (comments ? 16 : 0)),
     ('buttons', (panel ? 2 : 1) * button + (files ? button : 0)),
+    // Last, in a header as narrow as beside a pane dragged wide (ADR 0123):
+    // the Jira key and the GitHub chips, into ⋯ too.
+    if (jira + github > 0) ('links', jira + github),
   ]) {
     if (width + saved >= need) break;
     folds.add(part);
@@ -630,6 +682,7 @@ HeaderFolds headerFolds(
     panel: folds.contains('panel'),
     tabs: folds.contains('tabs'),
     buttons: folds.contains('buttons'),
+    links: folds.contains('links'),
     any: folds.isNotEmpty,
     // The model's points were never in the row's 455.
     saved: saved - (folds.contains('model') ? 50 : 0),
