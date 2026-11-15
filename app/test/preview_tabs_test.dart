@@ -206,6 +206,8 @@ ScrollPosition _row(WidgetTester tester) => tester
 /// file and three.
 Map<String, Rect> _marks(WidgetTester tester) {
   Rect at(Finder f) => tester.getRect(f);
+  // A pane at its least (a narrow window, ADR 0123) folds it into ⋯.
+  Rect? folds(Finder f) => f.evaluate().isEmpty ? null : at(f);
   return {
     'pane': at(find.byType(PreviewPane)),
     'title row': at(_inPane(find.byType(PaneHeader))),
@@ -213,7 +215,7 @@ Map<String, Rect> _marks(WidgetTester tester) {
     'path line': at(_inPane(find.byType(PathLine))),
     'source button': at(_inPane(find.byType(SourceButton))),
     'Live': at(_inPane(find.byType(LiveMark))),
-    'Show in Finder': at(_inPane(find.byTooltip('Show in Finder'))),
+    'Show in Finder': ?folds(_inPane(find.byTooltip('Show in Finder'))),
     'Close': at(_inPane(find.byTooltip('Close'))),
     'body': at(_inPane(find.byType(PreviewBody))),
     'transcript': at(find.byType(Transcript)),

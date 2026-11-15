@@ -275,9 +275,11 @@ void main() {
     testWidgets('with the details and the Files pane open, it opens and the '
         'details tuck away; with the side chat too, the transcript stays and '
         'the row opens it', (tester) async {
+      // 1100 for the chat: the rail beside Files (1064), and the side chat,
+      // Files and the preview need 1160 even narrowed to their least.
       final (fake, d) = await _app(
         tester,
-        size: const Size(1728, 1000),
+        size: const Size(1368, 1000),
         items: [_show('a', 'docs/report.md', text: 'Shown.')],
       );
       // The Files pane's listing stays open, as a daemon's does.

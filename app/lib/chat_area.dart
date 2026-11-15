@@ -170,9 +170,9 @@ class _ChatAreaState extends State<ChatArea> {
 
   /// Whether the preview opens beside the transcript and leaves it
   /// [ChatView.leastBesideWide], as [Beside] works it out ([chatFit]): the
-  /// side chat and the Files pane take their widths (a subagent's pane
-  /// doesn't: the preview takes its place), and the details rail tucks
-  /// itself away for it. It is read when asked, since a side chat or the
+  /// details rail tucks itself away for it and the panes narrow, each to
+  /// its least at most (a subagent's pane takes no room: the preview takes
+  /// its place). It is read when asked, since a side chat or the
   /// Files pane opens without building this area again.
   bool _previewFits() => !chatFit(
     room: _width,

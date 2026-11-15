@@ -47,14 +47,47 @@ void main() {
     await tester.pump(const Duration(seconds: 2)); // the width's saved
   });
 
-  testWidgets('over the chat, a pane with no cap drags on to a strip of it', (
-    tester,
-  ) async {
-    // 700 less the pane's 560 leaves the chat under 360: it lies over it.
-    tester.view.physicalSize = const Size(700, 800);
+  testWidgets('narrowed for the chat, a pane drags narrower but no wider, '
+      'and a drag that moves nothing saves nothing (ADR 0123)', (tester) async {
+    // 800 less the chat's 360: the preview, saved at 700, is narrowed to
+    // 440.
+    tester.view.physicalSize = const Size(800, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    paneWidths.value = {'preview': 700};
+    await tester.pumpWidget(beside(double.infinity));
+    expect(width(tester), 440);
+    var drag = await tester.startGesture(edge(tester));
+    await drag.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    await drag.moveBy(const Offset(-1300, 0));
+    await tester.pump();
+    expect(width(tester), 440);
+    await drag.up();
+    await tester.pump();
+    expect(width(tester), 440);
+    expect(paneWidths.value['preview'], 700);
+    // Narrower is the user's to give: that's saved.
+    drag = await tester.startGesture(edge(tester));
+    await drag.moveBy(const Offset(20, 0)); // the slop
+    await tester.pump();
+    await drag.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await drag.up();
+    await tester.pump();
+    expect(width(tester), 400);
+    expect(paneWidths.value['preview'], 400);
+    await tester.pump(const Duration(seconds: 2)); // the width's saved
+  });
+
+  testWidgets('over the chat, a pane is at its least and its edge stops '
+      'there', (tester) async {
+    // 600 less the chat's 360 is under the pane's least: it lies over it.
+    tester.view.physicalSize = const Size(600, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(beside(double.infinity));
+    expect(width(tester), 300);
     final drag = await tester.startGesture(edge(tester));
     await drag.moveBy(const Offset(-20, 0));
     await tester.pump();
@@ -62,7 +95,8 @@ void main() {
     await tester.pump();
     await drag.up();
     await tester.pump();
-    expect(width(tester), 700 - 48);
+    expect(width(tester), 300);
+    expect(paneWidths.value.containsKey('preview'), isFalse);
     await tester.pump(const Duration(seconds: 2)); // the width's saved
   });
 

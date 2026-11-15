@@ -556,12 +556,21 @@ void main() {
   final shots = <(String, double, bool, PanesOpen, String)>[
     ('beside', 1700, false, _open(browser: 2), 'rail'),
     ('tucked', 1515, false, _open(files: true, browser: 2), 'tucked'),
-    // The side chat, Files and the preview need 1560 of the chat's room:
-    // at 1500 they lie over the transcript, the sidebar hidden as in
+    // The side chat, Files and the preview want 1560 of the chat's room
+    // and need 1160, each at its least: at 1500 the preview narrows, and
+    // at 1100 they lie over the transcript; the sidebar hidden, as in
     // every window golden.
-    ('over', 1500, false, _open(side: true, files: true, browser: 2), 'over'),
+    (
+      'narrowed',
+      1500,
+      false,
+      _open(side: true, files: true, browser: 2),
+      'tucked',
+    ),
+    ('over', 1100, false, _open(side: true, files: true, browser: 2), 'over'),
     ('cover', 1700, false, _open(browser: 2), 'cover'),
-    ('720', 720, false, _open(browser: 2), 'over'),
+    // 704 for the chat: the preview narrowed to 344 beside it.
+    ('720', 720, false, _open(browser: 2), 'tucked'),
   ];
   for (final (name, width, sidebar, open, way) in shots) {
     for (final brightness in [Brightness.dark, Brightness.light]) {

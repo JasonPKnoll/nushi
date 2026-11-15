@@ -116,6 +116,7 @@ class _ResizableState extends State<Resizable> {
   double? _asked; // where the pointer has taken the edge
   double? _dragged; // the width the drag asks for, not yet clamped
   double? _told; // the width [Resizable.onDrag] was last told
+  double? _from; // the width the drag started at
   bool _hover = false;
 
   double _width() => (_dragged ?? paneWidth(widget.name, widget.initial)).clamp(
@@ -123,7 +124,7 @@ class _ResizableState extends State<Resizable> {
     max(widget.min, widget.max),
   );
 
-  void _start() => setState(() => _asked = _dragged = _width());
+  void _start() => setState(() => _from = _asked = _dragged = _width());
 
   // A drag's width is a whole number of points, and moves once the pointer
   // is a point from it: a pointer's sub-pixel jitter doesn't change it.
@@ -139,12 +140,14 @@ class _ResizableState extends State<Resizable> {
 
   // Saved in whole points, never past its most: a drag let go at a most
   // that isn't whole (a window of 1209.5) keeps beside what it was beside.
+  // One let go where it started saves nothing: a pane narrowed for the
+  // room (ADR 0123) keeps the width it was given, pushed at or not.
   void _end() {
     final width = _width();
     final most = max(widget.min, widget.max);
     final whole = width.roundToDouble();
-    _set(whole > most ? most.floorToDouble() : whole);
-    setState(() => _asked = _dragged = null);
+    if (width != _from) _set(whole > most ? most.floorToDouble() : whole);
+    setState(() => _from = _asked = _dragged = null);
     if (_told == null) return;
     _told = null;
     widget.onDrag?.call(null);

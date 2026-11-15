@@ -255,9 +255,11 @@ void main() {
   testWidgets('a match under the bar at the top: the text starts below it', (
     tester,
   ) async {
+    // Wide enough for the preview at its 560, not narrowed (ADR 0123):
+    // the match's column is under the bar.
     final (d, _) = await openEditor(tester, {
       'main.go': utf8.encode('${'x' * 120} needle\n$_source'),
-    }, width: 1100);
+    }, width: 1200);
     await _openFind(tester, d);
     await _look(tester, 'needle', '1 of 1');
     final f = _findOf(tester);

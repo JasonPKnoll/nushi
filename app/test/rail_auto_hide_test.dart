@@ -60,10 +60,15 @@ Type _typeOf(PaneSpec p) => switch (p.name) {
 /// The rail shows (drawn: not tucked away).
 bool _rail() => find.byType(DetailsPanel).evaluate().isNotEmpty;
 
-/// The panes lie over the transcript: the first starts under the header.
+/// The panes lie over the transcript: it runs on under the first.
 bool _over(WidgetTester tester, List<PaneSpec> panes) =>
-    tester.getRect(find.byType(_typeOf(panes.first))).top >
-    tester.getRect(find.byType(Pane)).top;
+    tester.getRect(_transcript).right >
+    tester.getRect(find.byType(_typeOf(panes.first))).left;
+
+/// The chat's own transcript.
+final Finder _transcript = find.byWidgetPredicate(
+  (w) => w is Transcript && w.items == null && w.chat.id == 'c',
+);
 
 /// The header's details button, by its tooltip.
 Finder get _button => find.descendant(
@@ -463,9 +468,10 @@ void main() {
       "under it and over the terminal, the first one's shadow on it", (
     tester,
   ) async {
+    // 1100 for the chat: under the 1160 the three need at their least.
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(1500, sidebar: false),
+      width: windowFor(1100, sidebar: false),
       terminal: true,
       open: _openOf([ChatPanes.side, ChatPanes.files, ChatPanes.preview]),
     );

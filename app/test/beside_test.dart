@@ -192,23 +192,33 @@ void main() {
     d.dispose();
   }, variant: _mac);
 
-  testWidgets('too narrow for the pane beside the transcript: it lies over '
-      'it', (tester) async {
+  testWidgets('too narrow for the pane beside the transcript: it narrows, '
+      'unsaved, then lies over it at its least', (tester) async {
     // 612 for the chat's pane: no details (under 804), and the transcript
-    // would keep under 360 beside the pane.
+    // keeps its 360 beside the pane only with the pane narrowed to 252.
     final d = await _app(tester, width: 880);
     await _openPane(tester);
-    final pane = tester.getRect(_pane);
+    var pane = tester.getRect(_pane);
     const edge = 880 - NushiTheme.windowPad;
     expect(pane.right, edge);
-    expect(pane.width, 264);
+    expect(pane.width, 612 - ChatView.leastBesideWide);
+    expect(_transcript(tester).right, pane.left);
+    expect(paneWidths.value.containsKey('subagent'), isFalse);
+    // 552 for the chat: under the pane's least and the transcript's, so
+    // it lies over the transcript, at its least.
+    viewport(tester, const Size(820, 560));
+    await tester.pumpAndSettle();
+    pane = tester.getRect(_pane);
+    expect(pane.right, 820 - NushiTheme.windowPad);
+    expect(pane.width, 220);
     // The transcript keeps its width, under the pane.
-    expect(_transcript(tester).right, edge);
+    expect(_transcript(tester).right, 820 - NushiTheme.windowPad);
     await tester.tap(
       find.descendant(of: _pane, matching: find.byIcon(Icons.close)),
     );
     await tester.pumpAndSettle();
-    expect(_transcript(tester).right, edge);
+    expect(_transcript(tester).right, 820 - NushiTheme.windowPad);
+    expect(paneWidths.value.containsKey('subagent'), isFalse);
     d.dispose();
   }, variant: _mac);
 

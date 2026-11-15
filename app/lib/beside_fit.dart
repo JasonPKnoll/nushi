@@ -23,8 +23,8 @@ class PaneSpec {
 
 /// What [besideFit] works out: whether the panes lie `over` the view or
 /// beside it, whether the details `rail` shows, the room `left` of the
-/// panes (the view's and the rail's), each pane's width, and the most each
-/// may be dragged to.
+/// panes (the view's and the rail's; over the view, all of it), each
+/// pane's width, and the most each may be dragged to.
 typedef BesideFit = ({
   bool over,
   bool rail,
@@ -38,19 +38,25 @@ typedef BesideFit = ({
 ///
 /// Each step reads only what the ones before it gave, so nothing it decides
 /// feeds back into itself:
-/// - `over` from [room] and the panes' saved widths alone, never their
-///   [live] ones: a drag never puts the panes over the view or takes them
-///   off it until it's let go, and so the saved width it leaves decides.
-/// - each pane's width and its most from [room], the [live] widths (a drag
-///   under way), the saved ones and `over`. Beside the view a pane may be
-///   dragged until the view keeps [least]; over it, until a [strip] of it
-///   is left. These are `Resizable`'s own clamps, so the two agree.
+/// - `over` from [room] and the panes' least widths alone: they lie over
+///   the view only once, every one of them at its least, the view would
+///   still keep less than [least]. Neither a drag nor a saved width puts
+///   them over it or takes them off it.
+/// - beside the view, each pane's width and its most from [room], the
+///   [live] widths (a drag under way) and the saved ones. Where those leave
+///   the view less than [least], the panes narrow, never saved, until it
+///   keeps [least]: the widest gives first, down to its least, then the
+///   next ([_share]); one being dragged gives last. Its saved width is back
+///   as soon as there's room. A pane may be dragged until the view keeps
+///   [least] beside the rest as they are; `Resizable` clamps to the same
+///   most, so the two agree.
+/// - over the view, every pane at its least, its edge stopping there.
 /// - the rail from the room the panes leave: it shows while the view keeps
 ///   [railLeast] beside it (at the line exactly, it shows). It is an input
 ///   to nothing, so showing or hiding it never moves a pane.
 ///
 /// [railLeast] is at most [least], so the rail has always gone before the
-/// panes lie over the view.
+/// panes narrow, and they narrow before they lie over the view.
 BesideFit besideFit({
   required double room,
   required List<PaneSpec> panes,
@@ -60,35 +66,84 @@ BesideFit besideFit({
   required double railLeast,
   required double rail,
   Map<String, double> live = const {},
-  double strip = 48,
 }) {
-  assert(railLeast <= least, 'the rail goes before the panes lie over');
-  var savedSum = 0.0;
+  assert(railLeast <= least, 'the rail goes before the panes narrow');
+  var leastSum = 0.0;
   for (final p in panes) {
-    savedSum += p.saved(saved);
+    leastSum += p.min;
   }
-  final over = panes.isNotEmpty && room - savedSum < least;
-  final reserve = over ? strip : least;
-  double base(PaneSpec p) =>
+  if (panes.isNotEmpty && room - leastSum < least) {
+    final at = {for (final p in panes) p.name: p.min};
+    return (over: true, rail: false, left: room, widths: at, most: {...at});
+  }
+  final avail = room - least;
+  double base(PaneSpec p, Map<String, double> live) =>
       (live[p.name] ?? p.saved(saved)).clamp(p.min, p.cap);
-  var baseSum = 0.0;
-  for (final p in panes) {
-    baseSum += base(p);
-  }
-  final widths = <String, double>{};
+  // Each one's most: the room the rest leave, as they'd be with it at its
+  // saved width, its own drag aside.
   final most = <String, double>{};
-  var used = 0.0;
   for (final p in panes) {
-    final m = min(p.cap, room - (baseSum - base(p)) - reserve);
-    most[p.name] = m;
-    used += widths[p.name] = base(p).clamp(p.min, max(p.min, m));
+    final others = {...live}..remove(p.name);
+    final fixed = _share(avail, panes, {
+      for (final q in panes) q.name: base(q, others),
+    }, others.keys.toSet());
+    var rest = 0.0;
+    for (final q in panes) {
+      if (q != p) rest += fixed[q.name]!;
+    }
+    most[p.name] = min(p.cap, avail - rest);
   }
-  final left = over ? room : room - used;
+  final widths = _share(avail, panes, {
+    for (final p in panes)
+      p.name: live.containsKey(p.name)
+          ? base(p, live).clamp(p.min, max(p.min, most[p.name]!))
+          : base(p, live),
+  }, live.keys.toSet());
+  var used = 0.0;
+  for (final w in widths.values) {
+    used += w;
+  }
+  final left = room - used;
   return (
-    over: over,
-    rail: wantRail && !over && left - rail >= railLeast,
+    over: false,
+    rail: wantRail && left - rail >= railLeast,
     left: left,
     widths: widths,
     most: most,
   );
+}
+
+/// [wants], each pane's width, narrowed until together they take at most
+/// [room]: the widest gives first, down to its least, then the next widest
+/// (the rightmost first of two alike); those [last] (being dragged) give
+/// only after the rest. In the panes' order.
+Map<String, double> _share(
+  double room,
+  List<PaneSpec> panes,
+  Map<String, double> wants,
+  Set<String> last,
+) {
+  final widths = {for (final p in panes) p.name: wants[p.name]!};
+  var over = -room;
+  for (final w in widths.values) {
+    over += w;
+  }
+  if (over <= 0) return widths;
+  final order = [for (var i = panes.length - 1; i >= 0; i--) i]
+    ..sort((a, b) {
+      final pa = panes[a].name;
+      final pb = panes[b].name;
+      final byLast = (last.contains(pa) ? 1 : 0) - (last.contains(pb) ? 1 : 0);
+      if (byLast != 0) return byLast;
+      final byWidth = widths[pb]!.compareTo(widths[pa]!);
+      return byWidth != 0 ? byWidth : b.compareTo(a);
+    });
+  for (final i in order) {
+    final p = panes[i];
+    final give = min(over, widths[p.name]! - p.min);
+    widths[p.name] = widths[p.name]! - give;
+    over -= give;
+    if (over <= 0) break;
+  }
+  return widths;
 }

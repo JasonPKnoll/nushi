@@ -20,11 +20,12 @@ part 'beside_layout.dart';
 ///
 /// How the room is shared is [besideFit]'s: when [main] would keep less
 /// than [railLeast] beside the rail, the rail tucks itself away (kept,
-/// not drawn; never saved, as it's still wanted), and when [main] would
-/// keep less than [least] beside the panes alone, they lie over it, under
-/// [head], [head] and [foot] then across all of it. A pane's edge, dragged
-/// while the panes are beside [main], stops where [main] keeps [least];
-/// the rail tucks and comes back as the edge moves.
+/// not drawn; never saved, as it's still wanted); when [main] would keep
+/// less than [least] beside the panes alone, they narrow, the widest
+/// first, never saved; and once each is at its least, they lie over it,
+/// under [head], [head] and [foot] then across all of it. A pane's edge,
+/// dragged while the panes are beside [main], stops where [main] keeps
+/// [least]; the rail tucks and comes back as the edge moves.
 ///
 /// A pane slides its full width in from the right as it opens and out as
 /// it closes ([Presence], [paneSlide]), and so does the rail as it's shown,
@@ -363,8 +364,9 @@ class _BesideState extends State<Beside> {
           // Those closing: over the main view and the rail, under the rest.
           for (final s in _seen)
             if (!now.contains(s) && s != railName) pane(s, null),
-          // Beside, a pane leaves [main] its least width; over it, a
-          // strip of it. Over it, the first one's shadow falls on it.
+          // Beside, a pane's edge stops where [main] keeps its least; over
+          // it, at the pane's own least. Over it, the first one's shadow
+          // falls on it.
           for (final (i, p) in panes.indexed)
             pane(
               p.name,

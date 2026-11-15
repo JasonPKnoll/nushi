@@ -41,30 +41,27 @@ _preview = (
 );
 
 /// Whether the rail is wanted shown now (its [Presence]'s say), whatever
-/// its slide has reached.
-bool _railShown(WidgetTester tester) => tester
-    .widget<Presence>(
-      find
-          .ancestor(
-            of: find.byType(DetailsPanel, skipOffstage: false),
-            matching: find.byType(Presence, skipOffstage: false),
-          )
-          .first,
-    )
-    .shown;
+/// its slide has reached; in a chat under 804 there's none (ADR 0092).
+bool _railShown(WidgetTester tester) {
+  final rail = find.ancestor(
+    of: find.byType(DetailsPanel, skipOffstage: false),
+    matching: find.byType(Presence, skipOffstage: false),
+  );
+  return rail.evaluate().isNotEmpty &&
+      tester.widget<Presence>(rail.first).shown;
+}
 
-/// The panes lie over the transcript: the preview starts under the header.
+/// The panes lie over the transcript: it runs on under the preview.
 bool _over(WidgetTester tester) =>
-    tester.getRect(find.byType(PreviewPane)).top >
-    tester.getRect(find.byType(Pane)).top;
+    _transcript(tester).right > tester.getRect(find.byType(PreviewPane)).left;
 
-double _transcriptWidth(WidgetTester tester) => tester
-    .getRect(
-      find.byWidgetPredicate(
-        (w) => w is Transcript && w.items == null && w.chat.id == 'c',
-      ),
-    )
-    .width;
+Rect _transcript(WidgetTester tester) => tester.getRect(
+  find.byWidgetPredicate(
+    (w) => w is Transcript && w.items == null && w.chat.id == 'c',
+  ),
+);
+
+double _transcriptWidth(WidgetTester tester) => _transcript(tester).width;
 
 /// Counts the rail's and the panes' flips, frame by frame, and holds the
 /// layout's rules on each frame.
@@ -276,33 +273,36 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('over the transcript, a drag back into room keeps it over '
-      'until let go, then it goes beside, once', (tester) async {
-    // 900 for the chat's pane: under the preview's 920.
+  testWidgets('over the transcript, a drag either way flips nothing: the '
+      'preview is at its least, and its edge stays there', (tester) async {
+    // 600 for the chat's pane: under the preview's least and the
+    // transcript's, 660.
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(900, sidebar: true),
+      width: windowFor(600, sidebar: true),
       sidebar: true,
       open: _preview,
     );
     expect(_over(tester), isTrue);
-    final drag = await _grab(tester);
-    final watch = _Watch(tester);
-    for (var i = 0; i < 10; i++) {
-      await drag.moveBy(const Offset(10, 0));
+    final at = tester.getRect(find.byType(PreviewPane));
+    expect(at.width, 300);
+    for (final by in [10.0, -10.0]) {
+      final drag = await _grab(tester);
+      final watch = _Watch(tester);
+      for (var i = 0; i < 10; i++) {
+        await drag.moveBy(Offset(by, 0));
+        await tester.pump();
+        watch.frame();
+      }
+      await drag.up();
       await tester.pump();
       watch.frame();
+      await tester.pumpAndSettle();
+      watch.frame();
+      expect(watch.overFlips, 0);
+      expect(_over(tester), isTrue);
+      expect(tester.getRect(find.byType(PreviewPane)), at);
     }
-    expect(watch.overFlips, 0);
-    expect(_over(tester), isTrue);
-    await drag.up();
-    await tester.pump();
-    watch.frame();
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle();
-    watch.frame();
-    expect(watch.overFlips, 1);
-    expect(_over(tester), isFalse);
     await closeView(tester, d);
   }, variant: _mac);
 
@@ -310,19 +310,20 @@ void main() {
       'back: each flips at each crossing', (tester) async {
     final (d, _) = await panesApp(
       tester,
-      width: 1100,
+      width: 900,
       sidebar: true,
       open: _preview,
     );
     final watch = _Watch(tester);
-    for (final (from, to, step) in [(1100, 1600, 1), (1600, 1100, -1)]) {
+    for (final (from, to, step) in [(900, 1600, 1), (1600, 900, -1)]) {
       for (var w = from; w != to; w += step) {
         viewport(tester, Size(w.toDouble(), 900));
         await tester.pump();
         watch.frame();
       }
     }
-    // The rail's line at 1508, the panes' at 1188, each crossed twice.
+    // The rail's line at 1508, the panes' at 928, each crossed twice; the
+    // preview narrows under 1188, which flips nothing.
     expect(watch.railFlips, 2);
     expect(watch.overFlips, 2);
     await closeView(tester, d);
