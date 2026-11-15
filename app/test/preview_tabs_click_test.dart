@@ -1,10 +1,11 @@
-import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
+import 'package:flutter/gestures.dart' show kDoubleTapSlop, kDoubleTapTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat_files.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/files_top_row.dart';
+import 'package:nushi/folder_tree.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/preview_entry.dart';
@@ -225,6 +226,57 @@ void main() {
       PreviewFile('PLAN.md'),
       PreviewFile('README.md'),
     ]);
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('the lone name’s first click shows it in the tree, as a '
+      'single click does, and leaves it provisional; the second keeps it', (
+    tester,
+  ) async {
+    final (d, _) = await panesApp(
+      tester,
+      width: 1700,
+      details: false,
+      open: _files,
+    );
+    final c = d.chats['c']!..openInFiles('README.md', keep: false);
+    await tester.pumpAndSettle();
+    final tree = folderTreeOf(c)..select('auth');
+    await tester.tap(_top('README.md'));
+    await tester.pump(_quick);
+    expect(tree.selected, 'README.md');
+    expect(c.files.provisional.value, const PreviewFile('README.md'));
+    await tester.tap(_top('README.md'));
+    await tester.pumpAndSettle();
+    expect(c.files.provisional.value, isNull);
+    expect(tree.selected, 'README.md');
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('two quick clicks further apart than a double click’s slop '
+      'are two clicks: the tab stays provisional', (tester) async {
+    final (d, _) = await panesApp(
+      tester,
+      width: 1700,
+      details: false,
+      open: _files,
+    );
+    final c = d.chats['c']!;
+    await _tree(tester);
+    final row = tester.getRect(_row('README.md'));
+    expect(row.width - 20, greaterThan(kDoubleTapSlop));
+    await tester.tapAt(row.centerLeft + const Offset(10, 0));
+    await tester.pump(_quick);
+    await tester.tapAt(row.centerRight - const Offset(10, 0));
+    await tester.pumpAndSettle();
+    expect(c.files.provisional.value, const PreviewFile('README.md'));
+    // Within the slop, it's a double click.
+    await tester.pump(_slow);
+    await tester.tapAt(row.center);
+    await tester.pump(_quick);
+    await tester.tapAt(row.center + const Offset(4, 0));
+    await tester.pumpAndSettle();
+    expect(c.files.provisional.value, isNull);
     await closeView(tester, d);
   }, variant: _mac);
 

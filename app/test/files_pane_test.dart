@@ -753,6 +753,16 @@ void main() {
         tester.getSize(_rowIn(find.byType(FilesScreen), 'img')).height,
         greaterThanOrEqualTo(44),
       );
+      // A tap opens a file full screen: no tab to keep, so no double
+      // click's Listener over a row (the desktop's tree has one).
+      for (final row in find.byType(TreeRowView).evaluate()) {
+        Widget? parent;
+        row.visitAncestorElements((e) {
+          parent = e.widget;
+          return false;
+        });
+        expect(parent, isNot(isA<Listener>()));
+      }
       await render(tester, find.byType(PhoneApp), 'files_phone_$name');
       await tester.tap(find.text('report.md'));
       await tester.pumpAndSettle();
