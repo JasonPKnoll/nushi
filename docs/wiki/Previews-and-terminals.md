@@ -8,7 +8,7 @@ Shortcuts below are the Mac's. On Linux, use Ctrl where the Mac uses ⌘, and Al
 
 ## Open a preview
 
-When the agent writes a document, page, image or diagram, its row in the chat has a **Preview** button. Click it and the file opens beside the chat, right of the details panel, from the window's top to its bottom. Where the row is narrow (a subagent's pane), the button is inside the row: click the row to open it first.
+When the agent writes a document, page, image or diagram, its row in the chat has a **Preview** button. Click it and the file opens beside the chat, right of the details panel, from the window's top to its bottom (in a narrow window it lies over the chat instead, under the chat's header). Where the row is narrow (a subagent's pane), the button is inside the row: click the row to open it first.
 
 You can also open files in these ways:
 
@@ -56,7 +56,7 @@ A browser tab shows a web page beside the chat, such as the dev server the agent
 
 The browser's tabs sit in its top row, level with the chat's header; the bar under them has Back, Forward and Reload (⌘R). ⌘L jumps to the address field. **Expand** gives the browser the whole chat area, its header and terminal too, and **Collapse** (or Esc) gives the chat back.
 
-**When the window gets narrow.** Panes open right of the details panel, and the header's buttons move left to make room. When the panes would leave the chat too narrow, the details panel tucks itself away; it comes back by itself as soon as there's room (a wider window, a narrower or closed pane). Its button stays lit, since you still want it: press it to hide the panel for good. Narrower still, the panes lie over the chat.
+**When the window gets narrow.** Panes open right of the details panel, and the header's buttons move left to make room. When the panes would leave the chat too narrow, the details panel tucks itself away; it comes back by itself as soon as there's room (a wider window, a narrower or closed pane). Its button stays lit, since you still want it: press it to hide the panel for good. Narrower still, the panes lie over the chat, under its header. In a very narrow window the panel can't show at all, and its button is off.
 
 If your project lists dev servers in a launch file (`.claude/launch.json` or `.agents/launch.json`), the **Servers** button starts and stops them. **Logs** shows a server's output. A server marked **Agent can't name it** has a name the agent can't use (only letters, digits and `: _ . -`): start it from the menu, or rename it in the launch file.
 

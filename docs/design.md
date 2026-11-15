@@ -80,7 +80,7 @@ Nothing is set between the steps: a size that was (12.5, 13.5, 10.5) went to the
 | `iconGap` | 2 | icon buttons, which carry their own padding |
 | `menuPad` | 5 | a menu's edge and its rows |
 
-Fixed heights: a header `PaneHeader.height` 56 (with a hairline under it, no fill), Changes' bar 44, a tool call's row 36, a sidebar row 34, a settings row 46 at least, a menu row 30, the composer's row 32. The transcript's column is `chatWidth` 800 at most; the details panel 320, between the transcript and the side panes, which run the pane's full height; it tucks away before the side panes lie over the transcript (`besideFit`, ADR [0123](adr/0123-side-panes-right-of-the-rail.md)). The phone keeps its own values (`TouchTargets`, every target 44).
+Fixed heights: a header `PaneHeader.height` 56 (with a hairline under it, no fill), Changes' bar 44, a tool call's row 36, a sidebar row 34, a settings row 46 at least, a menu row 30, the composer's row 32. The transcript's column is `chatWidth` 800 at most; the details panel 320, between the transcript and the side panes, which run the pane's full height beside the transcript (over it, under the header); it tucks away before the side panes lie over the transcript (`besideFit`, ADR [0123](adr/0123-side-panes-right-of-the-rail.md)). The phone keeps its own values (`TouchTargets`, every target 44).
 
 ### Corners (`NushiTheme`, ADR [0110](adr/0110-corners-come-from-the-theme.md))
 
