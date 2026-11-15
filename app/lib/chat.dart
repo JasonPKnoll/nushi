@@ -371,6 +371,10 @@ class ChatState extends ChangeNotifier {
   /// Its browser tabs (ADR 0094): their tabs and the one showing.
   late final browser = BrowserTabs();
 
+  /// Counts the files asked to open ([openInFiles]), the one showing too:
+  /// an expanded browser gives way to each (ADR 0094).
+  final filesOpened = ValueNotifier<int>(0);
+
   /// The file its file tabs show, as its tab names it; null with none.
   String? get shownFile => files.shown.value?.path;
 
@@ -444,6 +448,7 @@ class ChatState extends ChangeNotifier {
       filesChats.value = {...filesChats.value, id};
     }
     lastTabbed = TabKind.file;
+    filesOpened.value++;
     sawFile(path);
   }
 

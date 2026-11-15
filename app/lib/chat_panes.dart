@@ -115,16 +115,16 @@ BesideFit chatFit({
 /// the Files pane, a subagent's or background command's pane (or the
 /// browser in its place). The Files pane's tab row is [fileTabsKey]'s and
 /// the browser's [browserTabsKey]'s, so each keeps its scroll as its tabs
-/// change; the browser is [expanded] over all of it (ADR 0094) and
-/// [onExpand] toggles that.
+/// change. The Files pane or the browser named [cover] is expanded over
+/// all of it (ADR 0094), and [onExpand] toggles a pane's, by its name.
 List<SidePane> chatPanes(
   BuildContext context,
   ChatState chat,
   Daemon daemon, {
   required GlobalKey fileTabsKey,
   required GlobalKey browserTabsKey,
-  required bool expanded,
-  required VoidCallback onExpand,
+  required String? cover,
+  required ValueChanged<String> onExpand,
 }) {
   final side = chat.side.value;
   final id = chat.pane.value;
@@ -146,6 +146,8 @@ List<SidePane> chatPanes(
             daemon: daemon,
             tabsKey: fileTabsKey,
             onClose: () => toggleFiles(chat),
+            expanded: cover == spec.name,
+            onExpand: () => onExpand(spec.name),
           ),
           'subagent' => _taskPane(chat, daemon, id!),
           _ => BrowserPane(
@@ -155,8 +157,8 @@ List<SidePane> chatPanes(
             daemon: daemon,
             tabsKey: browserTabsKey,
             onClose: () => closeBrowser(chat),
-            expanded: expanded,
-            onExpand: onExpand,
+            expanded: cover == spec.name,
+            onExpand: () => onExpand(spec.name),
           ),
         },
       ),

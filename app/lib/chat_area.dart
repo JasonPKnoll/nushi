@@ -53,11 +53,13 @@ class _ChatAreaState extends State<ChatArea> {
   final GlobalKey<State> _fileTabs = GlobalKey();
   final GlobalKey<State> _browserTabs = GlobalKey();
 
-  /// Whether the browser tab showing takes the whole area, over the
-  /// transcript (its Expand, ADR 0094). It lasts while a browser tab shows
-  /// on the Chat tab: a file shown, the browser hidden, a subagent's pane,
-  /// another chat (another area) or another tab put it back.
-  final _expanded = ValueNotifier<bool>(false);
+  /// The pane that takes the whole area, over the transcript (its Expand,
+  /// ADR 0094): the Files pane or the browser, by its name; null for none.
+  /// It lasts while that pane shows on the Chat tab: the pane closed or
+  /// hidden, the other one showing a tab, a subagent's pane in the
+  /// browser's place, a terminal opening, another chat (another area) or
+  /// another tab put it back.
+  final _cover = ValueNotifier<String?>(null);
 
   /// Where ⌃` and the keys stay when what had the focus goes.
   final _keys = FocusNode(skipTraversal: true);
@@ -69,12 +71,14 @@ class _ChatAreaState extends State<ChatArea> {
     // transcript when it needs you: what it asks is there.
     if (widget.chat.phase == ChatPhase.waiting) _tab.value = ChatTab.chat;
     widget.chat.addListener(_showFile);
-    widget.chat.files.shown.addListener(_showFileTab);
+    widget.chat.files.shown.addListener(_filesShown);
+    widget.chat.filesOpened.addListener(_fileOpened);
     filesChats.addListener(_filesShown);
     _tab.addListener(_filesShown);
     _filesShown();
-    widget.chat.browser.shown.addListener(_collapse);
+    widget.chat.browser.shown.addListener(_showBrowserTab);
     widget.chat.pane.addListener(_collapse);
+    filesChats.addListener(_collapse);
     widget.chat.showAsked.addListener(_showAsked);
     _tab.addListener(_showAsked);
     _tab.addListener(_collapse);
@@ -93,11 +97,13 @@ class _ChatAreaState extends State<ChatArea> {
   @override
   void dispose() {
     widget.chat.removeListener(_showFile);
-    widget.chat.files.shown.removeListener(_showFileTab);
+    widget.chat.files.shown.removeListener(_filesShown);
+    widget.chat.filesOpened.removeListener(_fileOpened);
     filesChats.removeListener(_filesShown);
     _tab.removeListener(_filesShown);
-    widget.chat.browser.shown.removeListener(_collapse);
+    widget.chat.browser.shown.removeListener(_showBrowserTab);
     widget.chat.pane.removeListener(_collapse);
+    filesChats.removeListener(_collapse);
     widget.chat.showAsked.removeListener(_showAsked);
     _tab.removeListener(_showAsked);
     _tab.removeListener(_collapse);
@@ -113,22 +119,39 @@ class _ChatAreaState extends State<ChatArea> {
       widget.chat.panelFits = ChatState.fitsAlways;
     }
     _pull.unfollow();
-    _expanded.dispose();
+    _cover.dispose();
     _inFiles.dispose();
     typesThrough.remove(_keys);
     _keys.dispose();
     super.dispose();
   }
 
-  /// Whether a browser tab shows beside the transcript, so it can expand.
-  bool get _browsing =>
-      widget.chat.shownTab == ChatTab.chat &&
-      widget.chat.pane.value == null &&
-      widget.chat.browser.shown.value != null;
+  /// Whether the pane [name] shows beside the transcript, so it can cover
+  /// it: the Files pane while it's open, the browser while a tab shows in
+  /// it, on the Chat tab.
+  bool _coverable(String? name) {
+    final chat = widget.chat;
+    if (name == null || chat.shownTab != ChatTab.chat) return false;
+    return switch (name) {
+      'filesPane' => filesOpen(chat),
+      'browser' => chat.pane.value == null && chat.browser.shown.value != null,
+      _ => false,
+    };
+  }
 
-  /// What shows is no longer a browser tab on the Chat tab: it's put back.
+  /// What covers no longer shows: it's put back.
   void _collapse() {
-    if (!_browsing) _expanded.value = false;
+    if (!_coverable(_cover.value)) _cover.value = null;
+  }
+
+  /// A browser tab showing puts an expanded Files pane back (it shows in
+  /// the browser beside it), and a browser hidden or closed is put back.
+  void _showBrowserTab() {
+    if (widget.chat.browser.shown.value != null &&
+        _cover.value == ChatPanes.files.name) {
+      _cover.value = null;
+    }
+    _collapse();
   }
 
   /// Whether its chat's terminal was open, as last heard.
@@ -139,7 +162,7 @@ class _ChatAreaState extends State<ChatArea> {
   /// tab is put back, or the terminal would open where nothing shows it.
   void _terminalShown() {
     final open = terminalChats.value.contains(widget.chat.id);
-    if (open && !_terminalOpen) _expanded.value = false;
+    if (open && !_terminalOpen) _cover.value = null;
     _terminalOpen = open;
   }
 
@@ -148,19 +171,19 @@ class _ChatAreaState extends State<ChatArea> {
   /// under it is shown, not closed unseen ([_terminalShown] puts the tab
   /// back for one that opens).
   void _toggleTerminal() {
-    if (_expanded.value && terminalChats.value.contains(widget.chat.id)) {
-      _expanded.value = false;
+    if (_cover.value != null &&
+        terminalChats.value.contains(widget.chat.id)) {
+      _cover.value = null;
       return;
     }
     toggleTerminalOf(widget.chat, _keys);
   }
 
   /// A file opened shows in the Files pane beside the chat, so an expanded
-  /// browser tab is put back for it (ADR 0094); the tabs' marks follow
-  /// ([_inFiles]).
-  void _showFileTab() {
-    _filesShown();
-    if (widget.chat.files.shown.value != null) _expanded.value = false;
+  /// browser is put back for it (ADR 0094); an expanded Files pane shows it
+  /// where it is.
+  void _fileOpened() {
+    if (_cover.value == ChatPanes.browser.name) _cover.value = null;
   }
 
   /// The file the Files pane shows while it shows: what a tool row's
@@ -325,7 +348,7 @@ class _ChatAreaState extends State<ChatArea> {
                     chat.side,
                     chat.sideHidden,
                     filesChats,
-                    _expanded,
+                    _cover,
                   ]),
                   builder: (context, _) => _beside(
                     context,
@@ -363,8 +386,9 @@ class _ChatAreaState extends State<ChatArea> {
             widget.daemon,
             fileTabsKey: _fileTabs,
             browserTabsKey: _browserTabs,
-            expanded: _expanded.value && _browsing,
-            onExpand: () => _expanded.value = !_expanded.value,
+            cover: _coverable(_cover.value) ? _cover.value : null,
+            onExpand: (name) =>
+                _cover.value = _cover.value == name ? null : name,
           )
         : const <SidePane>[];
     // One is dragged as wide as it's wanted (PaneSpec.wide).
@@ -382,7 +406,7 @@ class _ChatAreaState extends State<ChatArea> {
       // narrower than that the panes lie over it ([chatFit]).
       least: wide ? ChatView.leastBesideWide : ChatView.minWidth,
       railLeast: wide ? ChatView.leastBesideWide : ChatView.leastBesideDetails,
-      cover: _expanded.value && _browsing ? ChatPanes.browser.name : null,
+      cover: _coverable(_cover.value) ? _cover.value : null,
       panes: panes,
       details: details,
     );

@@ -520,6 +520,33 @@ void main() {
       await closeView(tester, d);
     }, variant: _mac);
 
+    testWidgets('the Files pane covers it too: header, rail, terminal and '
+        'box hidden; ⌃` puts it back and shows the terminal', (tester) async {
+      final (d, _) = await panesApp(
+        tester,
+        width: windowFor(1600, sidebar: false),
+        terminal: true,
+        open: _open(files: true, previews: 1),
+      );
+      final files = _r(tester, find.byType(FilesPane));
+      Finder inFiles(String tip) => find.descendant(
+        of: find.byType(FilesPane),
+        matching: find.byTooltip(tip),
+      );
+      await tester.tap(inFiles('Expand'));
+      await tester.pumpAndSettle();
+      expect(_r(tester, find.byType(FilesPane)), _r(tester, find.byType(Pane)));
+      for (final t in [ChatHeader, DetailsPanel, TerminalPanel, Composer]) {
+        expect(find.byType(t), findsNothing, reason: '$t drawn');
+        expect(find.byType(t, skipOffstage: false), findsOneWidget);
+      }
+      await _terminalKey(tester);
+      expect(inFiles('Expand'), findsOneWidget);
+      expect(_r(tester, find.byType(FilesPane)), files);
+      expect(find.byType(TerminalPanel), findsOneWidget);
+      await closeView(tester, d);
+    }, variant: _both);
+
     testWidgets('tucked or over, collapsing puts each back', (tester) async {
       for (final area in [1100.0, 900.0]) {
         browserFakes();

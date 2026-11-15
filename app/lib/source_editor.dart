@@ -275,7 +275,10 @@ class _EditorKeys extends CodeShortcutsActivatorsBuilder {
     CodeShortcutType.lineDelete ||
     CodeShortcutType.lineSelect ||
     CodeShortcutType.singleLineComment ||
-    CodeShortcutType.multiLineComment => null,
+    CodeShortcutType.multiLineComment ||
+    // Esc is the pane's: it collapses an expanded Files pane (ADR 0094);
+    // the find bar takes its own.
+    CodeShortcutType.esc => null,
     CodeShortcutType.cursorMoveLineStart when commandKey == CommandKey.meta => [
       ...?_builtIn.build(type),
       const SingleActivator(LogicalKeyboardKey.keyA, control: true),
