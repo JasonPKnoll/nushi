@@ -50,13 +50,14 @@ bool _inOrder(String s, String w) {
 /// The most files a filter shows.
 const filterShows = 200;
 
+/// What a filter found: its rows, the best match, and whether more matched
+/// than it shows ([filterShows]).
+typedef FilterFound = ({List<TreeRow> rows, String? best, bool capped});
+
 /// The rows of the files [paths] that match [query], as a tree: their
 /// folders open above them, folders first, each by name; at most
 /// [filterShows] of the best, and the best match.
-({List<TreeRow> rows, String? best}) filterRows(
-  Iterable<String> paths,
-  String query,
-) {
+FilterFound filterRows(Iterable<String> paths, String query) {
   final scored = <(int, String)>[
     for (final p in paths)
       if (matchScore(p, query) case final s?) (s, p),
@@ -85,7 +86,11 @@ const filterShows = 200;
   }
 
   walk(root, '', 0);
-  return (rows: rows, best: hits.firstOrNull);
+  return (
+    rows: rows,
+    best: hits.firstOrNull,
+    capped: scored.length > filterShows,
+  );
 }
 
 /// [filterRows] of a tree's listings and git's list, worked out again only
@@ -94,14 +99,10 @@ const filterShows = 200;
 /// large folder takes 10 to 25 ms.
 class FilterMemo {
   Object? _key;
-  ({List<TreeRow> rows, String? best})? _found;
+  FilterFound? _found;
 
   /// The rows for [query] in [tree] and [git].
-  ({List<TreeRow> rows, String? best}) of(
-    FolderTree tree,
-    GitFiles git,
-    String query,
-  ) {
+  FilterFound of(FolderTree tree, GitFiles git, String query) {
     // git's list is replaced, never changed: the same list is the same.
     final key = (query, tree.revision, git.paths);
     if (_found case final found? when key == _key) return found;

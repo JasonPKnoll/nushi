@@ -277,7 +277,7 @@ The open file's name, in the Files pane's top row, shows its path when the point
 - The files the chat wrote or edited have a green dot, and so do the folders holding them.
 - What git ignores is left out; the eye at the end of the tree's filter shows it, dimmed. `.git` never shows.
 - A folder with more than 500 entries shows the first 500 and "N more".
-- **Filter files** over the tree finds any file in the folder by name, in folders not opened too: the start of its name first, then anywhere in its name or path, then its letters in order ("trvw" finds `tree_view.dart`). The matches show as a tree, the best one picked; ⏎ opens it, Esc clears the filter.
+- **Search files…** over the tree finds any file in the folder by name, in folders not opened too: the start of its name first, then anywhere in its name or path, then its letters in order ("trvw" finds `tree_view.dart`). The matches show as a tree, the best one picked; ⏎ opens it, Esc clears the search. It shows the best 200; past those it says "Some entries may not be listed. Keep typing to narrow.".
 - On the phone, the chat's ⋯ › Files shows the same tree; a file opens full screen ([ADR 0090](adr/0090-a-files-pane-beside-the-chat.md)).
 
 **Open file** (⌘P, File › Open File…) opens any file in the chat's folder that git doesn't ignore, but those the Files pane dims, matched as you type.

@@ -169,7 +169,7 @@ class _FilesTreeState extends State<FilesTree> {
                 style: theme.ui(t.text, size: 12),
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: 'Filter files',
+                  hintText: 'Search files…',
                   prefixIcon: Icon(Icons.search, size: 14, color: t.textMuted),
                   prefixIconConstraints: const BoxConstraints(minWidth: 26),
                   // What git ignores, shown or not: the tree's own switch.
@@ -216,9 +216,11 @@ class _FilesTreeState extends State<FilesTree> {
   Widget _body(NushiTheme theme) {
     final t = theme.t;
     final marks = writtenMarks(widget.chat);
+    var capped = false;
     if (_q.isNotEmpty) {
       final found = _filter.of(_tree, _git, _q);
       _rows = found.rows;
+      capped = found.capped;
       if (_filterAt == null || !_rows.any((r) => r.path == _filterAt)) {
         _filterAt = found.best;
       }
@@ -239,28 +241,46 @@ class _FilesTreeState extends State<FilesTree> {
     final open = widget.chat.shownFile;
     return MacScrollbar(
       controller: _scroll,
-      child: ListView.builder(
+      child: CustomScrollView(
         controller: _scroll,
-        itemExtent: FilesTree.row,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        itemCount: _rows.length,
-        itemBuilder: (context, i) {
-          final r = _rows[i];
-          return TreeRowView(
-            r,
-            selected: r.entry && r.path == _at,
-            showing: r.kind == TreeRowKind.file && r.path == open,
-            wrote: r.kind == TreeRowKind.folder
-                ? marks.folders.contains(r.path)
-                : marks.files.contains(r.path),
-            onTap: r.entry
-                ? () {
-                    _list.requestFocus();
-                    _activate(r);
-                  }
-                : null,
-          );
-        },
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            sliver: SliverFixedExtentList.builder(
+              itemExtent: FilesTree.row,
+              itemCount: _rows.length,
+              itemBuilder: (context, i) {
+                final r = _rows[i];
+                return TreeRowView(
+                  r,
+                  selected: r.entry && r.path == _at,
+                  showing: r.kind == TreeRowKind.file && r.path == open,
+                  wrote: r.kind == TreeRowKind.folder
+                      ? marks.folders.contains(r.path)
+                      : marks.files.contains(r.path),
+                  onTap: r.entry
+                      ? () {
+                          _list.requestFocus();
+                          _activate(r);
+                        }
+                      : null,
+                );
+              },
+            ),
+          ),
+          // More matched than the filter shows: Claude desktop's words, an
+          // explanation, so its full stops (docs/design.md).
+          if (capped)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  'Some entries may not be listed. Keep typing to narrow.',
+                  style: theme.ui(t.textMuted, size: 12),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

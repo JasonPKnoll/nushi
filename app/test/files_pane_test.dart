@@ -139,6 +139,7 @@ Future<(Daemon, _Folder)> _app(
   Size size = const Size(1700, 900),
   Brightness? brightness,
   bool open = true,
+  List<String> git = _gitFiles,
 }) async {
   viewport(tester, size, brightness: brightness);
   showDetails.value = false;
@@ -153,7 +154,7 @@ Future<(Daemon, _Folder)> _app(
       unawaited(s.close());
     }
   });
-  final d = await _fake(folder, previews).connect(tester);
+  final d = await _fake(folder, previews, git: git).connect(tester);
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
@@ -163,13 +164,14 @@ Future<(Daemon, _Folder)> _app(
 /// The fake daemon on [folder], each preview's stream kept in [previews].
 FakeDaemon _fake(
   _Folder folder,
-  List<StreamController<WatchChatFileResponse>> previews,
-) {
+  List<StreamController<WatchChatFileResponse>> previews, {
+  List<String> git = _gitFiles,
+}) {
   final c = chat('c', 'claude', 'Write the report');
   return FakeDaemon([c])
     ..answer = ((input) => switch (input) {
       GetChatRequest() => GetChatResponse(chat: c, items: _items),
-      ListFilesRequest() => ListFilesResponse(paths: _gitFiles),
+      ListFilesRequest() => ListFilesResponse(paths: git),
       _ => null,
     })
     ..streams = (input) {
@@ -584,6 +586,42 @@ void main() {
     await _key(tester, LogicalKeyboardKey.escape);
     expect(_names(tester).first, 'app');
     expect(_names(tester), isNot(contains('widgets')));
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('Search files… with the eye at its end; past its 200 best '
+      'matches it says some may not be listed', (tester) async {
+    final (d, _) = await _app(
+      tester,
+      git: [for (var i = 0; i < 250; i++) 'gen/part$i.dart'],
+    );
+    final field = find.descendant(of: _pane, matching: find.byType(TextField));
+    expect(
+      tester.widget<TextField>(field).decoration!.hintText,
+      'Search files…',
+    );
+    expect(
+      find.descendant(
+        of: field,
+        matching: find.byTooltip('Show what git ignores'),
+      ),
+      findsOneWidget,
+    );
+    const note = 'Some entries may not be listed. Keep typing to narrow.';
+    await tester.enterText(field, 'part');
+    await tester.pumpAndSettle();
+    // 250 match: the best 200 show, and after them the note, with its
+    // full stops.
+    await tester.drag(find.byType(FilesTree), const Offset(0, -20000));
+    await tester.pumpAndSettle();
+    expect(find.text(note), findsOneWidget);
+    final last = tester.getRect(find.byType(TreeRowView).last);
+    expect(tester.getRect(find.text(note)).top, greaterThan(last.bottom));
+    await render(tester, find.byType(NushiApp), 'files_search_capped');
+    // Narrowed to 111: no note.
+    await tester.enterText(field, 'part1');
+    await tester.pumpAndSettle();
+    expect(find.text(note), findsNothing);
     await closeView(tester, d);
   }, variant: _mac);
 
