@@ -5,6 +5,7 @@ import 'dart:ui' show BoxHeightStyle;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import 'package:nushi/indent_guides.dart';
 import 'package:nushi/preview_text.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_spans.dart';
@@ -34,6 +35,7 @@ class SourceView extends StatefulWidget {
     this.padding,
     this.wrap = true,
     this.tabSize = defaultTabSize,
+    this.guides = false,
   });
 
   final String text;
@@ -43,6 +45,10 @@ class SourceView extends StatefulWidget {
 
   /// The columns between tab stops.
   final int tabSize;
+
+  /// Whether its indent guides are drawn (the Mac's Files pane's Indent
+  /// guides).
+  final bool guides;
 
   @override
   State<SourceView> createState() => _SourceViewState();
@@ -54,6 +60,7 @@ class _SourceViewState extends State<SourceView> {
   List<Uint32List?>? _spans;
   int _reads = 0; // a highlight lands only for the latest read
   int? _columns; // the widest line's, worked out when first unwrapped
+  List<int>? _levels; // each line's indent, worked out when guides show
 
   /// Each wrapping's list, to find the line at its top (a key of their
   /// own: one shared would carry the scroll offset across); and its
@@ -79,7 +86,7 @@ class _SourceViewState extends State<SourceView> {
     // The file changed: read again where it scrolled to.
     if (old.text != widget.text || old.path != widget.path) _read();
     if (old.wrap != widget.wrap) _keepTopLine();
-    if (old.tabSize != widget.tabSize) _columns = null;
+    if (old.tabSize != widget.tabSize) _columns = _levels = null;
   }
 
   @override
@@ -101,6 +108,7 @@ class _SourceViewState extends State<SourceView> {
     if (_lines.length > 1 && _lines.last.isEmpty) _lines.removeLast();
     _spans = null;
     _columns = null;
+    _levels = null;
     if (sourceLanguage(widget.path, _text) case final language?) {
       highlightSides(language, '', _text).then((s) {
         if (mounted && read == _reads && s[1] != null) {
@@ -251,6 +259,11 @@ class _SourceViewState extends State<SourceView> {
     }
 
     String number(int i) => '${i + 1}'.padLeft(digits);
+    // Indent guides, a tab's columns apart.
+    final step = widget.tabSize * char;
+    int level(int i) => widget.guides
+        ? (_levels ??= indentLevels(_lines, widget.tabSize))[i]
+        : 0;
     if (widget.wrap) {
       return SelectionArea(
         child: SelectionContainer(
@@ -278,6 +291,8 @@ class _SourceViewState extends State<SourceView> {
                     ),
                     whole: _lines[i],
                     column: char,
+                    level: level(i),
+                    step: step,
                   ),
                 ),
               ],
@@ -332,6 +347,8 @@ class _SourceViewState extends State<SourceView> {
                               ),
                               whole: _lines[i],
                               column: char,
+                              level: level(i),
+                              step: step,
                             ),
                           ),
                           Positioned(

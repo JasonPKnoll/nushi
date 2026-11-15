@@ -356,12 +356,14 @@ void main() {
       'Preview tabs',
       '—',
       'Word wrap',
+      'Indent guides',
       'Show whitespace',
       'Tab size',
     ]);
     expect(_checked('Show file tree'), isTrue);
     expect(_checked('Preview tabs'), isTrue);
     expect(_checked('Word wrap'), isTrue);
+    expect(_checked('Indent guides'), isTrue);
     expect(_checked('Show whitespace'), isFalse);
     expect(
       tester.widget<MenuItemButton>(_menuRow('Collapse all folders')).onPressed,

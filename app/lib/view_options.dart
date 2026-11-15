@@ -65,6 +65,17 @@ final wrapOption = ViewToggle(
   paletteOff: 'Wrap lines in Files',
 );
 
+/// Indent guides: a faint line down each of a source's indent levels.
+final indentGuidesOption = ViewToggle(
+  act: Act.indentGuides,
+  pref: indentGuides,
+  label: 'Indent guides',
+  viewOn: 'Hide Indent Guides',
+  viewOff: 'Show Indent Guides',
+  paletteOn: 'Hide indent guides in Files',
+  paletteOff: 'Show indent guides in Files',
+);
+
 /// Show whitespace: a source's spaces and tabs marked (ADR 0096).
 final whitespaceOption = ViewToggle(
   act: Act.whitespace,
@@ -80,6 +91,7 @@ final whitespaceOption = ViewToggle(
 final List<ViewToggle> viewToggles = [
   previewTabsOption,
   wrapOption,
+  indentGuidesOption,
   whitespaceOption,
 ];
 

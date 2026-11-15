@@ -7,6 +7,7 @@ import 'package:nushi/app_actions.dart' show findKey;
 import 'package:nushi/conventions.dart';
 import 'package:nushi/editor_find.dart';
 import 'package:nushi/file_edit.dart';
+import 'package:nushi/indent_guides.dart';
 import 'package:nushi/keys.dart';
 import 'package:nushi/menu.dart' show Menu;
 import 'package:nushi/settings.dart';
@@ -205,13 +206,23 @@ class _SourceEditorState extends State<SourceEditor> {
     // elsewhere it's the chat's or Changes'.
     return CallbackShortcuts(
       bindings: {findKey: _find.open},
-      child: ValueListenableBuilder(
-        valueListenable: showWhitespace,
-        builder: (context, show, editor) => Stack(
+      child: ListenableBuilder(
+        listenable: Listenable.merge([showWhitespace, indentGuides, tabSize]),
+        builder: (context, editor) => Stack(
           fit: StackFit.expand,
           children: [
             editor!,
-            if (show)
+            // Over its fill, in the indentation, where no text is.
+            if (indentGuides.value)
+              IndentGuideOverlay(
+                lines: _lines,
+                controller: widget.edit.controller,
+                gutter: _gutter,
+                step: tabSize.value * columnWidth(code, TextScaler.noScaling),
+                size: tabSize.value,
+                color: whitespaceColor(NushiTheme.of(context).t),
+              ),
+            if (showWhitespace.value)
               WhitespaceOverlay(
                 lines: _lines,
                 controller: widget.edit.controller,

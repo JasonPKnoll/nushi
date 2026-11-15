@@ -10,7 +10,7 @@ import 'package:nushi/file_text.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/preview.dart';
 import 'package:nushi/preview_marks.dart';
-import 'package:nushi/settings.dart' show tabSize;
+import 'package:nushi/settings.dart' show indentGuides, tabSize;
 import 'package:nushi/skills_list.dart';
 import 'package:nushi/source_editor.dart';
 import 'package:nushi/theme/theme.dart';
@@ -227,11 +227,13 @@ class _FileViewState extends State<FileView> {
                     chat.editsChanged,
                     shown.source,
                     tabSize,
+                    indentGuides,
                   ]),
                   builder: (context, _) => PreviewBody(
                     watch: shown.watch,
                     source: shown.source.value,
                     tabSize: tabSize.value,
+                    guides: indentGuides.value,
                     onReveal: shown.reveal,
                     editor: _editor,
                     readOnly: shown.readOnly,

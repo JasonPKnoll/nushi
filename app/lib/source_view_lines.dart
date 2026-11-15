@@ -28,12 +28,22 @@ class _Whole extends StaticSelectionContainerDelegate {
 /// end: each line is a text of its own, and a selection across them
 /// otherwise runs them together.
 class _Line extends StatefulWidget {
-  const new(this.text, {required this.whole, required this.column});
+  const new(
+    this.text, {
+    required this.whole,
+    required this.column,
+    this.level = 0,
+    this.step = 0,
+  });
 
   final Widget text;
 
   /// A column's width, for its whitespace's marks (Show whitespace).
   final double column;
+
+  /// Its indent guides: how many, [step] apart (Indent guides; none off).
+  final int level;
+  final double step;
 
   /// The line as the file has it: a line cut at [_maxLine] copies its
   /// own text to its end, not the note that stands for the rest.
@@ -64,18 +74,23 @@ class _LineState extends State<_Line> {
         color:
             DefaultSelectionStyle.of(context).selectionColor ??
             DefaultSelectionStyle.defaultColor,
-        child: ValueListenableBuilder(
-          valueListenable: showWhitespace,
-          builder: (context, show, text) => WhitespaceMarks(
-            line: whole.length > _maxLine
-                ? whole.substring(0, _maxLine)
-                : whole,
-            show: show,
-            color: whitespaceColor(t),
-            column: widget.column,
-            child: text,
+        child: IndentGuides(
+          level: widget.level,
+          step: widget.step,
+          color: whitespaceColor(t),
+          child: ValueListenableBuilder(
+            valueListenable: showWhitespace,
+            builder: (context, show, text) => WhitespaceMarks(
+              line: whole.length > _maxLine
+                  ? whole.substring(0, _maxLine)
+                  : whole,
+              show: show,
+              color: whitespaceColor(t),
+              column: widget.column,
+              child: text,
+            ),
+            child: widget.text,
           ),
-          child: widget.text,
         ),
       ),
     );

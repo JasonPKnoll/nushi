@@ -507,11 +507,14 @@ Widget _beside(FileEdit e, Brightness b) => themed(
         color: NushiTheme.of(context).t.base,
         child: Row(
           children: [
+            // As the Files pane has it: its indent guides on, as the
+            // editor's are.
             const Expanded(
               child: SourceView(
                 tabbed,
                 path: 'main.go',
                 wrap: false,
+                guides: true,
                 padding: EdgeInsets.fromLTRB(28, 22, 28, 28),
               ),
             ),

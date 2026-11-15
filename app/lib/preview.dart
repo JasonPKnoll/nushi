@@ -340,6 +340,7 @@ class PreviewBody extends StatelessWidget {
     this.editor,
     this.readOnly,
     this.tabSize = defaultTabSize,
+    this.guides = false,
   });
 
   final FileWatch watch;
@@ -361,6 +362,10 @@ class PreviewBody extends StatelessWidget {
   /// A source's columns between tab stops: the Mac's Files pane's setting,
   /// the phone's [defaultTabSize].
   final int tabSize;
+
+  /// Whether a source draws its indent guides: the Mac's setting; never on
+  /// the phone.
+  final bool guides;
 
   @override
   Widget build(BuildContext context) {
@@ -441,6 +446,7 @@ class PreviewBody extends StatelessWidget {
                 padding: padding,
                 wrap: wrap,
                 tabSize: tabSize,
+                guides: guides,
               );
               final why = readOnly?.call();
               if (why == null || why.isEmpty) return view;
