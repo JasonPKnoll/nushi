@@ -495,8 +495,8 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets("a chat narrower than its panes' least widths narrows them "
-      'alike, none past its left edge', (tester) async {
+  testWidgets("a chat narrower than its panes' least widths narrows them, "
+      'Files first, none past its left edge', (tester) async {
     // 732 for the chat: the side chat, Files and the browser need 1100.
     browserFakes();
     final (d, _) = await panesApp(
@@ -516,9 +516,10 @@ void main() {
       expect(panes[i].left, closeTo(panes[i - 1].right, 0.01));
     }
     expect(panes.last.right, area.right);
-    // Each by the same share of its least: 732 of 1100.
-    for (final (i, least) in [300.0, 500.0, 300.0].indexed) {
-      expect(panes[i].width, closeTo(least * 732 / 1100, 0.01));
+    // Each to the least its rows hold (240, 200, 300: Files gives the
+    // most), then all by the same share of that: 732 of 740.
+    for (final (i, least) in [240.0, 200.0, 300.0].indexed) {
+      expect(panes[i].width, closeTo(least * 732 / 740, 0.01));
     }
     // Inside Files, its viewer and its tree narrowed alike too (ADR 0123).
     final files = panes[1].width;

@@ -284,14 +284,13 @@ class _BesideState extends State<Beside> {
           child: child,
         );
         // Over [main] a pane is never narrower than its least; in a room
-        // narrower than theirs, all of them are narrowed alike to fit, the
-        // first never past its left edge nor, with the sidebar hidden,
-        // under the title buttons (ADR 0118), which would lie over its top
-        // row.
-        final used = fit.widths.values.fold(0.0, (w, x) => w + x);
+        // narrower than theirs, they narrow to fit ([squeeze]): each to the
+        // least its rows hold, then all alike, the first never past its
+        // left edge nor, with the sidebar hidden, under the title buttons
+        // (ADR 0118), which would lie over its top row.
         final fits = max(0.0, room - (sidebarShut ? hiddenHeaderStart : 0));
-        final squeezed = over && used > fits
-            ? {for (final e in fit.widths.entries) e.key: e.value * fits / used}
+        final squeezed = over
+            ? squeeze(fit.widths, panes, fits)
             : const <String, double>{};
         final railName = details?.name ?? _BesideState._railName;
         final children = [

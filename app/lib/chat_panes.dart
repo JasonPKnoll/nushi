@@ -24,16 +24,24 @@ import 'package:nushi/subagent_pane.dart';
 /// background command's pane (named as the old Wider one was, so a width
 /// dragged then stays), and the browser, in that one's place.
 abstract final class ChatPanes {
-  static const side = PaneSpec('side', initial: 380, min: 300, cap: 640);
+  static const side = PaneSpec(
+    'side',
+    initial: 380,
+    min: 300,
+    cap: 640,
+    squeezed: 240,
+  );
 
   /// The viewer at 560 and the tree at 260 (`files_split.dart`); at its
-  /// least, the viewer's 300 and the tree's 200.
+  /// least, the viewer's 300 and the tree's 200. Its rows fold, so lying
+  /// over the view it gives first, down to 200, before the rest narrow.
   static const files = PaneSpec(
     'filesPane',
     initial: 820,
     min: 500,
     cap: double.infinity,
     wide: true,
+    squeezed: 200,
   );
 
   /// The Files pane with its viewer alone (its tree hidden, ⇧⌘Y, or a
@@ -45,6 +53,7 @@ abstract final class ChatPanes {
     min: 300,
     cap: double.infinity,
     wide: true,
+    squeezed: 200,
   );
 
   /// It opens at the details panel's width before that took its own (ADR

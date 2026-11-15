@@ -437,4 +437,55 @@ void main() {
     }
     expect(told, 0);
   });
+
+  group('squeezed over the view', () {
+    const panes = [ChatPanes.side, ChatPanes.files, ChatPanes.browser];
+    final least = {for (final p in panes) p.name: p.min};
+
+    test('Files gives first, to its own least, then all alike', () {
+      // 300 + 500 + 300 at their least; the floors 240 + 200 + 300.
+      expect(squeeze(least, panes, 1100), isEmpty);
+      final half = squeeze(least, panes, 920);
+      expect(half['side'], closeTo(240 + 60 * 180 / 360, 1e-9));
+      expect(half['filesPane'], closeTo(200 + 300 * 180 / 360, 1e-9));
+      expect(half['browser'], 300);
+      expect(squeeze(least, panes, 740), {
+        'side': 240,
+        'filesPane': 200,
+        'browser': 300,
+      });
+      final under = squeeze(least, panes, 370);
+      expect(under['side'], closeTo(120, 1e-9));
+      expect(under['filesPane'], closeTo(100, 1e-9));
+      expect(under['browser'], closeTo(150, 1e-9));
+    });
+
+    test('it fills the room, and no width jumps as the room narrows', () {
+      for (final row in thresholdRows) {
+        final widths = {for (final p in row.panes) p.name: p.min};
+        Map<String, double>? last;
+        for (var room = 2400.0; room >= 100; room -= 1) {
+          final now = squeeze(widths, row.panes, room);
+          final shown = now.isEmpty ? widths : now;
+          if (now.isNotEmpty) {
+            expect(
+              shown.values.fold(0.0, (a, b) => a + b),
+              closeTo(room, 1e-6),
+              reason: '${row.name} at $room',
+            );
+          }
+          if (last != null) {
+            for (final name in shown.keys) {
+              expect(
+                (shown[name]! - last[name]!).abs(),
+                lessThanOrEqualTo(1 + 1e-9),
+                reason: '${row.name} $name at $room',
+              );
+            }
+          }
+          last = shown;
+        }
+      }
+    });
+  });
 }

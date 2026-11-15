@@ -10,12 +10,18 @@ class PaneSpec {
     required this.min,
     required this.cap,
     this.wide = false,
-  });
+    double? squeezed,
+  }) : squeezed = squeezed ?? min;
 
   final String name;
   final double initial;
   final double min;
   final double cap;
+
+  /// The least its rows hold: lying over the view in a room under the
+  /// panes' least, it narrows to this before the rest give ([squeeze]).
+  /// Its [min] unless it folds below that (the Files pane).
+  final double squeezed;
 
   /// It's dragged as wide as it's wanted (a subagent's pane, the preview):
   /// beside it the view keeps a smaller least (`chatFit`).
@@ -159,4 +165,39 @@ Map<String, double> _share(
     if (over <= 0) break;
   }
   return widths;
+}
+
+/// [widths] (the panes lying over the view, each at its least) narrowed
+/// to fit [room], when they don't: each down to its [PaneSpec.squeezed] in
+/// step with the rest, then all of them alike. Empty when they fit. It's
+/// continuous in [room], so no edge jumps as the window narrows.
+Map<String, double> squeeze(
+  Map<String, double> widths,
+  List<PaneSpec> panes,
+  double room,
+) {
+  var used = 0.0;
+  for (final w in widths.values) {
+    used += w;
+  }
+  if (used <= room) return const {};
+  final floors = {
+    for (final e in widths.entries)
+      e.key: min(
+        e.value,
+        panes.where((p) => p.name == e.key).firstOrNull?.squeezed ?? e.value,
+      ),
+  };
+  var least = 0.0;
+  for (final f in floors.values) {
+    least += f;
+  }
+  if (room >= least) {
+    final share = (room - least) / (used - least);
+    return {
+      for (final e in widths.entries)
+        e.key: floors[e.key]! + (e.value - floors[e.key]!) * share,
+    };
+  }
+  return {for (final e in floors.entries) e.key: e.value * room / least};
 }

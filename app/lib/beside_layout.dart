@@ -19,6 +19,7 @@ class SidePane extends PaneSpec {
         min: spec.min,
         cap: spec.cap,
         wide: spec.wide,
+        squeezed: spec.squeezed,
       );
 
   /// A pane of one [width], with no edge to drag: the details panel

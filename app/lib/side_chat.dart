@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -236,67 +238,100 @@ class _Row extends StatelessWidget {
   /// Under this, the row's own icon leaves its three buttons no room.
   static const iconFrom = 140.0;
 
+  /// An icon button's box here: its 15 and [IconTap.header] each side.
+  static const double _button = 15 + 2 * IconTap.header;
+
+  /// Keep as chat's words' width, as its [Tap] draws them.
+  static double _keepWidth(BuildContext context, TextStyle style) {
+    final p = TextPainter(
+      text: TextSpan(
+        text: 'Keep as chat',
+        style: DefaultTextStyle.of(context).style.merge(style),
+      ),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = p.width.ceilToDouble();
+    p.dispose();
+    return width + 12;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
     final t = theme.t;
     final can = canKeepSide(daemon, side);
     const keep = 'Keep as chat: a chat of its own in the sidebar';
+    final keepStyle = theme.ui(can ? t.textSecondary : t.textMuted, size: 12);
     return LayoutBuilder(
-      builder: (context, box) => Row(
-        children: [
-          // Squeezed in a narrow window (ADR 0123), its buttons keep their
-          // room and its icon goes.
-          if (box.maxWidth >= iconFrom) ...[
-            Icon(Icons.forum_outlined, size: 14, color: t.textSecondary),
-            const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: PaneTitle(
-              title: Text(
-                'Side chat',
-                style: theme.ui(t.text, size: 12, weight: FontWeight.w600),
-              ),
-              caption: Text(
-                'not added to the chat',
-                style: theme.ui(t.textMuted, size: 12),
+      builder: (context, box) {
+        final room = box.maxWidth;
+        final icon = room >= iconFrom;
+        // Its words while they leave the name its least, as measured.
+        final words =
+            room >=
+            max(
+              wordsFrom,
+              (icon ? 22 : 0) +
+                  PaneTitle.titleLeast +
+                  _keepWidth(context, keepStyle) +
+                  2 * _button,
+            );
+        return Row(
+          children: [
+            // Squeezed in a narrow window (ADR 0123), its buttons keep their
+            // room and its icon goes; narrower than its three buttons, hide
+            // goes (its key stays), then Keep as chat.
+            if (icon) ...[
+              Icon(Icons.forum_outlined, size: 14, color: t.textSecondary),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: PaneTitle(
+                title: Text(
+                  'Side chat',
+                  style: theme.ui(t.text, size: 12, weight: FontWeight.w600),
+                ),
+                caption: Text(
+                  'not added to the chat',
+                  style: theme.ui(t.textMuted, size: 12),
+                ),
               ),
             ),
-          ),
-          if (daemon.daemonApi >= forkApi && box.maxWidth >= wordsFrom)
-            Tap(
-              tooltip: keep,
-              onTap: can ? onKeep : null,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: Text(
-                'Keep as chat',
-                style: theme.ui(can ? t.textSecondary : t.textMuted, size: 12),
+            if (daemon.daemonApi >= forkApi && words)
+              Tap(
+                tooltip: keep,
+                onTap: can ? onKeep : null,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                child: Text('Keep as chat', style: keepStyle),
+              )
+            else if (daemon.daemonApi >= forkApi && room >= 2 * _button)
+              IconTap(
+                Icons.open_in_new,
+                tooltip: keep,
+                size: 15,
+                padding: IconTap.header,
+                onTap: can ? onKeep : null,
               ),
-            )
-          else if (daemon.daemonApi >= forkApi)
+            if (room >= 3 * _button)
+              IconTap(
+                Icons.remove,
+                tooltip: withKey('Hide the side chat', keyLabel(sideChatKey)),
+                size: 15,
+                padding: IconTap.header,
+                onTap: onHide,
+              ),
             IconTap(
-              Icons.open_in_new,
-              tooltip: keep,
+              Icons.close,
+              tooltip: 'End the side chat',
               size: 15,
               padding: IconTap.header,
-              onTap: can ? onKeep : null,
+              onTap: onClose,
             ),
-          IconTap(
-            Icons.remove,
-            tooltip: withKey('Hide the side chat', keyLabel(sideChatKey)),
-            size: 15,
-            padding: IconTap.header,
-            onTap: onHide,
-          ),
-          IconTap(
-            Icons.close,
-            tooltip: 'End the side chat',
-            size: 15,
-            padding: IconTap.header,
-            onTap: onClose,
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 }
