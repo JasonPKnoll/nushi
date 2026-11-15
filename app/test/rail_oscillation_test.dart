@@ -109,6 +109,25 @@ Future<TestGesture> _grab(WidgetTester tester) async {
 double _previewWidth(WidgetTester tester) =>
     tester.getRect(find.byType(PreviewPane)).width;
 
+/// The preview dragged a point at a time until it's [width] wide.
+Future<void> _dragTo(
+  WidgetTester tester,
+  TestGesture drag,
+  double width,
+) async {
+  for (var i = 0; i < 400 && _previewWidth(tester) != width; i++) {
+    await drag.moveBy(Offset(_previewWidth(tester) < width ? -1 : 1, 0));
+    await tester.pump();
+  }
+  expect(_previewWidth(tester), width);
+}
+
+/// The widest the preview is with the rail still shown beside it.
+double _railLine(WidgetTester tester) =>
+    tester.getRect(find.byType(Pane)).width -
+    DetailsPanel.width -
+    ChatView.leastBesideWide;
+
 void main() {
   setUpAll(loadFonts);
 
@@ -173,20 +192,25 @@ void main() {
       open: _preview,
     );
     final drag = await _grab(tester);
-    // Back to where it began: the rail at its line, shown.
-    await drag.moveBy(const Offset(20, 0));
-    await tester.pump();
-    await tester.pumpAndSettle();
-    final watch = _Watch(tester);
-    for (var i = 0; i < 60; i++) {
-      await drag.moveBy(Offset(i.isEven ? 0.5 : -0.5, 0));
-      await tester.pump(const Duration(milliseconds: 16));
-      watch.frame();
+    // At the line, the rail shown, and a point past it, tucked: held there
+    // with the pointer moving half a point either way.
+    final at = _railLine(tester);
+    for (final (width, shown) in [(at, true), (at + 1, false)]) {
+      await _dragTo(tester, drag, width);
+      await tester.pumpAndSettle();
+      expect(_railShown(tester), shown);
+      final watch = _Watch(tester);
+      for (var i = 0; i < 60; i++) {
+        await drag.moveBy(Offset(i.isEven ? 0.5 : -0.5, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+        watch.frame();
+        expect(_previewWidth(tester), width);
+      }
+      expect(watch.railFlips, 0);
+      await tester.pump(Motion.enter);
+      await tester.pump();
+      expect(SchedulerBinding.instance.hasScheduledFrame, isFalse);
     }
-    expect(watch.railFlips, 0);
-    await tester.pump(Motion.enter);
-    await tester.pump();
-    expect(SchedulerBinding.instance.hasScheduledFrame, isFalse);
     await drag.up();
     await tester.pump(const Duration(seconds: 2));
     await closeView(tester, d);
@@ -204,13 +228,20 @@ void main() {
     viewport(tester, Size(line, 900), ratio: 2);
     await tester.pumpAndSettle();
     final drag = await _grab(tester);
-    await drag.moveBy(const Offset(19, 0));
+    // At the line's last shown width, then the pointer shaking by most of
+    // a point across the half point where the width would round past it.
+    await _dragTo(tester, drag, _railLine(tester));
+    await drag.moveBy(const Offset(-0.05, 0));
     await tester.pump();
     final watch = _Watch(tester);
-    for (var i = 0; i < 10; i++) {
-      await drag.moveBy(Offset(i.isEven ? -0.3 : 0.3, 0));
+    for (var i = 0; i < 40; i++) {
+      await drag.moveBy(Offset(i.isEven ? -0.9 : 0.9, 0));
       await tester.pump();
       watch.frame();
+      expect(
+        _previewWidth(tester),
+        inInclusiveRange(_railLine(tester), _railLine(tester) + 1),
+      );
     }
     expect(watch.railFlips, lessThanOrEqualTo(1));
     await drag.up();
