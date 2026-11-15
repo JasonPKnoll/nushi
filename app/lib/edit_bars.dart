@@ -234,12 +234,14 @@ Future<void> closeTabSaving(
 void closeBrowser(ChatState chat) => chat.browser.shown.value = null;
 
 /// What ⌘W closes in [chat]: the tab showing in the pane that has the focus
-/// (the Files pane or the browser), else in the one whose tab showed last,
-/// else in the other; null with no tab showing.
+/// (the Files pane or the browser), and nothing else, even with none
+/// showing there (Files blank); with neither focused, the tab in the one
+/// whose tab showed last, else in the other; null with no tab showing.
 PreviewEntry? tabToClose(ChatState chat) {
-  // A file shows only while the Files pane does: hidden, its tabs wait.
+  // A file shows only while the Files pane does: hidden, its tabs wait. A
+  // page only while no subagent's pane has the browser's place.
   final file = filesOpen(chat) ? chat.files.shown.value : null;
-  final page = chat.browser.shown.value;
+  final page = chat.pane.value == null ? chat.browser.shown.value : null;
   final at = FocusManager.instance.primaryFocus?.context;
   final focused = switch (at) {
     final at? when at.findAncestorStateOfType<FileTabsFocus>() != null =>
@@ -248,8 +250,10 @@ PreviewEntry? tabToClose(ChatState chat) {
       TabKind.browser,
     _ => null,
   };
-  final first = focused ?? chat.lastTabbed ?? TabKind.file;
-  return switch (first) {
+  return switch (focused ?? chat.lastTabbed ?? TabKind.file) {
+    // The pane the keys are in: ⌘W stays in it (docs/chats.md).
+    TabKind.file when focused != null => file,
+    TabKind.browser when focused != null => page,
     TabKind.file => file ?? page,
     TabKind.browser => page ?? file,
   };

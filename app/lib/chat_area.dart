@@ -76,6 +76,7 @@ class _ChatAreaState extends State<ChatArea> {
     filesChats.addListener(_filesShown);
     _tab.addListener(_filesShown);
     _filesShown();
+    _browserTab = widget.chat.browser.shown.value;
     widget.chat.browser.shown.addListener(_showBrowserTab);
     widget.chat.pane.addListener(_collapse);
     filesChats.addListener(_collapse);
@@ -144,11 +145,18 @@ class _ChatAreaState extends State<ChatArea> {
     if (!_coverable(_cover.value)) _cover.value = null;
   }
 
-  /// A browser tab showing puts an expanded Files pane back (it shows in
-  /// the browser beside it), and a browser hidden or closed is put back.
+  /// The browser's tab that showed, as last heard.
+  BrowserTab? _browserTab;
+
+  /// A browser tab opened or shown puts an expanded Files pane back (it
+  /// shows in the browser beside it), but not the next one showing as one
+  /// closes; a browser hidden or closed is put back.
   void _showBrowserTab() {
-    if (widget.chat.browser.shown.value != null &&
-        _cover.value == ChatPanes.files.name) {
+    final browser = widget.chat.browser;
+    final was = _browserTab;
+    final now = _browserTab = browser.shown.value;
+    final closed = was != null && !browser.tabs.value.contains(was);
+    if (now != null && !closed && _cover.value == ChatPanes.files.name) {
       _cover.value = null;
     }
     _collapse();

@@ -36,6 +36,14 @@ Future<void> _tap(WidgetTester tester, Finder f) async {
   await tester.pumpAndSettle();
 }
 
+/// ⌘W.
+Future<void> _close(WidgetTester tester) async {
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+  await tester.sendKeyEvent(LogicalKeyboardKey.keyW);
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _esc(WidgetTester tester) async {
   await tester.sendKeyEvent(LogicalKeyboardKey.escape);
   await tester.pumpAndSettle();
@@ -172,6 +180,65 @@ void main() {
     );
     expect(tester.getRect(files).left, greaterThanOrEqualTo(hiddenHeaderStart));
     await render(tester, find.byType(Pane), 'files_expanded_1700');
+    await endEditor(tester, d);
+  }, variant: macOnly);
+
+  testWidgets('⌘W stays in the Files pane with the keys: blank, beside the '
+      'browser or covering it, it closes none of its tabs', (tester) async {
+    browserFakes();
+    final (d, _) = await openEditor(tester, {
+      'main.go': utf8.encode('package main\n'),
+    }, width: 2400);
+    final c = chatC(d)
+      ..openBrowserTab('http://localhost:3000')
+      ..openBrowserTab('http://localhost:3001')
+      ..openInFiles('main.go');
+    await tester.pumpAndSettle();
+    final tabs = [...c.browser.tabs.value];
+    // From the tree's filter: the file closes, then nothing.
+    await _tap(
+      tester,
+      find.descendant(
+        of: find.byType(FilesTree),
+        matching: find.byType(EditableText),
+      ),
+    );
+    await _close(tester);
+    expect(c.files.tabs.value, isEmpty);
+    expect(find.byType(FilesBlank), findsOneWidget);
+    await _close(tester);
+    expect(c.browser.tabs.value, tabs);
+    expect(c.browser.shown.value, tabs.last);
+    // Expanded over the browser, the pane has the keys: nothing closes,
+    // and it stays expanded.
+    await _tap(tester, _expand);
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'files pane');
+    await _close(tester);
+    expect(c.browser.tabs.value, tabs);
+    expect(_collapse, findsOneWidget);
+    await endEditor(tester, d);
+  }, variant: macOnly);
+
+  testWidgets('a browser tab closing while Files covers leaves it expanded', (
+    tester,
+  ) async {
+    browserFakes();
+    final (d, _) = await openEditor(tester, {
+      'main.go': utf8.encode('package main\n'),
+    }, width: 2400);
+    final c = chatC(d)
+      ..openBrowserTab('http://localhost:3000')
+      ..openBrowserTab('http://localhost:3001')
+      ..openInFiles('main.go');
+    await tester.pumpAndSettle();
+    await _tap(tester, _expand);
+    c.browser.close(c.browser.shown.value!);
+    await tester.pumpAndSettle();
+    expect(_collapse, findsOneWidget);
+    // A tab opened, though, puts it back.
+    c.openBrowserTab('http://localhost:3002');
+    await tester.pumpAndSettle();
+    expect(_expand, findsOneWidget);
     await endEditor(tester, d);
   }, variant: macOnly);
 }
