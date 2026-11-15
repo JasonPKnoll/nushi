@@ -30,6 +30,12 @@ import 'right_panes_fixture.dart';
 
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
+/// Linux too, for a few: the same layout (ADR 0123).
+const _both = TargetPlatformVariant({
+  TargetPlatform.macOS,
+  TargetPlatform.linux,
+});
+
 PanesOpen _openOf(List<PaneSpec> panes) => (
   side: panes.contains(ChatPanes.side),
   files: panes.contains(ChatPanes.files),
@@ -128,7 +134,7 @@ void main() {
         }
         expect(showDetails.value, isTrue);
         await closeView(tester, d);
-      }, variant: _mac);
+      }, variant: {'none', 'preview'}.contains(row.name) ? _both : _mac);
     }
   }
 
@@ -224,7 +230,7 @@ void main() {
       viewport(tester, Size(width + 40, 900));
       await slidesBack(tester);
       await closeView(tester, d);
-    }, variant: _mac);
+    }, variant: _both);
 
     testWidgets('the pane closes', (tester) async {
       final d = await app(tester);
@@ -236,7 +242,7 @@ void main() {
       );
       await slidesBack(tester);
       await closeView(tester, d);
-    }, variant: _mac);
+    }, variant: _both);
 
     testWidgets('its edge is dragged narrower', (tester) async {
       final d = await app(tester);
