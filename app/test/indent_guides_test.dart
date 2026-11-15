@@ -114,12 +114,18 @@ void main() {
         indentLevels(['    a', ...List.filled(199, ''), '    b'], 4)[1],
         1,
       );
-      // Large and linear: 50,000 lines in one go.
+      // Large and linear: 50,000 lines of long blank runs (150 each,
+      // within the look), each line read three times however long its
+      // run, where a look per blank line would read it hundreds of times.
       final big = [
         for (var i = 0; i < 50000; i++)
-          if (i.isEven) '    x' else '',
+          if (i % 151 == 0) '    x' else '',
       ];
-      expect(indentLevels(big, 4), hasLength(50000));
+      indentLinesRead = 0;
+      final read = indentLevels(big, 4);
+      expect(read, hasLength(50000));
+      expect(read[75], 1, reason: 'a blank in the middle of a run');
+      expect(indentLinesRead, lessThanOrEqualTo(3 * big.length));
     });
 
     test('the guides sit at each level’s first column', () {

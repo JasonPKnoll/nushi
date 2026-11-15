@@ -18,6 +18,11 @@ const _look = 200;
 /// A file's indent: each line's level, and the columns a level is wide.
 typedef Indents = ({List<int> levels, int unit});
 
+/// The lines [indents] has read, every pass counted: a test's count that
+/// it reads each line a fixed number of times, however long a blank run.
+@visibleForTesting
+int indentLinesRead = 0;
+
 /// The widths a level of spaces can be: the steps people indent by.
 const _units = [2, 3, 4, 8];
 
@@ -39,6 +44,7 @@ Indents indents(List<String> lines, int size) {
   final steps = <int, int>{};
   var previous = 0;
   for (var i = 0; i < n; i++) {
+    indentLinesRead++;
     final line = lines[i];
     var column = 0;
     var at = 0;
@@ -79,6 +85,7 @@ Indents indents(List<String> lines, int size) {
   final before = List<int>.filled(n, 0);
   var last = -1;
   for (var i = 0; i < n; i++) {
+    indentLinesRead++;
     if (own[i] != null) {
       last = i;
     } else if (last >= 0 && i - last <= _look) {
@@ -88,6 +95,7 @@ Indents indents(List<String> lines, int size) {
   final levels = List<int>.filled(n, 0);
   var next = -1;
   for (var i = n - 1; i >= 0; i--) {
+    indentLinesRead++;
     if (own[i] case final level?) {
       next = i;
       levels[i] = level;
