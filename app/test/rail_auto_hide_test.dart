@@ -330,15 +330,44 @@ void main() {
   }, variant: _mac);
 
   testWidgets('a pane open in a chat area under 804: too narrow, no '
-      'button', (tester) async {
-    final (d, _) = await panesApp(
+      'button or ⋯ entry, the panel gone and made once each time the area '
+      'crosses back', (tester) async {
+    final (d, fake) = await panesApp(
       tester,
       width: windowFor(800, sidebar: false),
       open: _openOf([ChatPanes.subagent]),
     );
     expect(_rail(), false);
+    // Gone, not tucked, as with no pane: it's made again once there's room.
+    expect(find.byType(DetailsPanel, skipOffstage: false), findsNothing);
     // Its button folds into ⋯ first, and ⋯ has no details either.
     expect(_button, findsNothing);
+    await tester.tap(find.byTooltip('Chat menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rename'), findsOneWidget); // the menu's open
+    expect(find.text('Show details'), findsNothing);
+    expect(find.text('Hide details'), findsNothing);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    // Back and forth across 804, the pane still open: made (tucked, as
+    // the pane needs its room) at each crossing up, and only then does it
+    // ask the daemon for the folder.
+    int asks() =>
+        fake.calls.whereType<GetFolderStatusRequest>().length +
+        fake.calls.whereType<ListBranchesRequest>().length;
+    var asked = asks();
+    for (var i = 0; i < 3; i++) {
+      viewport(tester, Size(windowFor(805, sidebar: false), 900));
+      await tester.pumpAndSettle();
+      expect(find.byType(DetailsPanel, skipOffstage: false), findsOneWidget);
+      expect(_rail(), false);
+      expect(asks() - asked, 2);
+      asked = asks();
+      viewport(tester, Size(windowFor(803, sidebar: false), 900));
+      await tester.pumpAndSettle();
+      expect(find.byType(DetailsPanel, skipOffstage: false), findsNothing);
+      expect(asks(), asked);
+    }
     await closeView(tester, d);
   }, variant: _mac);
 
