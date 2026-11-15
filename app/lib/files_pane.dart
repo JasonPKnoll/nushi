@@ -292,8 +292,10 @@ String? inFiles(Daemon daemon, ChatState chat, String path) {
 }
 
 /// Shows [inFiles]' file in [chat]'s Files pane: the pane opens on the Chat
-/// tab, the folders above it open, its row selected and scrolled to.
+/// tab, the tree shows if it was hidden (⇧⌘Y), the folders above it open,
+/// its row selected and scrolled to.
 void showInFiles(ChatState chat, String inside) {
+  filesTree.value = true;
   folderTreeOf(chat).reveal(inside);
   chat.tab.value = ChatTab.chat;
   if (!filesOpen(chat)) toggleFiles(chat);

@@ -9,6 +9,7 @@ import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/files_bar.dart';
 import 'package:nushi/files_pane.dart';
+import 'package:nushi/files_top_row.dart';
 import 'package:nushi/files_tree.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/main.dart';
@@ -407,6 +408,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(_checked('Show whitespace'), isTrue);
     await render(tester, find.byType(NushiApp), 'files_menu');
+    await closeView(tester, d);
+  }, variant: _both);
+
+  testWidgets('with the tree hidden, a click on the file’s name shows the '
+      'tree on it', (tester) async {
+    final (d, _) = await panesApp(tester, width: 1700, open: _files);
+    filesTree.value = false;
+    final c = d.chats['c']!..openInFiles('README.md');
+    await tester.pumpAndSettle();
+    expect(find.byType(FilesTree), findsNothing);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(FilesTopRow),
+        matching: find.text('README.md'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(filesTree.value, isTrue);
+    expect(find.byType(FilesTree), findsOneWidget);
+    expect(folderTreeOf(c).selected, 'README.md');
     await closeView(tester, d);
   }, variant: _both);
 
