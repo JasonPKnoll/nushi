@@ -10,6 +10,7 @@ import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_column.dart';
 import 'package:nushi/chat_menu.dart';
+import 'package:nushi/chat_panes.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/composer_parts.dart';
 import 'package:nushi/daemon.dart';
@@ -22,7 +23,6 @@ import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/github_link_chip.dart';
 import 'package:nushi/github_view.dart' show showItem;
 import 'package:nushi/new_chat.dart';
-import 'package:nushi/panes.dart';
 import 'package:nushi/preview.dart';
 import 'package:nushi/preview_entry.dart';
 import 'package:nushi/preview_pane.dart';
@@ -71,14 +71,6 @@ class ChatView extends StatefulWidget {
   /// The narrowest the transcript gets beside a pane dragged as wide as
   /// it's wanted (a subagent's, or the preview).
   static const leastBesideWide = 360.0;
-
-  /// The width a subagent's or a command's pane opens at, until dragged:
-  /// the details panel's before it took its own (ADR 0092).
-  static const taskPaneWidth = 264.0;
-
-  /// The preview pane's width, as dragged.
-  static double get previewWidth =>
-      paneWidth('preview', 560).clamp(300, double.infinity);
 
   @override
   State<ChatView> createState() => _ChatViewState();
@@ -270,11 +262,8 @@ class _ChatViewState extends State<ChatView> {
       cover: _expanded ? 'preview' : null,
       panes: [
         if (side != null)
-          SidePane(
-            'side',
-            initial: 380,
-            min: 300,
-            cap: 640,
+          SidePane.of(
+            ChatPanes.side,
             child: SideChat(
               key: ValueKey(side.id),
               side: side,
@@ -285,11 +274,8 @@ class _ChatViewState extends State<ChatView> {
             ),
           ),
         if (files)
-          SidePane(
-            'files',
-            initial: 260,
-            min: 200,
-            cap: 480,
+          SidePane.of(
+            ChatPanes.files,
             child: FilesPane(
               chat: chat,
               daemon: widget.daemon,
@@ -297,20 +283,13 @@ class _ChatViewState extends State<ChatView> {
             ),
           ),
         if (id != null)
-          SidePane(
-            // Named as the old Wider one was: a width dragged then stays.
-            'subagent',
-            initial: ChatView.taskPaneWidth,
-            min: 220,
-            cap: double.infinity,
+          SidePane.of(
+            ChatPanes.subagent,
             child: _pane(id),
           ),
         if (preview != null)
-          SidePane(
-            'preview',
-            initial: 560,
-            min: 300,
-            cap: double.infinity,
+          SidePane.of(
+            ChatPanes.preview,
             child: switch (preview) {
               PreviewFile(:final path) => PreviewPane(
                 key: ValueKey(path),

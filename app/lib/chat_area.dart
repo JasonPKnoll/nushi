@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:nushi/beside_fit.dart';
 import 'package:nushi/changes_view.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
+import 'package:nushi/chat_panes.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
-import 'package:nushi/files_pane.dart';
-import 'package:nushi/folder_tree.dart' show filesApi;
-import 'package:nushi/panes.dart' show Pane, paneWidth;
+import 'package:nushi/panes.dart' show Pane;
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_tab.dart';
 import 'package:nushi/settings.dart';
@@ -98,25 +98,20 @@ class _ChatAreaState extends State<ChatArea> {
   }
 
   /// Whether the preview opens beside the transcript and leaves it
-  /// [ChatView.leastBesideWide], as `Beside` works it out: the details
-  /// panel, the side chat and the Files pane each take their widths. It is
+  /// [ChatView.leastBesideWide], as `Beside` works it out ([besideFit]):
+  /// the details panel, the side chat and the Files pane each take their
+  /// widths (a subagent's pane doesn't: the preview takes its place). It is
   /// read when asked, since a side chat or the Files pane opens without
   /// building this area again.
-  bool _previewFits() {
-    final chat = widget.chat;
-    final side =
-        chat.side.value != null && !chat.archived && !chat.sideHidden.value;
-    final files = filesOpen(chat) && widget.daemon.daemonApi >= filesApi;
-    // The widths ChatView's side chat and Files pane open at, as dragged.
-    final panes =
-        (side ? paneWidth('side', 380).clamp(300, 640) : 0) +
-        (files ? paneWidth('files', 260).clamp(200, 480) : 0);
-    return _width -
-            (_panel ? DetailsPanel.width : 0) -
-            panes -
-            ChatView.previewWidth >=
-        ChatView.leastBesideWide;
-  }
+  bool _previewFits() => !besideFit(
+    room: _width - (_panel ? DetailsPanel.width : 0),
+    panes: openPanes(widget.chat, widget.daemon, preview: true),
+    saved: paneWidths.value,
+    wantRail: false,
+    least: ChatView.leastBesideWide,
+    railLeast: ChatView.leastBesideWide,
+    rail: DetailsPanel.width,
+  ).over;
 
   /// A file to show (ChatState.showFile, from a review's finding) shows in
   /// the Changes view.

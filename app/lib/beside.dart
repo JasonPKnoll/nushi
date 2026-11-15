@@ -2,40 +2,38 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'package:nushi/beside_fit.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
 
-/// A pane beside a view: its [name] (its remembered width's), the width
-/// it starts at, and its least and most.
-class SidePane {
+/// A pane beside a view, as its [PaneSpec] says, and what it shows.
+class SidePane extends PaneSpec {
   new(
-    this.name, {
-    required this.initial,
-    required this.min,
-    required this.cap,
+    super.name, {
+    required super.initial,
+    required super.min,
+    required super.cap,
     required this.child,
   }) : fixed = false;
 
+  /// One of [spec]'s sizes, showing [child].
+  new of(PaneSpec spec, {required this.child})
+    : fixed = false,
+      super(spec.name, initial: spec.initial, min: spec.min, cap: spec.cap);
+
   /// A pane of one [width], with no edge to drag: the details panel
   /// (ADR 0092), which shows or hides only.
-  new fixed(this.name, {required double width, required this.child})
-    : initial = width,
-      min = width,
-      cap = width,
-      fixed = true;
+  new fixed(super.name, {required double width, required this.child})
+    : fixed = true,
+      super(initial: width, min: width, cap: width);
 
-  final String name;
-  final double initial;
-  final double min;
-  final double cap;
   final bool fixed;
   final Widget child;
 
-  double get width =>
-      fixed ? initial : paneWidth(name, initial).clamp(min, cap);
+  double get width => fixed ? initial : saved(paneWidths.value);
 }
 
 /// [main] with [panes] beside it, left to right, and [details] at the
