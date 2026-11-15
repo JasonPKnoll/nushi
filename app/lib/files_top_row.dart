@@ -57,8 +57,9 @@ class FilesTopRow extends StatelessWidget {
   /// The kind's icon and the gap after it.
   static const double _kindRoom = 14 + 6;
 
-  /// The least the one file's name keeps: its ✕'s box.
-  static const double _nameLeast = _Name.closeBox;
+  /// The least the one file's name keeps: a few letters and its ✕'s box
+  /// (narrower, a ✕ alone would read as a stray).
+  static const double _nameLeast = _Name.closeBox + 24;
 
   /// The gap before the end's buttons.
   static const _endGap = 8.0;
