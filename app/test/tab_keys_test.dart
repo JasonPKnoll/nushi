@@ -103,4 +103,20 @@ void main() {
     expect(tester.widget<EditableText>(_box).controller.text, 'x');
     d.dispose();
   }, variant: macOS);
+
+  testWidgets('with the box’s choices showing, ⌃Tab and ⌃⇧Tab step the tabs '
+      'and pick none', (tester) async {
+    final d = await _app(tester);
+    final b = d.chats['b']!;
+    await tester.tap(_box);
+    await tester.enterText(_box, '/co');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('/copy', findRichText: true), findsWidgets);
+    await _tab(tester);
+    expect(b.shownTab, ChatTab.changes);
+    await _tab(tester, back: true);
+    expect(b.shownTab, ChatTab.chat);
+    expect(tester.widget<EditableText>(_box).controller.text, '/co');
+    d.dispose();
+  }, variant: macOS);
 }

@@ -138,8 +138,10 @@ class Completions extends ChangeNotifier {
       notifyListeners();
       return true;
     }
+    // ⌃Tab and ⌃⇧Tab are the chat's tabs (`chat_keys.dart`), not a pick.
     if ((key == LogicalKeyboardKey.enter && !shift) ||
-        key == LogicalKeyboardKey.tab) {
+        (key == LogicalKeyboardKey.tab &&
+            !HardwareKeyboard.instance.isControlPressed)) {
       accept(choices[picked]);
       return true;
     }
