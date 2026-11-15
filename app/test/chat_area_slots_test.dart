@@ -75,7 +75,7 @@ void main() {
   testWidgets('the rail tucking and coming back, by a pane opening and by '
       'its edge dragged, rebuilds neither the chat view nor its '
       'transcript', (tester) async {
-    // A chat area of 1100: the preview needs the rail's room (1240).
+    // A chat area of 1100: the Files pane needs the rail's room (1500).
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
@@ -91,11 +91,11 @@ void main() {
         find.byType(DetailsPanel).evaluate().isEmpty &&
         find.byType(DetailsPanel, skipOffstage: false).evaluate().isNotEmpty;
     expect(tucked(), isFalse);
-    final c = d.chats['c']!..openPreview('PLAN.md');
+    final c = d.chats['c']!..openInFiles('PLAN.md');
     await tester.pumpAndSettle();
     expect(tucked(), isTrue);
     expect(tester.widget(transcript), same(first));
-    c.files.closeAll();
+    toggleFiles(c);
     await tester.pumpAndSettle();
     expect(tucked(), isFalse);
     // A subagent's pane (264) leaves the rail its room, until its edge is

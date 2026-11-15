@@ -7,6 +7,7 @@ import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/editor_find.dart';
 import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/transcript_find.dart';
@@ -80,7 +81,7 @@ void main() {
     expect(_bar, findsOne);
     expect(find.text('Find in the file'), findsOne);
     expect(
-      find.descendant(of: find.byType(FileView), matching: _bar),
+      find.descendant(of: find.byType(FilesPane), matching: _bar),
       findsOne,
     );
     expect(chatC(d).find.query, isNull);
@@ -255,11 +256,11 @@ void main() {
   testWidgets('a match under the bar at the top: the text starts below it', (
     tester,
   ) async {
-    // Wide enough for the preview at its 560, not narrowed (ADR 0123):
-    // the match's column is under the bar.
+    // Wide enough for the Files pane's viewer at its 560, not narrowed
+    // (ADR 0123): the match's column is under the bar.
     final (d, _) = await openEditor(tester, {
       'main.go': utf8.encode('${'x' * 120} needle\n$_source'),
-    }, width: 1200);
+    });
     await _openFind(tester, d);
     await _look(tester, 'needle', '1 of 1');
     final f = _findOf(tester);

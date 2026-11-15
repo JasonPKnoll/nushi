@@ -399,9 +399,9 @@ class ChatState extends ChangeNotifier {
   /// it).
   bool Function() panelFits = fitsAlways;
 
-  /// Whether its pane has room for a file's view beside the transcript,
-  /// worked out when asked (its chat area's, which sets it): a side chat or
-  /// the Files pane opens without laying the area out again.
+  /// Whether its pane has room for the Files pane beside the transcript, or
+  /// it's open, worked out when asked (its chat area's, which sets it): a
+  /// side chat opens without laying the area out again.
   bool Function() filesFit = fitsAlways;
 
   /// Whether its pane has room for the browser beside the transcript, as
@@ -433,17 +433,23 @@ class ChatState extends ChangeNotifier {
   /// null while it's closed. In the app's memory only.
   final serverLogs = ValueNotifier<ServerEntry?>(null);
 
-  /// Shows [path] in its file tabs: the tab of the same file if it has
-  /// one, however each is named ([relativeIn]), or a new one last.
-  void openPreview(String path) {
+  /// Shows [path] in its Files pane (ADR 0123), the one way a file opens:
+  /// the pane opens on the Chat tab if it's closed, on the tab of the same
+  /// file if it has one, however each is named ([relativeIn]), or a new one
+  /// last.
+  void openInFiles(String path) {
+    tab.value = ChatTab.chat;
     files.open(path, folder: folder);
+    if (!filesChats.value.contains(id)) {
+      filesChats.value = {...filesChats.value, id};
+    }
     lastTabbed = TabKind.file;
     sawFile(path);
   }
 
   /// Shows [entry], one of its file or browser tabs.
   void showTab(PreviewEntry entry) => switch (entry) {
-    PreviewFile(:final path) => openPreview(path),
+    PreviewFile(:final path) => openInFiles(path),
     final BrowserTab b => showBrowserTab(b),
   };
 

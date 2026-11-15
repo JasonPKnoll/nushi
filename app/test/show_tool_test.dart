@@ -10,6 +10,7 @@ import 'package:nushi/chat_files.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone_app.dart';
@@ -272,22 +273,16 @@ void main() {
     // A laptop's chat area, 1460 wide, holds the preview beside the Files
     // pane, the details tucking away for it (ADR 0123), but not beside the
     // side chat too (ADR 0068: never over the box).
-    testWidgets('with the details and the Files pane open, it opens and the '
-        'details tuck away; with the side chat too, the transcript stays and '
-        'the row opens it', (tester) async {
-      // 1100 for the chat: the rail beside Files (1064), and the side chat,
-      // Files and the preview need 1160 even narrowed to their least.
+    testWidgets('with the Files pane open it opens there, the details '
+        'tucking away; closed, it opens Files where it fits beside the '
+        'transcript, else the row opens it', (tester) async {
+      // 1100 for the chat: the Files pane fits beside the transcript from
+      // 860, the side chat and Files from 1160 (ADR 0068, 0123).
       final (fake, d) = await _app(
         tester,
         size: const Size(1368, 1000),
         items: [_show('a', 'docs/report.md', text: 'Shown.')],
       );
-      // The Files pane's listing stays open, as a daemon's does.
-      final listing = StreamController<WatchChatFolderResponse>();
-      addTearDown(listing.close);
-      final files = fake.streams!;
-      fake.streams = (i) =>
-          i is WatchChatFolderRequest ? listing.stream : files(i);
       showDetails.value = true;
       await tester.pumpAndSettle();
       filesChats.value = {'c'};
@@ -296,21 +291,62 @@ void main() {
       expect(find.byType(FileView), findsOneWidget);
       expect(find.byType(DetailsPanel), findsNothing);
       expect(showDetails.value, isTrue);
-      await tester.tap(find.byTooltip('Close').last);
+      // Files hidden: its tab stays, the details come back.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(FilesPane),
+          matching: find.byTooltip('Close'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.byType(FileView), findsNothing);
       expect(find.byType(DetailsPanel), findsOneWidget);
-      // The side chat too: no room.
+      expect(_chat(d).shownFile, 'docs/report.md');
+      // The side chat too, Files closed: no room.
       _chat(d).side.value = ChatState('s', '/Users/me')..title = 'Side';
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
-      expect(find.byType(FileView), findsNothing);
+      expect(find.byType(FilesPane), findsNothing);
       expect(_chat(d).showAsked.value, isNull);
-      // With the Files pane closed, it fits.
-      filesChats.value = {};
+      // The side chat hidden, it fits: Files opens on it.
+      _chat(d).sideHidden.value = true;
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
       expect(find.byType(FileView), findsOneWidget);
+      expect(filesChats.value, {'c'});
+      await closeView(tester, d);
+    }, variant: _mac);
+
+    for (final (area, opens) in [(861.0, true), (859.0, false)]) {
+      testWidgets('Files closed, a chat of ${area.toInt()}: '
+          '${opens ? 'it opens' : 'it stays shut'}', (tester) async {
+        final (fake, d) = await _app(
+          tester,
+          size: Size(area + 16, 1000),
+          items: [_show('a', 'docs/report.md', text: 'Shown.')],
+        );
+        sidebarHidden.value = true;
+        await tester.pumpAndSettle();
+        await _shows(tester, fake, 'docs/report.md');
+        expect(find.byType(FileView), opens ? findsOneWidget : findsNothing);
+        expect(_chat(d).showAsked.value, isNull);
+        await closeView(tester, d);
+      }, variant: _mac);
+    }
+
+    testWidgets('Files open over the transcript (a narrow window): it still '
+        'opens there', (tester) async {
+      final (fake, d) = await _app(
+        tester,
+        size: const Size(720, 900),
+        items: [_show('a', 'docs/report.md', text: 'Shown.')],
+      );
+      filesChats.value = {'c'};
+      await tester.pumpAndSettle();
+      final pane = tester.getRect(find.byType(FilesPane));
+      await _shows(tester, fake, 'docs/report.md');
+      expect(find.byType(FileView), findsOneWidget);
+      expect(tester.getRect(find.byType(FilesPane)), pane);
       await closeView(tester, d);
     }, variant: _mac);
 
@@ -367,7 +403,7 @@ void main() {
       tester,
     ) async {
       final (fake, d) = await _app(tester);
-      final c = _chat(d)..openPreview('docs/first.md');
+      final c = _chat(d)..openInFiles('docs/first.md');
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
       expect(c.fileNames, ['docs/first.md', 'docs/report.md']);
@@ -381,9 +417,10 @@ void main() {
     testWidgets('waits on Changes with tabs open, and adds none in a narrow '
         'window', (tester) async {
       final (fake, d) = await _app(tester, size: const Size(720, 900));
-      final c = _chat(d)
-        ..openPreview('docs/first.md')
-        ..tab.value = ChatTab.changes;
+      final c = _chat(d)..openInFiles('docs/first.md');
+      // Files hidden, its tab kept: a narrow window has no room to open it.
+      toggleFiles(c);
+      c.tab.value = ChatTab.changes;
       await tester.pumpAndSettle();
       await _shows(tester, fake, 'docs/report.md');
       expect(c.fileNames, ['docs/first.md']);
@@ -428,7 +465,7 @@ void main() {
 
       expect(lit(), isFalse);
       // As the Artifacts widget's row opens it: by the artifact's name.
-      _chat(d).openPreview(chatArtifacts(_chat(d)).recent.single);
+      _chat(d).openInFiles(chatArtifacts(_chat(d)).recent.single);
       await tester.pumpAndSettle();
       expect(_chat(d).shownFile, 'docs/report.md');
       expect(lit(), isTrue);

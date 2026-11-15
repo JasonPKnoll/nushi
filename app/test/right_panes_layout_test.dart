@@ -16,12 +16,13 @@ import 'package:nushi/chat_view.dart';
 import 'package:nushi/controls.dart' show MenuField;
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/file_view.dart';
+import 'package:nushi/files_bar.dart';
 import 'package:nushi/files_pane.dart';
+import 'package:nushi/files_tree.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_path.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/slides.dart';
@@ -107,8 +108,8 @@ final List<_Kind> _kinds = [
   (
     name: '3 files',
     open: _open(previews: 3),
-    specs: [ChatPanes.fileView],
-    types: [FileView],
+    specs: [ChatPanes.files],
+    types: [FilesPane],
   ),
   (
     name: '2 browser tabs',
@@ -276,10 +277,9 @@ void main() {
               ),
               findsNothing,
             );
-            // The preview's tabs in its top row; the address and the path
-            // under it.
-            if (kind.types.contains(FileView) ||
-                kind.types.contains(BrowserPane)) {
+            // The tabs in the top row; the address, or the Files pane's bar
+            // with the path, under it.
+            if (kind.name == '3 files' || kind.types.contains(BrowserPane)) {
               final pane = find.byType(kind.types.last);
               final row = _rect(tester, _topRow(pane));
               final tabs = find.descendant(
@@ -292,7 +292,10 @@ void main() {
                 of: pane,
                 matching: find.byType(NewBrowserTab),
               );
-              if (kind.types.last == BrowserPane) {
+              // A browser squeezed under a few chips' room keeps its tabs
+              // and buttons, and leaves out its +.
+              if (kind.types.last == BrowserPane &&
+                  _rect(tester, pane).width >= 200) {
                 expect(plus, findsOneWidget);
               }
               for (final f in [tabs, if (plus.evaluate().isNotEmpty) plus]) {
@@ -302,7 +305,7 @@ void main() {
               }
               final below = kind.types.last == BrowserPane
                   ? find.byType(BrowserBar)
-                  : find.byType(PathLine);
+                  : find.byType(FilesBar);
               expect(_rect(tester, below).top, row.bottom);
             }
             await closeView(tester, d);
@@ -494,17 +497,18 @@ void main() {
 
   testWidgets("a chat narrower than its panes' least widths narrows them "
       'alike, none past its left edge', (tester) async {
-    // 732 for the chat: the side chat, Files and the preview need 800.
+    // 732 for the chat: the side chat, Files and the browser need 1100.
+    browserFakes();
     final (d, _) = await panesApp(
       tester,
       width: windowFor(732, sidebar: true),
       sidebar: true,
-      open: _open(side: true, files: true, previews: 1),
+      open: _open(side: true, files: true, previews: 1, browser: 1),
     );
     expect(tester.takeException(), isNull);
     final area = _rect(tester, find.byType(Pane));
     final panes = [
-      for (final t in [SideChat, FilesPane, FileView])
+      for (final t in [SideChat, FilesPane, BrowserPane])
         _rect(tester, find.byType(t)),
     ];
     expect(panes.first.left, area.left);
@@ -512,12 +516,22 @@ void main() {
       expect(panes[i].left, closeTo(panes[i - 1].right, 0.01));
     }
     expect(panes.last.right, area.right);
-    // Each by the same share of its least: 732 of 800.
-    for (final (i, least) in [300.0, 200.0, 300.0].indexed) {
-      expect(panes[i].width, closeTo(least * 732 / 800, 0.01));
+    // Each by the same share of its least: 732 of 1100.
+    for (final (i, least) in [300.0, 500.0, 300.0].indexed) {
+      expect(panes[i].width, closeTo(least * 732 / 1100, 0.01));
     }
+    // Inside Files, its viewer and its tree narrowed alike too (ADR 0123).
+    final files = panes[1].width;
+    expect(
+      _rect(tester, find.byType(FilesTree)).width,
+      closeTo(files * 200 / 500, 0.01),
+    );
+    expect(
+      _rect(tester, find.byType(FileView)).width,
+      closeTo(files * 300 / 500, 0.01),
+    );
     // Wider, they're back at their least or more.
-    viewport(tester, Size(windowFor(900, sidebar: true), 900));
+    viewport(tester, Size(windowFor(1500, sidebar: true), 900));
     await tester.pumpAndSettle();
     expect(
       _rect(tester, find.byType(SideChat)).width,
@@ -557,19 +571,33 @@ void main() {
   // browser tabs.
   final shots = <(String, double, bool, PanesOpen, String)>[
     ('beside', 1700, false, _open(browser: 2), 'rail'),
-    ('tucked', 1515, false, _open(files: true, browser: 2), 'tucked'),
-    // The side chat, Files and the preview want 1560 of the chat's room
-    // and need 1160, each at its least: at 1500 the preview narrows, and
-    // at 1100 they lie over the transcript; the sidebar hidden, as in
-    // every window golden.
+    // Files with a file, and the browser: 1740 of the chat's room beside
+    // the transcript, 2060 with the rail.
     (
-      'narrowed',
-      1500,
+      'tucked',
+      1900,
       false,
-      _open(side: true, files: true, browser: 2),
+      _open(files: true, previews: 1, browser: 2),
       'tucked',
     ),
-    ('over', 1100, false, _open(side: true, files: true, browser: 2), 'over'),
+    // The side chat, Files and the browser want 2120 of the chat's room
+    // and need 1460, each at its least: at 1700 Files narrows, and at 1100
+    // they lie over the transcript; the sidebar hidden, as in every window
+    // golden.
+    (
+      'narrowed',
+      1700,
+      false,
+      _open(side: true, files: true, previews: 1, browser: 2),
+      'tucked',
+    ),
+    (
+      'over',
+      1100,
+      false,
+      _open(side: true, files: true, previews: 1, browser: 2),
+      'over',
+    ),
     ('cover', 1700, false, _open(browser: 2), 'cover'),
     // 704 for the chat: the preview narrowed to 344 beside it.
     ('720', 720, false, _open(browser: 2), 'tucked'),

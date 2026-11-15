@@ -276,7 +276,7 @@ void main() {
 
   testWidgets('narrow, the rail keeps the text its room', (tester) async {
     final d = await outlineApp(tester);
-    paneWidths.value = {'fileView': 400};
+    paneWidths.value = {'filesPane': 660};
     await tester.pumpAndSettle();
     expect(tester.getSize(find.byType(FileView)).width, 400);
     final dash = tester.getRect(find.byType(RailDash).first);

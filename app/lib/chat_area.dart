@@ -9,8 +9,10 @@ import 'package:nushi/chat_panes.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/files_open.dart';
 import 'package:nushi/panes.dart' show Pane;
 import 'package:nushi/preview.dart';
+import 'package:nushi/preview_entry.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_tab.dart';
 import 'package:nushi/settings.dart';
@@ -68,6 +70,9 @@ class _ChatAreaState extends State<ChatArea> {
     if (widget.chat.phase == ChatPhase.waiting) _tab.value = ChatTab.chat;
     widget.chat.addListener(_showFile);
     widget.chat.files.shown.addListener(_showFileTab);
+    filesChats.addListener(_filesShown);
+    _tab.addListener(_filesShown);
+    _filesShown();
     widget.chat.browser.shown.addListener(_collapse);
     widget.chat.pane.addListener(_collapse);
     widget.chat.showAsked.addListener(_showAsked);
@@ -89,6 +94,8 @@ class _ChatAreaState extends State<ChatArea> {
   void dispose() {
     widget.chat.removeListener(_showFile);
     widget.chat.files.shown.removeListener(_showFileTab);
+    filesChats.removeListener(_filesShown);
+    _tab.removeListener(_filesShown);
     widget.chat.browser.shown.removeListener(_collapse);
     widget.chat.pane.removeListener(_collapse);
     widget.chat.showAsked.removeListener(_showAsked);
@@ -107,6 +114,7 @@ class _ChatAreaState extends State<ChatArea> {
     }
     _pull.unfollow();
     _expanded.dispose();
+    _inFiles.dispose();
     typesThrough.remove(_keys);
     _keys.dispose();
     super.dispose();
@@ -147,13 +155,21 @@ class _ChatAreaState extends State<ChatArea> {
     toggleTerminalOf(widget.chat, _keys);
   }
 
-  /// A file opened (from Artifacts, or ⌘P) shows beside the chat, and an
-  /// expanded browser tab is put back for it (ADR 0094).
+  /// A file opened shows in the Files pane beside the chat, so an expanded
+  /// browser tab is put back for it (ADR 0094); the tabs' marks follow
+  /// ([_inFiles]).
   void _showFileTab() {
-    if (widget.chat.files.shown.value == null) return;
-    _tab.value = ChatTab.chat;
-    _expanded.value = false;
+    _filesShown();
+    if (widget.chat.files.shown.value != null) _expanded.value = false;
   }
+
+  /// The file the Files pane shows while it shows: what a tool row's
+  /// Preview and a file chip mark as open.
+  final _inFiles = ValueNotifier<PreviewFile?>(null);
+
+  void _filesShown() => _inFiles.value = filesShown(widget.chat)
+      ? widget.chat.files.shown.value
+      : null;
 
   /// A file or page its agent asked to show opens while the transcript
   /// shows. This area lives only while its chat is the one showing, so
@@ -169,20 +185,21 @@ class _ChatAreaState extends State<ChatArea> {
     chat.showAsked.value = null;
     switch (asked) {
       case ShowFile(:final path) when _filesFit():
-        chat.openPreview(path);
+        chat.openInFiles(path);
       case ShowPage(:final url) when _browserFits():
         chat.showPage(url);
       case _:
     }
   }
 
-  /// Whether a file's view opens beside the transcript and leaves it
-  /// [ChatView.leastBesideWide], as [Beside] works it out ([chatFit]): the
-  /// details rail tucks itself away for it and the panes narrow, each to
-  /// its least at most. It is read when asked, since a side chat or the
-  /// Files pane opens without building this area again.
+  /// Whether the Files pane is open, or opens beside the transcript and
+  /// leaves it [ChatView.leastBesideWide], as [Beside] works it out
+  /// ([chatFit]): the details rail tucks itself away for it and the panes
+  /// narrow, each to its least at most. It is read when asked, since a side
+  /// chat opens without building this area again.
   bool _filesFit() =>
-      _fits(openPanes(widget.chat, widget.daemon, fileView: true));
+      filesOpen(widget.chat) ||
+      _fits(openPanes(widget.chat, widget.daemon, files: true));
 
   /// Whether the browser opens beside the transcript, as [_filesFit] (a
   /// subagent's pane takes no room: the browser takes its place).
@@ -296,15 +313,14 @@ class _ChatAreaState extends State<ChatArea> {
                   : null;
               return Previews(
                 // Only the transcript's rows open a preview or a tab.
-                open: onChat ? chat.openPreview : null,
+                open: onChat ? chat.openInFiles : null,
                 browse: onChat ? (url) => chat.openBrowserTab('$url') : null,
                 browseFits: () => chat.browserFits(),
-                current: chat.files.shown,
+                current: _inFiles,
                 name: (path) => relativeIn(chat.folder, path),
                 child: ListenableBuilder(
                   listenable: Listenable.merge([
                     chat.pane,
-                    chat.files.shown,
                     chat.browser.shown,
                     chat.side,
                     chat.sideHidden,

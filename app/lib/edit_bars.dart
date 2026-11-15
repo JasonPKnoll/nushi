@@ -229,13 +229,6 @@ Future<void> closeTabSaving(
   }
 }
 
-/// Closes the file view and its tabs, their edits saved first.
-Future<void> closeFilesSaving(BuildContext context, ChatState chat) async {
-  if (await saveBeforeClosing(context, chat, chat.files.tabs.value)) {
-    chat.files.closeAll();
-  }
-}
-
 /// Closes the browser pane and its tabs (they hold no edits).
 void closeBrowser(ChatState chat) => chat.browser.shown.value = null;
 

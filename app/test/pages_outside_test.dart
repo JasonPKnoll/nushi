@@ -11,7 +11,7 @@ import 'package:nushi/chat_header.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/markdown.dart' show openWebOutside;
@@ -113,37 +113,38 @@ void main() {
   ) async {
     final opened = pagesOutside();
     final (_, d) = await _app(tester);
-    d.chats['c']!.openPreview('site/index.html');
+    d.chats['c']!.openInFiles('site/index.html');
     await tester.pumpAndSettle();
     expect(opened, isEmpty); // shown, not opened
-    expect(_in<FileView>(find.text('index.html')), findsWidgets);
-    expect(_in<FileView>(find.text(outsideNote)), findsOneWidget);
-    expect(_in<FileView>(find.byTooltip('Reload')), findsNothing);
-    expect(_in<FileView>(find.byTooltip('Open in browser')), findsOne);
+    expect(_in<FilesPane>(find.text('index.html')), findsWidgets);
+    expect(_in<FilesPane>(find.text(outsideNote)), findsOneWidget);
+    expect(_in<FilesPane>(find.byTooltip('Reload')), findsNothing);
+    expect(_in<FilesPane>(find.byTooltip('Open in browser')), findsOne);
     await render(tester, find.byType(NushiApp), 'outside_preview_1700');
     await tester.tap(_openButton);
     await tester.pumpAndSettle();
     expect(opened, [Uri.file('/Users/me/nushi/site/index.html')]);
-    await tester.tap(_in<FileView>(find.byType(SourceButton)));
+    await tester.tap(_in<FilesPane>(find.byType(SourceButton)));
     await tester.pumpAndSettle();
     expect(
-      _in<FileView>(find.textContaining('The Still Kettle')),
+      _in<FilesPane>(find.textContaining('The Still Kettle')),
       findsOneWidget,
     );
-    expect(_in<FileView>(find.byType(SourceView)), findsOneWidget);
+    expect(_in<FilesPane>(find.byType(SourceView)), findsOneWidget);
     await closeView(tester, d);
   }, variant: linuxOnly);
 
   testWidgets('beside the details rail, right of it, the placeholder keeps '
       'its button in the pane, under its top row', (tester) async {
     final opened = pagesOutside();
-    final (_, d) = await _app(tester);
+    // Wide enough for the rail beside the Files pane.
+    final (_, d) = await _app(tester, width: 2000);
     showDetails.value = true;
     await tester.pumpAndSettle();
-    d.chats['c']!.openPreview('site/index.html');
+    d.chats['c']!.openInFiles('site/index.html');
     await tester.pumpAndSettle();
-    await render(tester, find.byType(NushiApp), 'outside_preview_rail_1700');
-    final pane = tester.getRect(find.byType(FileView));
+    await render(tester, find.byType(NushiApp), 'outside_preview_rail_2000');
+    final pane = tester.getRect(find.byType(FilesPane));
     final rail = tester.getRect(find.byType(DetailsPanel));
     expect(pane.left, rail.right);
     expect(pane.right, tester.getRect(find.byType(Pane)).right);
@@ -159,7 +160,7 @@ void main() {
       pane.contains(button.topLeft) && pane.contains(button.bottomRight),
       isTrue,
     );
-    expectTextInside(tester, 1700);
+    expectTextInside(tester, 2000);
     await tester.tap(_openButton);
     await tester.pumpAndSettle();
     expect(opened, [Uri.file('/Users/me/nushi/site/index.html')]);
@@ -171,10 +172,10 @@ void main() {
   ) async {
     pagesOutside();
     final (_, d) = await _app(tester, width: 720, brightness: Brightness.dark);
-    d.chats['c']!.openPreview('site/index.html');
+    d.chats['c']!.openInFiles('site/index.html');
     await tester.pumpAndSettle();
     await render(tester, find.byType(NushiApp), 'outside_preview_720');
-    final pane = tester.getRect(find.byType(FileView));
+    final pane = tester.getRect(find.byType(FilesPane));
     final button = tester.getRect(_openButton);
     expect(
       pane.contains(button.topLeft) && pane.contains(button.bottomRight),
@@ -194,7 +195,7 @@ void main() {
       ..conventions = linuxConventions;
     addTearDown(() => defaultBrowser.value = null);
     final (_, d) = await _app(tester);
-    d.chats['c']!.openPreview('site/index.html');
+    d.chats['c']!.openInFiles('site/index.html');
     await tester.pumpAndSettle();
     // No name from the runner: the button says "your browser".
     await tester.tap(find.text('Open in your browser'));
@@ -208,7 +209,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(_in<FileView>(find.byTooltip('Open in browser')));
+    await tester.tap(_in<FilesPane>(find.byTooltip('Open in browser')));
     await tester.pumpAndSettle();
     expect(find.textContaining('No default browser is set'), findsOneWidget);
     await closeView(tester, d);
@@ -218,9 +219,9 @@ void main() {
       'note', (tester) async {
     final opened = pagesOutside();
     final (_, d) = await _app(tester);
-    d.chats['c']!.openPreview('docs/menu.pdf');
+    d.chats['c']!.openInFiles('docs/menu.pdf');
     await tester.pumpAndSettle();
-    expect(_in<FileView>(find.text(outsideNote)), findsOneWidget);
+    expect(_in<FilesPane>(find.text(outsideNote)), findsOneWidget);
     expect(find.text('Open it on your Mac to see it.'), findsNothing);
     await tester.tap(_openButton);
     await tester.pumpAndSettle();
@@ -232,11 +233,11 @@ void main() {
       'to', (tester) async {
     pagesOutside();
     final (_, d) = await _app(tester);
-    d.chats['c']!.openPreview('docs/flow.mmd');
+    d.chats['c']!.openInFiles('docs/flow.mmd');
     await tester.pumpAndSettle();
-    expect(_in<FileView>(find.byType(SourceButton)), findsNothing);
-    expect(_in<FileView>(find.textContaining('Plan --> Build')), findsOne);
-    expect(_in<FileView>(find.byTooltip('Open in browser')), findsNothing);
+    expect(_in<FilesPane>(find.byType(SourceButton)), findsNothing);
+    expect(_in<FilesPane>(find.textContaining('Plan --> Build')), findsOne);
+    expect(_in<FilesPane>(find.byTooltip('Open in browser')), findsNothing);
     await closeView(tester, d);
   }, variant: linuxOnly);
 

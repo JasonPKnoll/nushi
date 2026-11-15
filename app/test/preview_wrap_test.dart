@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_bar.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/panes.dart' show PaneHeader;
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
@@ -97,13 +99,13 @@ Future<Daemon> _app(
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
-  d.chats['c']!.openPreview(file);
+  d.chats['c']!.openInFiles(file);
   await tester.pumpAndSettle();
   return d;
 }
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(FileView), matching: f);
+    find.descendant(of: find.byType(FilesPane), matching: f);
 
 Finder get _wrapButton => _inPane(find.byIcon(Icons.wrap_text));
 
@@ -202,18 +204,32 @@ void main() {
     await tester.tap(_inPane(find.byType(SourceButton)));
     await tester.pumpAndSettle();
     expect(_wrapButton, findsOneWidget);
-    // In the title row: the source button didn't move from under the
+    // In the bar, left of it: the source button didn't move from under the
     // pointer.
     expect(tester.getRect(_inPane(find.byType(SourceButton))), source);
-    expect(tester.getRect(_wrapButton).bottom, lessThan(source.top));
+    expect(tester.getRect(_wrapButton).right, lessThanOrEqualTo(source.left));
     await closeView(tester, d);
   }, variant: _mac);
 
   testWidgets('a pane too narrow for its buttons has wrapping in its ⋯', (
     tester,
   ) async {
-    final d = await _app(tester);
-    paneWidths.value = {'fileView': 300};
+    // The pane squeezed in a window too narrow for it (ADR 0123), on its
+    // own here.
+    viewport(tester, const Size(900, 600));
+    final d = await _fake().connect(tester);
+    final c = d.chats['c']!..openInFiles('src/tea.go');
+    await tester.pumpWidget(
+      themed(
+        Center(
+          child: SizedBox(
+            width: 210,
+            height: 500,
+            child: FilesPane(chat: c, daemon: d, onClose: () {}),
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(_wrapButton, findsNothing);
     await tester.tap(_inPane(find.byTooltip('More')));
@@ -400,12 +416,12 @@ void main() {
       }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
     }
 
-    testWidgets('the title row with the wrap button, $name', (tester) async {
-      viewport(tester, const Size(700, 200));
+    testWidgets("the Files pane's top rows, the wrap button in its bar, "
+        '$name', (tester) async {
+      viewport(tester, const Size(900, 200));
       final d = await _fake().connect(tester);
-      final c = d.chats['c']!..openPreview('src/tea.go');
-      // The row on its own: the pane, cut to its title row (the path line
-      // under it has its own golden, markdown_outline_test.dart).
+      final c = d.chats['c']!..openInFiles('src/tea.go');
+      // The pane on its own, cut to its two rows.
       await tester.pumpWidget(
         MaterialApp(
           theme: NushiTheme(
@@ -417,18 +433,21 @@ void main() {
                 key: const ValueKey('row'),
                 child: ClipRect(
                   child: SizedBox(
-                    width: 560,
-                    height: 44,
+                    width: 820,
+                    height: PaneHeader.height + FilesBar.height,
                     child: OverflowBox(
                       alignment: Alignment.topCenter,
-                      maxHeight: 120,
-                      child: SizedBox(
-                        height: 120,
-                        child: FileView(
-                          chat: c,
-                          daemon: d,
-                          path: 'src/tea.go',
-                          onClose: () {},
+                      maxHeight: 200,
+                      // On a pane's fill, as the chat's area backs it.
+                      child: ColoredBox(
+                        color:
+                            (brightness == Brightness.dark
+                                    ? Tokens.dark
+                                    : Tokens.light)
+                                .base,
+                        child: SizedBox(
+                          height: 200,
+                          child: FilesPane(chat: c, daemon: d, onClose: () {}),
                         ),
                       ),
                     ),
@@ -442,7 +461,7 @@ void main() {
       await tester.pumpAndSettle();
       await expectLater(
         find.byKey(const ValueKey('row')),
-        matchesGoldenFile('goldens/preview_title_row_$name.png'),
+        matchesGoldenFile('goldens/files_top_row_$name.png'),
       );
       await closeView(tester, d);
     }, variant: _mac);

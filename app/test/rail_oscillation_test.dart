@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/details_panel.dart';
-import 'package:nushi/file_view.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/panes.dart';
@@ -12,6 +12,7 @@ import 'package:nushi/sidebar.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/transcript.dart';
 
+import 'browser_fixture.dart' show browserFakes;
 import 'fake_daemon.dart';
 import 'harness.dart';
 import 'right_panes_fixture.dart';
@@ -36,8 +37,8 @@ _preview = (
   files: false,
   subagent: false,
   command: false,
-  previews: 1,
-  browser: 0,
+  previews: 0,
+  browser: 1,
 );
 
 /// Whether the rail is wanted shown now (its [Presence]'s say), whatever
@@ -53,7 +54,7 @@ bool _railShown(WidgetTester tester) {
 
 /// The panes lie over the transcript: it runs on under the preview.
 bool _over(WidgetTester tester) =>
-    _transcript(tester).right > tester.getRect(find.byType(FileView)).left;
+    _transcript(tester).right > tester.getRect(find.byType(BrowserPane)).left;
 
 Rect _transcript(WidgetTester tester) => tester.getRect(
   find.byWidgetPredicate(
@@ -94,7 +95,7 @@ class _Watch {
 
 /// The preview's edge, grabbed and past the drag's slop.
 Future<TestGesture> _grab(WidgetTester tester) async {
-  final pane = tester.getRect(find.byType(FileView));
+  final pane = tester.getRect(find.byType(BrowserPane));
   final drag = await tester.startGesture(
     Offset(pane.left + Resizable.edgeWidth / 2, pane.center.dy),
   );
@@ -104,7 +105,7 @@ Future<TestGesture> _grab(WidgetTester tester) async {
 }
 
 double _previewWidth(WidgetTester tester) =>
-    tester.getRect(find.byType(FileView)).width;
+    tester.getRect(find.byType(BrowserPane)).width;
 
 /// The preview dragged a point at a time until it's [width] wide.
 Future<void> _dragTo(
@@ -127,6 +128,7 @@ double _railLine(WidgetTester tester) =>
 
 void main() {
   setUpAll(loadFonts);
+  setUp(browserFakes);
 
   // With the sidebar: the chat's pane is the window less 268; the preview
   // with the rail needs 1240 of it.
@@ -261,7 +263,7 @@ void main() {
     for (var i = 0; i < 40; i++) {
       await drag.moveBy(const Offset(-40, 0));
       await tester.pump();
-      expect(tester.getRect(find.byType(FileView)).top, area.top);
+      expect(tester.getRect(find.byType(BrowserPane)).top, area.top);
       expect(tester.takeException(), isNull);
     }
     expect(_previewWidth(tester), area.width - ChatView.leastBesideWide);
@@ -269,7 +271,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(_over(tester), isFalse);
-    expect(paneWidths.value['fileView'], area.width - ChatView.leastBesideWide);
+    expect(paneWidths.value['browser'], area.width - ChatView.leastBesideWide);
     await closeView(tester, d);
   }, variant: _mac);
 
@@ -284,7 +286,7 @@ void main() {
       open: _preview,
     );
     expect(_over(tester), isTrue);
-    final at = tester.getRect(find.byType(FileView));
+    final at = tester.getRect(find.byType(BrowserPane));
     expect(at.width, 300);
     for (final by in [10.0, -10.0]) {
       final drag = await _grab(tester);
@@ -301,7 +303,7 @@ void main() {
       watch.frame();
       expect(watch.overFlips, 0);
       expect(_over(tester), isTrue);
-      expect(tester.getRect(find.byType(FileView)), at);
+      expect(tester.getRect(find.byType(BrowserPane)), at);
     }
     await closeView(tester, d);
   }, variant: _mac);

@@ -9,6 +9,7 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/pane_tabs.dart';
@@ -37,7 +38,7 @@ void main() {
 
     test('each new browser tab is a tab of its own, last, apart from the '
         'files', () {
-      final c = state()..openPreview('docs/a.md');
+      final c = state()..openInFiles('docs/a.md');
       final one = c.openBrowserTab();
       final two = c.openBrowserTab();
       expect(c.browser.tabs.value, [one, two]);
@@ -45,14 +46,14 @@ void main() {
       // The file's tab stays and shows, beside them.
       expect(c.fileNames, ['docs/a.md']);
       expect(c.shownFile, 'docs/a.md');
-      c.openPreview('/Users/me/nushi/docs/a.md');
+      c.openInFiles('/Users/me/nushi/docs/a.md');
       expect(c.fileNames, ['docs/a.md']);
       expect(c.browser.shown.value, two);
     });
 
     test('closing one shows the next; Close takes them all and leaves the '
         'files', () {
-      final c = state()..openPreview('a.md');
+      final c = state()..openInFiles('a.md');
       final one = c.openBrowserTab('http://localhost:3000');
       final two = c.openBrowserTab('http://localhost:5173');
       c
@@ -71,7 +72,7 @@ void main() {
       final first = c.browser.shown.value!;
       expect(first.address.value, '');
       final second = c.openBrowserTab();
-      c.openPreview('a.md');
+      c.openInFiles('a.md');
       expect(c.browser.shown.value, same(second));
       c.showOrHideBrowser();
       expect(c.browser.shown.value, isNull);
@@ -81,7 +82,7 @@ void main() {
     });
 
     test('the globe hides the browser tabs and brings the same ones back', () {
-      final c = state()..openPreview('a.md');
+      final c = state()..openInFiles('a.md');
       final one = c.openBrowserTab('http://localhost:3000');
       final two = c.openBrowserTab('http://localhost:5173');
       c.showBrowserTab(one);
@@ -151,12 +152,36 @@ void main() {
       await closeView(tester, d);
     }, variant: macOnly);
 
+    testWidgets("Files' and the browser's Close sit at the same "
+        "offsets from each pane's right; a file's address opens Files beside "
+        'it', (tester) async {
+      browserFakes();
+      final d = await browserApp(tester, width: 2400);
+      final c = d.chats['c']!..openBrowserTab('http://localhost:3000');
+      await tester.pumpAndSettle();
+      expect(find.byType(FilesPane), findsNothing);
+      await typeAddress(tester, 'file:///Users/me/nushi/docs/a.md');
+      expect(c.shownFile, '/Users/me/nushi/docs/a.md');
+      expect(find.byType(FilesPane), findsOneWidget);
+      expect(c.browser.shown.value, isNotNull);
+      Rect at(Type pane, String tip) {
+        final p = tester.getRect(find.byType(pane));
+        final r = tester.getRect(
+          find.descendant(of: find.byType(pane), matching: find.byTooltip(tip)),
+        );
+        return r.shift(Offset(-p.right, -p.top));
+      }
+
+      expect(at(FilesPane, 'Close'), at(BrowserPane, 'Close'));
+      await closeView(tester, d);
+    }, variant: macOnly);
+
     testWidgets('+ shows after the chips, and the browser holds no file', (
       tester,
     ) async {
       browserFakes();
       final d = await browserApp(tester);
-      final c = d.chats['c']!..openPreview('docs/a.md');
+      final c = d.chats['c']!..openInFiles('docs/a.md');
       await tester.pumpAndSettle();
       expect(find.byTooltip('New browser tab'), findsNothing);
       c.openBrowserTab('http://localhost:3000');
@@ -542,7 +567,7 @@ void main() {
             brightness: brightness,
           );
           d.chats['c']!
-            ..openPreview('docs/plan.md')
+            ..openInFiles('docs/plan.md')
             ..openBrowserTab('http://localhost:3000');
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);

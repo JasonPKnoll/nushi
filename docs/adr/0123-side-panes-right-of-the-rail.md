@@ -45,3 +45,36 @@ A chat was laid out transcript | side panes | details rail, the chat's header ac
 - Saving the hide (turning `showDetails` off): the panel would stay away once there's room again, and the user's choice would be the window's.
 - Panes under the header at every width, as before: the header's buttons couldn't then end where Claude's do, and every pane lost a row's height.
 - Over the transcript, the header and the terminal across the whole pane and the panes under the header (this ADR as first accepted): a point past the beside line the window switched layouts, the header's buttons jumping to the far right, the panes dropping under it, the transcript re-centred and cut mid-sentence.
+
+## Amendment (2026-11-15): Files holds the open files, as Claude desktop's does
+
+The owner, with Claude desktop's Files pane (`nushi-review/2026-11-15-right-panes/owner/19–22`): "We should copy claude code now that we open on the right for files. It shows a blank space for open files and it also keep the tree on the right instead of left."
+
+- **One Files pane: [viewer | tree].** The file viewer (what the preview pane's file side was, `FileView`) is the Files pane's left part and the tree (`FilesTree`) its right part, at the window's edge, its own edge dragged (`filesTree`, 260, from 200 to 480; `files` stays the Changes list's width). With no file open the viewer is blank, as Claude's: a folder, "Open files appear here" and "Pick a file in the tree, or click a file path in the conversation" (Nushi's empty states have no full stops). Opening a file never moves the tree. With a daemon older than the tree (`filesApi`) the viewer is alone, and its blank says "Go to a file with ⌘P, or click a file path in the conversation".
+- **The pane's two rows.** The top row, level with the chat's header: Files at its left; after it the shown file's kind and name with its ✕, or with two or more open their tabs (ADR 0070's plain tabs, after the name rather than in its place: the pane is Files, not one file); Live; and at its right end ×, in the same boxes and at the same pixels as the browser's (`PaneEndButtons`). The second row (`FilesBar`, 40 high, across the whole pane): the shown file's path line over the viewer, wrapping while a source shows, the source button, a page's Reload and Open in browser, and Show in Finder, folded into ⋯ when the row is too narrow. The git-ignored eye is in the tree's filter field.
+- **Files' × hides it and keeps its tabs**, as ⇧⌘E, View › Files and the header's button do: one meaning, and no question on a toggle; hiding saves an edited file as its editor goes (ADR 0096), and one in a conflict keeps its text in memory. ⌘W closes the shown file; the last leaves the viewer blank and the pane open.
+- **Every way a file opens opens Files on it** (`ChatState.openInFiles`): a path in the conversation, a tool row's Preview, a message's file chip, the agent's `show`, ⌘P, Artifacts, the tree, and a `file:` address typed in the browser. The file view's tabs are `FileTabs`, apart from the browser's (`BrowserTabs`): the browser is a pane of its own (ADR 0094), and a subagent's pane takes only its place.
+- **Order: side chat, Files, subagent or command, browser.** Files is a wide pane (`PaneSpec.wide`): 820 at first (the viewer 560, the tree 260), 500 at least (300 and 200), no most. Inside it the viewer gives width first, to 300, then the tree, to 200 (`treeWidth`, `files_split.dart`); squeezed narrower still, the two narrow alike, so no edge jumps. Hiding the tree when narrow was weighed and left out: a third thing tucking itself away would jump the viewer by 200 and undo the user's choice; the tree keeps its least.
+- Between the panes the rule is the one above: the widest gives first, so with the browser open Files gives its 320 before the browser gives any.
+- **Costs**: with Files open the rail tucks below a chat of 1500 (it was 1064 with Files alone), and an agent's `show` that has to open Files needs a chat of 860 (it was 660 for the preview); an open Files pane always takes it. Both follow from a viewer in Files; Files' opening width is the knob if they're too much. In the narrowest windows a squeezed pane drops what it can (the browser's +, Servers and ⋯; the side chat's icon) before its buttons are cut.
+- The table, re-derived (the rest as above):
+
+  | Open (default widths) | Rail from A | Narrowing under A | Beside from A |
+  |---|---|---|---|
+  | none | 804 | — | — |
+  | side chat 380 | 1184 | 936 | 856 |
+  | Files 820 | 1500 | 1180 | 860 |
+  | Files, no tree | 1500 | 1180 | 660 |
+  | side chat + Files | 1880 | 1560 | 1160 |
+  | subagent or command 264 | 944 | 624 | 580 |
+  | side chat + subagent | 1324 | 1004 | 880 |
+  | Files + subagent | 1764 | 1444 | 1080 |
+  | side chat + Files + subagent | 2144 | 1824 | 1380 |
+  | browser 560 | 1240 | 920 | 660 |
+  | side chat + browser | 1620 | 1300 | 960 |
+  | Files + browser | 2060 | 1740 | 1160 |
+  | side chat + Files + browser | 2440 | 2120 | 1460 |
+
+  Files alone (A → viewer | tree): 1180 → 560 | 260, 1000 → 380 | 260, 920 → 300 | 260, 900 → 300 | 240, 860 → 300 | 200; under 860 it lies over the transcript at 500. Files and the browser (A → Files / browser): 1740 → 820 / 560, 1600 → 680 / 560, 1420 → 500 / 560, 1300 → 500 / 440, 1160 → 500 / 300.
+- "Leaving the leftmost out… Files would vanish" above still holds; Files' row now drops its title below 120 and keeps its ×.
+- Renames, so the code says what each part is: the preview pane's file view `PreviewPane` → `FileView`, its tab row `PreviewTabs` → `PaneTabs`, `openPreview` → `openInFiles`, `previewFile` → `shownFile`, `previewFits` → `filesFit` and `browserFits`, `closePreviewSaving` → `closeBrowser`; `PreviewHeader` is gone (its parts are the Files pane's two rows), and the old shared `preview` width is read as the browser's.

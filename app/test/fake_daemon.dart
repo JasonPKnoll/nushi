@@ -360,12 +360,21 @@ class FakeDaemon implements Transport {
     Stream<I> input, [
     CallOptions? options,
   ]) async {
-    if (streams != null || files.isNotEmpty || _serverLogs.isNotEmpty) {
-      final request = await input.first;
-      if (streams?.call(request) case final s?) {
-        calls.add(request);
-        return StreamResponse(spec, Headers(), s.cast<O>(), Headers());
-      }
+    final request = await input.first;
+    if (streams?.call(request) case final s?) {
+      calls.add(request);
+      return StreamResponse(spec, Headers(), s.cast<O>(), Headers());
+    }
+    // A folder the test doesn't list is empty, and stays watched while the
+    // test runs (the Files pane's tree, open with every file, ADR 0123).
+    if (request case WatchChatFolderRequest(:final path)) {
+      calls.add(request);
+      final watch = StreamController<WatchChatFolderResponse>()
+        ..add(WatchChatFolderResponse(folders: [FolderListing(path: path)]));
+      addTearDown(watch.close);
+      return StreamResponse(spec, Headers(), watch.stream.cast<O>(), Headers());
+    }
+    {
       if (request case WatchServerLogRequest(:final serverId)) {
         calls.add(request);
         // One the test closed is gone, as the daemon's output of a server

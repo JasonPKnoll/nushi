@@ -125,7 +125,7 @@ void main() {
     expect(_expand, findsOneWidget);
 
     await expand();
-    c.openPreview('docs/plan.md');
+    c.openInFiles('docs/plan.md');
     await tester.pumpAndSettle();
     expect(find.byType(Composer), findsOneWidget);
     c.showBrowserTab(c.browser.tabs.value.first);
@@ -157,7 +157,7 @@ void main() {
           brightness: brightness,
         );
         d.chats['c']!
-          ..openPreview('docs/plan.md')
+          ..openInFiles('docs/plan.md')
           ..openBrowserTab('https://example.com');
         await tester.pumpAndSettle();
         await render(

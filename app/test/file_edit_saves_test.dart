@@ -85,13 +85,13 @@ void main() {
     );
     final e = editOf(d);
     await typeIn(tester, e, '// mine\n');
-    chatC(d).openPreview('b.go');
+    chatC(d).openInFiles('b.go');
     await tester.pumpAndSettle();
     expect(fake.writes, hasLength(1));
     expect(utf8.decode(fake.files['main.go']!), _mine);
     // The agent puts it back while it's hidden.
     fake.files['main.go'] = utf8.encode(goSource);
-    chatC(d).openPreview('main.go');
+    chatC(d).openInFiles('main.go');
     await tester.pumpAndSettle();
     expect(e.text, goSource);
     expect(e.unsaved, isFalse);

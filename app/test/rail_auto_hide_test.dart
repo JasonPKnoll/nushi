@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/beside_fit.dart';
+import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_panes.dart';
@@ -24,6 +25,7 @@ import 'package:nushi/sidebar_beside.dart';
 import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/transcript.dart';
 
+import 'browser_fixture.dart' show browserFakes;
 import 'fake_daemon.dart' show loadFonts;
 import 'harness.dart';
 import 'right_panes_fixture.dart';
@@ -42,20 +44,23 @@ const _both = TargetPlatformVariant({
   TargetPlatform.linux,
 });
 
-PanesOpen _openOf(List<PaneSpec> panes) => (
+PanesOpen _openOf(List<PaneSpec> panes, {int previews = 0}) => (
   side: panes.contains(ChatPanes.side),
   files: panes.contains(ChatPanes.files),
   subagent: panes.contains(ChatPanes.subagent),
   command: false,
-  previews: panes.contains(ChatPanes.fileView) ? 1 : 0,
-  browser: 0,
+  previews: previews,
+  browser: panes.contains(ChatPanes.browser) ? 1 : 0,
 );
+
+/// A file open: in the Files pane.
+final PanesOpen _aFile = _openOf([ChatPanes.files], previews: 1);
 
 Type _typeOf(PaneSpec p) => switch (p.name) {
   'side' => SideChat,
-  'files' => FilesPane,
+  'filesPane' => FilesPane,
   'subagent' => SubagentPane,
-  _ => FileView,
+  _ => BrowserPane,
 };
 
 /// The rail shows (drawn: not tucked away).
@@ -101,6 +106,7 @@ void main() {
           '${windowFor(row.rail, sidebar: sidebar).toInt()}, beside from '
           '$beside', (tester) async {
         final rail = windowFor(row.rail, sidebar: sidebar);
+        browserFakes();
         final (d, _) = await panesApp(
           tester,
           width: rail,
@@ -170,13 +176,13 @@ void main() {
         }
         expect(showDetails.value, isTrue);
         await closeView(tester, d);
-      }, variant: {'none', 'preview'}.contains(row.name) ? _both : _mac);
+      }, variant: {'none', 'browser'}.contains(row.name) ? _both : _mac);
     }
   }
 
   testWidgets('hiding it for room is never saved, and the button keeps the '
       "user's choice", (tester) async {
-    // Files and the preview: the rail tucks under 1500 for the chat.
+    // A file in the Files pane: the rail tucks under 1500 for the chat.
     final width = windowFor(1450, sidebar: false);
     final (d, _) = await panesApp(tester, width: width + 200);
     await tester.pump(const Duration(seconds: 2));
@@ -186,11 +192,7 @@ void main() {
     showDetails.addListener(count);
     addTearDown(() => showDetails.removeListener(count));
     viewport(tester, Size(width, 900));
-    await openPanesIn(
-      tester,
-      d,
-      _openOf([ChatPanes.files, ChatPanes.fileView]),
-    );
+    await openPanesIn(tester, d, _aFile);
     expect(_rail(), false);
     expect(told, 0);
     await tester.pump(const Duration(seconds: 2)); // a save would be done
@@ -235,6 +237,7 @@ void main() {
     c.files.close(c.files.shown.value!);
     await tester.pumpAndSettle();
     expect(find.byType(FileView), findsNothing);
+    expect(find.byType(FilesPane), findsOneWidget);
     expect(_rail(), false);
     toggleFiles(c);
     await tester.pumpAndSettle();
@@ -248,11 +251,12 @@ void main() {
 
   for (final tucked in [false, true]) {
     testWidgets('a peek at the hidden sidebar, the rail '
-        '${tucked ? 'tucked' : 'shown'} beside the preview, flips nothing: '
+        '${tucked ? 'tucked' : 'shown'} beside the browser, flips nothing: '
         'the rail stays as it was and no pane moves', (tester) async {
-      // At the preview's line the rail just fits; a point under, it's
+      // At the browser's line the rail just fits; a point under, it's
       // tucked. The peek lies over the chat, so it takes none of the room.
-      final row = thresholdRows.firstWhere((r) => r.name == 'preview');
+      final row = thresholdRows.firstWhere((r) => r.name == 'browser');
+      browserFakes();
       final line = windowFor(row.rail, sidebar: false);
       final (d, _) = await panesApp(
         tester,
@@ -262,7 +266,7 @@ void main() {
       expect(_rail(), !tucked);
       Map<String, Rect> rects() => {
         'header': tester.getRect(find.byType(ChatHeader)),
-        'preview': tester.getRect(find.byType(FileView)),
+        'browser': tester.getRect(find.byType(BrowserPane)),
         'menu': tester.getRect(find.byTooltip('Chat menu')),
         if (!tucked) 'rail': tester.getRect(find.byType(DetailsPanel)),
       };
@@ -290,7 +294,7 @@ void main() {
       expect(sidebarHidden.value, isTrue, reason: 'a peek');
       check('peeking');
       // The pointer off it: it slides away, and still nothing moved.
-      await mouse.moveTo(Offset(before['preview']!.center.dx, 400));
+      await mouse.moveTo(Offset(before['browser']!.center.dx, 400));
       await tester.pump(SidebarBeside.grace);
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 16));
@@ -405,7 +409,7 @@ void main() {
     testWidgets('the Files pane closes (⇧⌘E)', (tester) async {
       final (d, _) = await panesApp(
         tester,
-        width: windowFor(1204, sidebar: true) - 1,
+        width: windowFor(1764, sidebar: true) - 1,
         sidebar: true,
         open: _openOf([ChatPanes.files, ChatPanes.subagent]),
       );
@@ -495,11 +499,11 @@ void main() {
       'after a turn, as a shown one does, so it comes back current', (
     tester,
   ) async {
-    // The preview needs the rail's room in a chat area of 1100.
+    // The Files pane needs the rail's room in a chat area of 1100.
     final (d, fake) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.fileView]),
+      open: _aFile,
     );
     final c = d.chats['c']!
       // A turn under way: the status the chat list sends.
@@ -528,7 +532,7 @@ void main() {
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.fileView]),
+      open: _aFile,
     );
     final c = d.chats['c']!;
     expect(c.panelFits(), isFalse);
@@ -540,7 +544,7 @@ void main() {
     expect(showDetails.value, isFalse);
     Navigator.of(tester.element(find.byType(Palette))).pop();
     await tester.pumpAndSettle();
-    c.files.closeAll();
+    toggleFiles(c);
     await tester.pumpAndSettle();
     expect(c.panelFits(), isTrue);
     revealArtifacts(tester.element(find.byType(ChatHeader)), c);
@@ -552,13 +556,13 @@ void main() {
   }, variant: _mac);
 
   testWidgets("an archived chat's side chat takes no room", (tester) async {
-    // At the preview's own line: the rail shows beside it, the side chat
-    // not placed.
+    // At the Files pane's own line: the rail shows beside it, the side
+    // chat not placed.
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(1240, sidebar: false),
+      width: windowFor(1500, sidebar: false),
       archived: true,
-      open: _openOf([ChatPanes.side, ChatPanes.fileView]),
+      open: _openOf([ChatPanes.side, ChatPanes.files], previews: 1),
     );
     expect(find.byType(SideChat, skipOffstage: false), findsNothing);
     expect(find.byType(FileView), findsOneWidget);
@@ -568,11 +572,11 @@ void main() {
 
   testWidgets('a chat whose session is gone is laid out as a live one: '
       'its side chat, a session of its own, takes its room (only archiving '
-      "ends it), so the rail tucks at the preview's line", (tester) async {
+      "ends it), so the rail tucks at the Files pane's line", (tester) async {
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(1240, sidebar: false),
-      open: _openOf([ChatPanes.side, ChatPanes.fileView]),
+      width: windowFor(1500, sidebar: false),
+      open: _openOf([ChatPanes.side, ChatPanes.files], previews: 1),
     );
     final c = d.chats['c']!..listed(ChatStatus(sessionGone: true));
     await tester.pumpAndSettle();
@@ -601,7 +605,7 @@ void main() {
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.fileView]),
+      open: _aFile,
     );
     final c = d.chats['c']!;
     final preview = tester.getRect(find.byType(FileView));
@@ -633,7 +637,7 @@ void main() {
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.fileView]),
+      open: _aFile,
     );
     final preview = tester.getRect(find.byType(FileView));
     d.select('d');

@@ -8,15 +8,15 @@ Shortcuts below are the Mac's. On Linux, use Ctrl where the Mac uses ⌘, and Al
 
 ## Open a preview
 
-When the agent writes a document, page, image or diagram, its row in the chat has a **Preview** button. Click it and the file opens beside the chat, right of the details panel, from the window's top to its bottom (in a narrow window it lies over the chat's right side instead). Where the row is narrow (a subagent's pane), the button is inside the row: click the row to open it first.
+When the agent writes a document, page, image or diagram, its row in the chat has a **Preview** button. Click it and the file opens in the **Files** pane beside the chat, right of the details panel, from the window's top to its bottom (in a narrow window it lies over the chat's right side instead). Where the row is narrow (a subagent's pane), the button is inside the row: click the row to open it first.
 
 You can also open files in these ways:
 
 - **Artifacts**: in the details panel (the panel button in the chat's header), the **Artifacts** list shows the documents, pages and images the chat made. Click one to open it.
 - **Open file** (⌘P): type part of a name to open any file in the chat's folder, code included.
-- **Files** (⇧⌘E, or the folder button in the header): a tree of the chat's folder. Files the chat wrote have a dot.
+- **Files** (⇧⌘E, or the folder button in the header): the open files on the left and a tree of the chat's folder on the right, as in Claude's desktop app. With nothing open it says **Open files appear here**. Files the chat wrote have a dot. Opening a file never moves the tree.
 
-Some agents can also open a file, or a page on your own machine, in the preview themselves.
+Some agents can also open a file in the Files pane, or a page on your own machine in the browser, themselves.
 
 ## What you can preview
 
@@ -27,18 +27,19 @@ Some agents can also open a file, or a page on your own machine, in the preview 
 - **Mermaid diagrams** (`.mmd` or `.mermaid` files). Mermaid blocks in the agent's messages draw as diagrams too.
 - **Code and text files**, with syntax highlighting.
 
-Above the file is its path. Click the path to copy it.
+Above the file, in the pane's second row, is its path. Click the path to copy it.
 
 ## Work with several files
 
-Opening a second file adds a tab at the top of the pane.
+Opening a second file adds a tab at the top of the Files pane, after **Files**.
 
 - Click a name to switch to that file.
-- Click a tab's **✕**, or press ⌘W, to close it. Closing the last tab closes the pane, and closing the pane closes all its tabs.
+- Click a tab's **✕**, or press ⌘W, to close it. Closing the last one leaves the pane open and blank.
+- The pane's **×** (or ⇧⌘E) hides it; your open files are still there when it comes back.
 
 ## Edit a file
 
-You can edit any file that shows as text. For Markdown, HTML, SVG, CSV and diagrams, first click the **`</>`** button at the right of the path line (**View source**). Click **View preview** to go back.
+You can edit any file that shows as text. For Markdown, HTML, SVG, CSV and diagrams, first click the **`</>`** button after the path (**View source**). Click **View preview** to go back.
 
 1. Click in the text and type. There's no Edit button.
 2. Press ⌘S to save. Clicking into the message box or a terminal saves too.
@@ -56,7 +57,7 @@ A browser tab shows a web page beside the chat, such as the dev server the agent
 
 The browser's tabs sit in its top row, level with the chat's header; the bar under them has Back, Forward and Reload (⌘R). ⌘L jumps to the address field. **Expand** gives the browser the whole chat area, its header and terminal too, and **Collapse** (or Esc) gives the chat back.
 
-**When the window gets narrow.** Panes open right of the details panel, and the header's buttons move left to make room. When the panes would leave the chat too narrow, the details panel tucks itself away; it comes back by itself as soon as there's room (a wider window, a narrower or closed pane). Its button stays lit, since you still want it: press it to hide the panel for good. Narrower still, the panes get narrower, the widest first, so the chat keeps its room; the widths you dragged them to come back once there's room. Only when every pane is as narrow as it goes do they lie over the chat's right side, still from the window's top to its bottom. In a very narrow window the panel can't show at all, and its button is off.
+**When the window gets narrow.** Panes open right of the details panel, and the header's buttons move left to make room. When the panes would leave the chat too narrow, the details panel tucks itself away; it comes back by itself as soon as there's room (a wider window, a narrower or closed pane). Its button stays lit, since you still want it: press it to hide the panel for good. Narrower still, the panes get narrower, the widest first, so the chat keeps its room (in the Files pane, the open file gives first, then the tree); the widths you dragged them to come back once there's room. Only when every pane is as narrow as it goes do they lie over the chat's right side, still from the window's top to its bottom. In a very narrow window the panel can't show at all, and its button is off.
 
 If your project lists dev servers in a launch file (`.claude/launch.json` or `.agents/launch.json`), the **Servers** button starts and stops them. **Logs** shows a server's output. A server marked **Agent can't name it** has a name the agent can't use (only letters, digits and `: _ . -`): start it from the menu, or rename it in the launch file.
 

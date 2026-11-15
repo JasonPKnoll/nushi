@@ -6,7 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/markdown_outline.dart';
@@ -103,14 +103,14 @@ Future<Daemon> outlineApp(
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
-  d.chats['c']!.openPreview(file);
+  d.chats['c']!.openInFiles(file);
   await tester.pumpAndSettle();
   return d;
 }
 
 /// [f] in the preview pane.
 Finder inPane(Finder f) =>
-    find.descendant(of: find.byType(FileView), matching: f);
+    find.descendant(of: find.byType(FilesPane), matching: f);
 
 /// The rail.
 Finder get rail => find.byType(Rail);

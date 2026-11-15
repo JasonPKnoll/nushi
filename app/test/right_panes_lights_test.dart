@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat_panes.dart';
-import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panes.dart';
@@ -44,17 +43,17 @@ final _firsts = <(String, Type, PanesOpen, List<PaneSpec>)>[
   (
     'side chat',
     SideChat,
-    _open(side: true, files: true, previews: 1),
-    [ChatPanes.side, ChatPanes.files, ChatPanes.fileView],
+    _open(side: true, files: true, previews: 1, browser: 1),
+    [ChatPanes.side, ChatPanes.files, ChatPanes.browser],
   ),
   (
     'Files',
     FilesPane,
-    _open(files: true, previews: 1),
-    [ChatPanes.files, ChatPanes.fileView],
+    _open(files: true, previews: 1, browser: 1),
+    [ChatPanes.files, ChatPanes.browser],
   ),
   ('subagent', SubagentPane, _open(subagent: true), [ChatPanes.subagent]),
-  ('file view', FileView, _open(previews: 1), [ChatPanes.fileView]),
+  ('Files alone', FilesPane, _open(previews: 1), [ChatPanes.files]),
   ('browser', BrowserPane, _open(browser: 1), [ChatPanes.browser]),
 ];
 

@@ -26,7 +26,8 @@ void main() {
     ('light', Brightness.light),
   ]) {
     testWidgets('golden: the rail and its menu, $name', (tester) async {
-      final d = await outlineApp(tester, width: 1200, brightness: brightness);
+      // Wide enough for the Files pane at 820, its viewer 560.
+      final d = await outlineApp(tester, brightness: brightness);
       await expectLater(
         find.byType(FileView),
         matchesGoldenFile('goldens/markdown_outline_$name.png'),

@@ -24,11 +24,12 @@ import 'right_panes_fixture.dart';
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
 PanesOpen _open({
+  bool side = false,
   bool files = false,
   bool subagent = false,
   int previews = 0,
 }) => (
-  side: false,
+  side: side,
   files: files,
   subagent: subagent,
   command: false,
@@ -51,7 +52,7 @@ void main() {
     final (d, _) = await panesApp(tester, width: width);
     final c = d.chats['c']!;
     final at = tester.getRect(_rail);
-    c.openPreview('PLAN.md');
+    c.openInFiles('PLAN.md');
     await tester.pump();
     expect(tester.getRect(_rail).left, closeTo(at.left, 0.5));
     await tester.pump(Motion.exit ~/ 2);
@@ -78,7 +79,7 @@ void main() {
     expect(find.byType(DetailsPanel, skipOffstage: false), findsOneWidget);
 
     // Closed: it slides back in from the right, to where it was.
-    c.files.closeAll();
+    toggleFiles(c);
     await tester.pump();
     final first = tester.getRect(_rail).left;
     expect(first, greaterThan(at.left + 100));
@@ -97,7 +98,7 @@ void main() {
       final (d, _) = await panesApp(tester, width: width);
       final c = d.chats['c']!;
       final at = tester.getRect(_rail);
-      c.openPreview('PLAN.md');
+      c.openInFiles('PLAN.md');
       await tester.pumpAndSettle();
       // The chat's area made again with the rail tucked from the start.
       if (way == 'another chat') {
@@ -111,7 +112,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(_rail, findsNothing);
-      c.files.closeAll();
+      toggleFiles(c);
       await tester.pump();
       // From past its place on the right, never from the left of it.
       expect(tester.getRect(_rail).left, greaterThan(at.left + 200));
@@ -139,11 +140,11 @@ void main() {
     final c = d.chats['c']!;
     final panel = tester.state(find.byType(DetailsPanel, skipOffstage: false));
     final shown = c.shownFile!;
-    c.files.closeAll();
+    toggleFiles(c);
     await tester.pump();
     await tester.pump(Motion.enter ~/ 3);
     final mid = tester.getRect(_rail).left;
-    c.openPreview(shown);
+    c.openInFiles(shown);
     await tester.pump();
     expect(tester.getRect(_rail).left, closeTo(mid, 2));
     await tester.pumpAndSettle();
@@ -160,7 +161,7 @@ void main() {
     // Wide: the text's column keeps its width, so it glides.
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(1884, sidebar: false),
+      width: windowFor(2444, sidebar: false),
       open: _open(files: true),
     );
     final question = find.text('Where is the login redirect handled?');
@@ -171,8 +172,8 @@ void main() {
     final width = tester.getSize(view).width;
     filesChats.value = {};
     await tester.pump();
-    // Laid out at once 260 wider; the text drawn where it was.
-    expect(tester.getSize(view).width, width + 260);
+    // Laid out at once 820 wider; the text drawn where it was.
+    expect(tester.getSize(view).width, width + 820);
     expect(tester.getRect(question).left, closeTo(from, 1));
     await tester.pump(Motion.enter ~/ 2);
     final mid = tester.getRect(question).left;
@@ -187,7 +188,7 @@ void main() {
       'and come out from under one closing', (tester) async {
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(1600, sidebar: false),
+      width: windowFor(2000, sidebar: false),
     );
     final area = tester.getRect(find.byType(Pane));
     filesChats.value = {'c'};
@@ -223,11 +224,13 @@ void main() {
 
   testWidgets('opening a pane moves the buttons by its width, with the '
       'rail shown and with it tucked', (tester) async {
-    for (final (area, open) in [
-      // The rail shown before and after.
-      (1600.0, _open()),
-      // Tucked before and after: a subagent's pane (944 for the rail).
-      (930.0, _open(subagent: true)),
+    for (final (area, open, pane) in [
+      // The rail shown before and after: Files.
+      (2000.0, _open(), 820.0),
+      // Tucked before and after: a subagent's pane (944 for the rail)
+      // beside a side chat; Files is wider than a tucked rail ever leaves
+      // room for (ADR 0123), so the subagent's pane opens here.
+      (1100.0, _open(side: true), 264.0),
     ]) {
       final (d, _) = await panesApp(
         tester,
@@ -235,9 +238,13 @@ void main() {
         open: open,
       );
       final before = tester.getRect(_menu).right;
-      filesChats.value = {'c'};
+      if (pane == 820) {
+        filesChats.value = {'c'};
+      } else {
+        d.chats['c']!.pane.value = 'a';
+      }
       await tester.pumpAndSettle();
-      expect(tester.getRect(_menu).right, before - 260);
+      expect(tester.getRect(_menu).right, before - pane);
       await closeView(tester, d);
     }
   }, variant: _mac);
@@ -302,14 +309,14 @@ void main() {
         const FakeAccessibilityFeatures(disableAnimations: true);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     final (d, _) = await panesApp(tester, width: width);
-    final c = d.chats['c']!..openPreview('PLAN.md');
+    final c = d.chats['c']!..openInFiles('PLAN.md');
     await tester.pump();
     final preview = tester.getRect(find.byType(FileView));
     expect(_rail, findsNothing);
     expect(tester.getRect(_menu).right, preview.left - ChatHeader.end);
     await tester.pumpAndSettle();
     expect(tester.getRect(find.byType(FileView)), preview);
-    c.files.closeAll();
+    toggleFiles(c);
     await tester.pump();
     expect(_rail, findsOneWidget);
     final rail = tester.getRect(_rail);

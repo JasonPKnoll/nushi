@@ -1,321 +1,200 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:nushi/app_actions.dart';
 import 'package:nushi/chat.dart';
+import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/file_filter.dart';
+import 'package:nushi/edit_bars.dart' show FileTabsFocus;
+import 'package:nushi/file_view.dart';
+import 'package:nushi/files_bar.dart';
+import 'package:nushi/files_open.dart';
+import 'package:nushi/files_split.dart';
+import 'package:nushi/files_top_row.dart';
+import 'package:nushi/files_tree.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/keys.dart';
-import 'package:nushi/pane_title.dart';
+import 'package:nushi/open_file.dart' show openFileKey;
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview.dart';
+import 'package:nushi/preview_entry.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
-import 'package:nushi/tree_rows.dart';
-import 'package:nushi/widgets.dart';
 
-/// Opens [chat]'s Files pane, or closes it.
-void toggleFiles(ChatState chat) {
-  final open = {...filesChats.value};
-  if (!open.remove(chat.id)) open.add(chat.id);
-  filesChats.value = open;
-}
+export 'package:nushi/files_open.dart';
 
-/// The Files pane: a tree of the chat's folder (its worktree's, for a
-/// worktree chat), beside the chat. Folders open as they're clicked (or
-/// with →, ← closing them), listed by the daemon then and kept current
-/// ([FolderTree]); a file that previews opens in the preview, as an
-/// artifact does, with a click or ⏎. The files the chat wrote are marked,
-/// and the folders holding them. What git ignores is left out unless the
-/// eye in its header shows it. The filter over the tree finds any file in
-/// the folder by name, as a tree of what matched. Read-only (ADR 0019).
+/// The Files pane (ADR 0123), as Claude desktop's: its top row
+/// ([FilesTopRow]: Files, the open files' name or tabs, ×), its bar
+/// ([FilesBar]: the shown file's path and buttons), then the viewer of the
+/// open files ([FileView]), blank with none ([FilesBlank]), and the tree of
+/// the chat's folder at the pane's right ([FilesTree]), its edge dragged.
+/// Opening a file never moves the tree. The viewer gives its width first
+/// as the pane narrows, then the tree ([treeWidth]). With a daemon older
+/// than the tree (`filesApi`) the viewer is alone.
 class FilesPane extends StatefulWidget {
   const new({
     required this.chat,
     required this.daemon,
     required this.onClose,
     super.key,
+    this.tabsKey,
+    this.expanded = false,
+    this.onExpand,
   });
 
   final ChatState chat;
   final Daemon daemon;
+
+  /// Hides the pane; its tabs stay.
   final VoidCallback onClose;
 
-  /// A row's height.
-  static const row = 24.0;
+  /// The key of its tabs' row ([FilesTopRow.tabsKey]).
+  final Key? tabsKey;
+
+  /// Whether it covers the chat's whole pane (ADR 0094's Expand).
+  final bool expanded;
+  final VoidCallback? onExpand;
 
   @override
   State<FilesPane> createState() => _FilesPaneState();
 }
 
-class _FilesPaneState extends State<FilesPane> {
-  /// Under this the top row has no room for its icon and a few letters of
-  /// its name beside its two buttons: the buttons alone.
-  static const _wordsFrom = 120.0;
+class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
+  ShownFile? _shown;
 
-  late final FolderTree _tree = folderTreeOf(widget.chat);
-  final _query = TextEditingController();
-  final _field = FocusNode(debugLabel: 'files filter');
-  final _list = FocusNode(debugLabel: 'files');
-  final _scroll = ScrollController();
-
-  final _git = GitFiles();
-  final _filter = FilterMemo();
-
-  /// The rows as last built: what the keys move through.
-  List<TreeRow> _rows = const [];
-
-  /// The filter's row the keys are on (its own: the tree's stays).
-  String? _filterAt;
+  ChatState get _chat => widget.chat;
 
   @override
   void initState() {
     super.initState();
-    _tree.attach(widget.daemon);
-    _query.addListener(_queried);
+    _shown = _make(_chat.files.shown.value);
+    _chat.files.shown.addListener(_showFile);
   }
 
   @override
   void dispose() {
-    _tree.detach();
-    _query.dispose();
-    _git.dispose();
-    _field.dispose();
-    _list.dispose();
-    _scroll.dispose();
+    _chat.files.shown.removeListener(_showFile);
+    // The viewer, under this, has gone already.
+    _shown?.dispose();
     super.dispose();
   }
 
-  String get _q => _query.text.trim();
+  ShownFile? _make(PreviewFile? file) =>
+      file == null ? null : ShownFile(_chat, widget.daemon, file.path);
 
-  void _queried() {
-    _filterAt = null;
-    if (_q.isNotEmpty) _git.ask(widget.daemon, widget.chat.folder);
-    setState(() {});
-  }
-
-  String? get _at => _q.isEmpty ? _tree.selected : _filterAt;
-
-  void _select(String path) {
-    if (_q.isEmpty) {
-      _tree.select(path);
-    } else {
-      setState(() => _filterAt = path);
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(path));
-  }
-
-  void _reveal(String path) {
-    final i = _rows.indexWhere((r) => r.entry && r.path == path);
-    if (i < 0 || !_scroll.hasClients) return;
-    final p = _scroll.position;
-    final top = i * FilesPane.row;
-    if (top < p.pixels) {
-      p.jumpTo(top);
-    } else if (top + FilesPane.row > p.pixels + p.viewportDimension) {
-      p.jumpTo(top + FilesPane.row - p.viewportDimension);
+  /// Another tab shows: its file's parts are made, and the last one's let
+  /// go once its view has gone.
+  void _showFile() {
+    final file = _chat.files.shown.value;
+    if (file?.path == _shown?.path) return;
+    final old = _shown;
+    setState(() => _shown = _make(file));
+    if (old != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
     }
   }
 
-  /// A row clicked, or ⏎ on it: a folder opens or closes (in a filter's
-  /// tree they're all open), a file previews.
-  void _activate(TreeRow r) {
-    _select(r.path);
-    if (r.kind == TreeRowKind.folder && _q.isEmpty) {
-      _tree.toggle(r.path);
-    } else if (r.opens) {
-      widget.chat.openPreview(r.path);
-    }
+  @override
+  Widget build(BuildContext context) {
+    final t = NushiTheme.of(context).t;
+    final tree = widget.daemon.daemonApi >= filesApi;
+    final shown = _shown;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final w = box.maxWidth;
+        // Under the least of both, the two narrow alike (treeWidth).
+        final squeezed = w < filesTreeLeast + filesViewerLeast;
+        final most = squeezed ? treeWidth(w, filesTreeInitial) : treeMost(w);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FilesTopRow(
+              chat: _chat,
+              daemon: widget.daemon,
+              shown: shown,
+              tabsKey: widget.tabsKey,
+              expanded: widget.expanded,
+              onExpand: widget.onExpand,
+              onClose: widget.onClose,
+            ),
+            FilesBar(shown: shown),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: shown == null
+                        ? FilesBlank(tree: tree)
+                        : FileView(key: ObjectKey(shown), shown: shown),
+                  ),
+                  if (tree)
+                    Resizable(
+                      name: 'filesTree',
+                      initial: filesTreeInitial,
+                      min: squeezed ? most : filesTreeLeast,
+                      max: most,
+                      left: true,
+                      locked: squeezed,
+                      // Its own hairline, which a locked edge keeps.
+                      line: false,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border(left: BorderSide(color: t.line)),
+                        ),
+                        child: FilesTree(chat: _chat, daemon: widget.daemon),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
+}
 
-  KeyEventResult _key(FocusNode _, KeyEvent e) {
-    if (e is KeyUpEvent) return KeyEventResult.ignored;
-    final entries = [
-      for (final r in _rows)
-        if (r.entry) r,
-    ];
-    final i = entries.indexWhere((r) => r.path == _at);
-    final row = i < 0 ? null : entries[i];
-    switch (e.logicalKey) {
-      case LogicalKeyboardKey.arrowDown || LogicalKeyboardKey.arrowUp:
-        if (entries.isEmpty) break;
-        final down = e.logicalKey == LogicalKeyboardKey.arrowDown;
-        final next = i < 0
-            ? 0
-            : (i + (down ? 1 : -1)).clamp(0, entries.length - 1);
-        _select(entries[next].path);
-      case LogicalKeyboardKey.enter || LogicalKeyboardKey.numpadEnter:
-        if (row != null) _activate(row);
-      case LogicalKeyboardKey.arrowRight
-          when row?.kind == TreeRowKind.folder && _q.isEmpty:
-        if (!row!.open) {
-          _tree.setOpen(row.path, open: true);
-        } else if (i + 1 < entries.length &&
-            parentOf(entries[i + 1].path) == row.path) {
-          _select(entries[i + 1].path);
-        }
-      case LogicalKeyboardKey.arrowLeft when row != null && _q.isEmpty:
-        if (row.kind == TreeRowKind.folder && row.open) {
-          _tree.setOpen(row.path, open: false);
-        } else if (parentOf(row.path) case final up when up.isNotEmpty) {
-          _select(up);
-        }
-      case LogicalKeyboardKey.escape when _q.isNotEmpty:
-        _query.clear();
-      default:
-        return KeyEventResult.ignored;
-    }
-    return KeyEventResult.handled;
-  }
+/// The viewer with no file open, as Claude desktop's: a folder, "Open
+/// files appear here" and how to open one; without the [tree] (a daemon
+/// older than it), the way that's there, Go to file's key.
+class FilesBlank extends StatelessWidget {
+  const new({required this.tree, super.key});
+
+  final bool tree;
 
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
     final t = theme.t;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        PaneHeader(
-          inset: 14,
-          end: 8,
-          // Narrowed for a narrow window (ADR 0123), it shortens its words,
-          // then keeps its buttons alone, never cut.
-          child: LayoutBuilder(
-            builder: (context, box) => Row(
-              spacing: 6,
+    return ColoredBox(
+      color: t.base,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(NushiTheme.gutter),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (box.maxWidth >= _wordsFrom) ...[
-                  Icon(Icons.folder_outlined, size: 14, color: t.textSecondary),
-                  Expanded(
-                    child: PaneTitle(
-                      gap: 6,
-                      title: Text(
-                        'Files',
-                        style: theme.ui(t.text, weight: FontWeight.w500),
-                      ),
-                      caption: Text(
-                        baseName(widget.chat.folder),
-                        style: theme.code(t.textMuted, size: 12),
-                      ),
-                    ),
-                  ),
-                ] else
-                  const Spacer(),
-                ValueListenableBuilder(
-                  valueListenable: filesIgnored,
-                  builder: (context, shown, _) => IconTap(
-                    shown
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                    tooltip: shown
-                        ? 'Hide what git ignores'
-                        : 'Show what git ignores',
-                    size: 15,
-                    padding: IconTap.header,
-                    color: shown ? t.text : null,
-                    onTap: () => filesIgnored.value = !shown,
-                  ),
+                LineIcon.folder.view(size: 20, color: t.textMuted),
+                const SizedBox(height: 12),
+                Text(
+                  'Open files appear here',
+                  textAlign: TextAlign.center,
+                  style: theme.ui(t.text),
                 ),
-                IconTap.line(
-                  LineIcon.close,
-                  tooltip: 'Close',
-                  size: 15,
-                  padding: IconTap.header,
-                  onTap: widget.onClose,
+                const SizedBox(height: 4),
+                Text(
+                  tree
+                      ? 'Pick a file in the tree, or click a file path in '
+                            'the conversation'
+                      : 'Go to a file with ${keyLabel(openFileKey)}, or '
+                            'click a file path in the conversation',
+                  textAlign: TextAlign.center,
+                  style: theme.ui(t.textMuted, size: 12),
                 ),
               ],
             ),
           ),
         ),
-        Focus(
-          onKeyEvent: _key,
-          skipTraversal: true,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-            child: SizedBox(
-              height: 26,
-              child: TextField(
-                controller: _query,
-                focusNode: _field,
-                style: theme.ui(t.text, size: 12),
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: 'Filter files',
-                  prefixIcon: Icon(Icons.search, size: 14, color: t.textMuted),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 26),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Expanded(
-          child: Focus(
-            focusNode: _list,
-            onKeyEvent: _key,
-            child: ListenableBuilder(
-              listenable: Listenable.merge([
-                _tree,
-                _git,
-                widget.chat,
-                widget.chat.files.shown,
-              ]),
-              builder: (context, _) => _body(theme),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _body(NushiTheme theme) {
-    final t = theme.t;
-    final marks = writtenMarks(widget.chat);
-    if (_q.isNotEmpty) {
-      final found = _filter.of(_tree, _git, _q);
-      _rows = found.rows;
-      if (_filterAt == null || !_rows.any((r) => r.path == _filterAt)) {
-        _filterAt = found.best;
-      }
-      if (_rows.isEmpty) {
-        return Padding(
-          padding: const EdgeInsets.all(14),
-          child: Text('No file matches', style: theme.ui(t.textMuted)),
-        );
-      }
-    } else {
-      _rows = _tree.rows();
-      // A file shown from elsewhere (the preview's name), once its row's
-      // in, or the folder it'd be in.
-      if (_tree.settleReveal(_rows) case final path? when path.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(path));
-      }
-    }
-    final open = widget.chat.shownFile;
-    return MacScrollbar(
-      controller: _scroll,
-      child: ListView.builder(
-        controller: _scroll,
-        itemExtent: FilesPane.row,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        itemCount: _rows.length,
-        itemBuilder: (context, i) {
-          final r = _rows[i];
-          return TreeRowView(
-            r,
-            selected: r.entry && r.path == _at,
-            showing: r.kind == TreeRowKind.file && r.path == open,
-            wrote: r.kind == TreeRowKind.folder
-                ? marks.folders.contains(r.path)
-                : marks.files.contains(r.path),
-            onTap: r.entry
-                ? () {
-                    _list.requestFocus();
-                    _activate(r);
-                  }
-                : null,
-          );
-        },
       ),
     );
   }
@@ -337,22 +216,6 @@ String? inFiles(Daemon daemon, ChatState chat, String path) {
 /// tab, the folders above it open, its row selected and scrolled to.
 void showInFiles(ChatState chat, String inside) {
   folderTreeOf(chat).reveal(inside);
-  chat.tab.value = ChatTab.chat;
-  if (!filesOpen(chat)) toggleFiles(chat);
-}
-
-/// Whether [chat]'s Files pane is open: a [Listenable] with it.
-bool filesOpen(ChatState chat) => filesChats.value.contains(chat.id);
-
-/// Whether [chat]'s Files pane shows: open, on the Chat tab (it's beside
-/// the chat).
-bool filesShown(ChatState chat) =>
-    filesOpen(chat) && chat.shownTab == ChatTab.chat;
-
-/// Hides [chat]'s Files pane while it shows, or shows it, on the Chat tab:
-/// what ⇧⌘E, View › Files and the header's button do.
-void showOrHideFiles(ChatState chat) {
-  if (filesShown(chat)) return toggleFiles(chat);
   chat.tab.value = ChatTab.chat;
   if (!filesOpen(chat)) toggleFiles(chat);
 }

@@ -7,7 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat_files.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/diagram_page.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
+import 'package:nushi/files_tree.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panes.dart';
@@ -179,7 +180,7 @@ Future<(Daemon, _Host)> _app(
   return (d, host);
 }
 
-Finder get _pane => find.byType(FileView);
+Finder get _pane => find.byType(FilesPane);
 
 Finder _inPane(Finder f) => find.descendant(of: _pane, matching: f);
 
@@ -283,7 +284,7 @@ void main() {
     final streams = <String, StreamController<WatchChatFileResponse>>{};
     final opened = <Uri>[];
     final (d, host) = await _app(tester, streams, opened: opened);
-    d.chats['c']!.openPreview('site/index.html');
+    d.chats['c']!.openInFiles('site/index.html');
     await tester.pumpAndSettle();
     // Loaded from disk, reading files in the chat's folder.
     expect(host.loads, [
@@ -341,7 +342,7 @@ void main() {
     final (d, _) = await _app(tester, streams);
     final diagram = _Diagram();
     fakeWebViews().newDiagram = () => diagram;
-    final c = d.chats['c']!..openPreview('site/index.html');
+    final c = d.chats['c']!..openInFiles('site/index.html');
     await tester.pumpAndSettle();
     await render(tester, find.byType(NushiApp), 'preview_html_edge');
     final pane = tester.getRect(_pane);
@@ -349,7 +350,11 @@ void main() {
     // The edge's strip, its full height under the header, is Flutter's:
     // the web view starts past it.
     expect(tester.getRect(page).left, pane.left + Resizable.edgeWidth);
-    expect(tester.getRect(page).right, pane.right);
+    // The tree's edge is its own, right of the page.
+    expect(
+      tester.getRect(page).right,
+      tester.getRect(find.byType(FilesTree)).left,
+    );
     // A press on the strip beside the page, dragged left, then right past
     // the pane's least width into the page's region, and back: it follows
     // the pointer throughout.
@@ -364,13 +369,13 @@ void main() {
     await move(-20); // past the slop
     await move(-200);
     expect(tester.getRect(_pane).left, pane.left - 200);
-    await move(500);
-    expect(tester.getSize(_pane).width, 300); // its least
+    await move(700);
+    expect(tester.getSize(_pane).width, 500); // its least
     expect(tester.getRect(page).contains(at), isTrue);
     await move(-100);
     await drag.up();
     await tester.pumpAndSettle();
-    expect(tester.getRect(_pane).left, pane.left + 200);
+    expect(tester.getRect(_pane).left, pane.left + 320);
     expect(
       tester.getRect(page).left,
       tester.getRect(_pane).left + Resizable.edgeWidth,
@@ -384,13 +389,13 @@ void main() {
       tester.getRect(_pane).left + Resizable.edgeWidth,
     );
     // A diagram's web view too; a page drawn by Flutter runs under it.
-    c.openPreview('docs/flow.mmd');
+    c.openInFiles('docs/flow.mmd');
     await tester.pumpAndSettle();
     expect(
       tester.getRect(_inPane(find.byKey(const Key('diagram')))).left,
       tester.getRect(_pane).left + Resizable.edgeWidth,
     );
-    c.openPreview('config.json');
+    c.openInFiles('config.json');
     await tester.pumpAndSettle();
     expect(
       tester.getRect(_inPane(find.byType(SourceView))).left,
@@ -405,11 +410,11 @@ void main() {
   ) async {
     final streams = <String, StreamController<WatchChatFileResponse>>{};
     final (d, host) = await _app(tester, streams);
-    d.chats['c']!.openPreview('site/pic.svg');
+    d.chats['c']!.openInFiles('site/pic.svg');
     await tester.pumpAndSettle();
     expect(host.loads.single.$1, '/Users/me/nushi/site/pic.svg');
     expect(_inPane(find.byType(SourceButton)), findsOneWidget);
-    d.chats['c']!.openPreview('report.pdf');
+    d.chats['c']!.openInFiles('report.pdf');
     await tester.pumpAndSettle();
     expect(host.loads.last, ('/Users/me/nushi/report.pdf', '/Users/me/nushi'));
     expect(_inPane(find.byType(SourceButton)), findsNothing);
@@ -439,7 +444,7 @@ void main() {
       'site/index.html',
     ]);
     expect(isArtifact('config.json'), isFalse);
-    d.chats['c']!.openPreview('config.json');
+    d.chats['c']!.openInFiles('config.json');
     await tester.pumpAndSettle();
     expect(_inPane(find.byType(SourceButton)), findsNothing);
     expect(_inPane(find.byTooltip('Reload')), findsNothing);
@@ -454,7 +459,7 @@ void main() {
   ) async {
     final (d, _) = await _app(tester, {});
     await _dark(tester);
-    d.chats['c']!.openPreview('data.csv');
+    d.chats['c']!.openInFiles('data.csv');
     await tester.pumpAndSettle();
     expect(_inPane(find.text('The first 500 rows of 600.')), findsOneWidget);
     expect(_inPane(find.text('city')), findsOneWidget);
@@ -475,7 +480,7 @@ void main() {
     final (d, host) = await _app(tester, streams);
     final diagram = _Diagram();
     fakeWebViews().newDiagram = () => diagram;
-    d.chats['c']!.openPreview('docs/flow.mmd');
+    d.chats['c']!.openInFiles('docs/flow.mmd');
     await tester.pumpAndSettle();
     expect(diagram.shown, [(_flow, false)]);
     expect(host.loads, isEmpty); // not a page of the agent's

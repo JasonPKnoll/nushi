@@ -12,9 +12,11 @@ import 'package:nushi/app_actions.dart';
 import 'package:nushi/artifacts_widget.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
+import 'package:nushi/composer.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/palette.dart';
@@ -159,14 +161,14 @@ Future<Daemon> _app(
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
   final c = d.chats['c']!;
-  files.forEach(c.openPreview);
-  if (files.isNotEmpty && !last) c.openPreview(files.first);
+  files.forEach(c.openInFiles);
+  if (files.isNotEmpty && !last) c.openInFiles(files.first);
   await tester.pumpAndSettle();
   return d;
 }
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(FileView), matching: f);
+    find.descendant(of: find.byType(FilesPane), matching: f);
 
 Finder _tab(String label) => find.ancestor(
   of: find.descendant(of: find.byType(PaneTabs), matching: find.text(label)),
@@ -211,7 +213,7 @@ Map<String, Rect> _marks(WidgetTester tester) {
   // into ⋯, and a header at the transcript's least folds the tabs.
   Rect? folds(Finder f) => f.evaluate().isEmpty ? null : at(f);
   return {
-    'pane': at(find.byType(FileView)),
+    'pane': at(find.byType(FilesPane)),
     'title row': at(_inPane(find.byType(PaneHeader))),
     'kind icon': at(_inPane(find.byType(Icon)).first),
     'path line': at(_inPane(find.byType(PathLine))),
@@ -244,25 +246,25 @@ void main() {
 
     test('a file opens once, however it’s named', () {
       final c = state()
-        ..openPreview('docs/a.md')
-        ..openPreview('docs/b.md')
-        ..openPreview('/Users/me/nushi/docs/a.md');
+        ..openInFiles('docs/a.md')
+        ..openInFiles('docs/b.md')
+        ..openInFiles('/Users/me/nushi/docs/a.md');
       expect(c.fileNames, ['docs/a.md', 'docs/b.md']);
       expect(c.shownFile, 'docs/a.md');
-      c.openPreview('./docs/b.md');
+      c.openInFiles('./docs/b.md');
       expect(c.fileNames, ['docs/a.md', 'docs/b.md']);
       expect(c.shownFile, 'docs/b.md');
-      c.openPreview('/Users/me//nushi/./docs//a.md');
+      c.openInFiles('/Users/me//nushi/./docs//a.md');
       expect(c.fileNames, ['docs/a.md', 'docs/b.md']);
       expect(c.shownFile, 'docs/a.md');
     });
 
     test('closing the one showing shows the one after it, or the last', () {
       final c = state()
-        ..openPreview('a.md')
-        ..openPreview('b.md')
-        ..openPreview('c.md')
-        ..openPreview('b.md')
+        ..openInFiles('a.md')
+        ..openInFiles('b.md')
+        ..openInFiles('c.md')
+        ..openInFiles('b.md')
         ..files.close(const PreviewFile('b.md'));
       expect(c.shownFile, 'c.md');
       c.files.close(const PreviewFile('c.md'));
@@ -274,8 +276,8 @@ void main() {
 
     test('closing another leaves the one showing', () {
       final c = state()
-        ..openPreview('a.md')
-        ..openPreview('b.md')
+        ..openInFiles('a.md')
+        ..openInFiles('b.md')
         ..files.close(const PreviewFile('a.md'));
       expect(c.shownFile, 'b.md');
       expect(c.fileNames, ['b.md']);
@@ -285,12 +287,12 @@ void main() {
 
     test('a subagent’s pane opens beside the files, which keep their tabs', () {
       final c = state()
-        ..openPreview('a.md')
-        ..openPreview('b.md');
+        ..openInFiles('a.md')
+        ..openInFiles('b.md');
       c.pane.value = 'agent';
       expect(c.shownFile, 'b.md');
       expect(c.fileNames, ['a.md', 'b.md']);
-      c.openPreview('c.md');
+      c.openInFiles('c.md');
       expect(c.pane.value, 'agent');
       expect(c.fileNames, ['a.md', 'b.md', 'c.md']);
     });
@@ -422,8 +424,8 @@ void main() {
         // The live mark is lit by each file's first answer, in both.
         final one = _marks(tester);
         final name = tester.getRect(_inPane(find.text('report.md')));
-        _three.forEach(c.openPreview);
-        c.openPreview(_three.first);
+        _three.forEach(c.openInFiles);
+        c.openInFiles(_three.first);
         await tester.pumpAndSettle();
         expect(find.byType(PaneTabs), findsOneWidget);
         expect(_marks(tester), one);
@@ -448,7 +450,7 @@ void main() {
         expect(row.height, 56);
         expect(row.top, header.top);
         expect(row.bottom, header.bottom);
-        expect(header.right, tester.getRect(find.byType(FileView)).left);
+        expect(header.right, tester.getRect(find.byType(FilesPane)).left);
         final lines = find.descendant(
           of: find.byType(TabFace),
           matching: find.byType(Positioned),
@@ -519,30 +521,29 @@ void main() {
       d.dispose();
     }, variant: _mac);
 
-    testWidgets('the pane’s Close closes it and forgets the tabs', (
-      tester,
-    ) async {
+    testWidgets('the pane’s × hides it and keeps its tabs', (tester) async {
       final d = await _app(tester, files: _three);
       final c = d.chats['c']!;
       await _tap(tester, _inPane(find.byTooltip('Close')));
-      expect(find.byType(FileView), findsNothing);
-      expect(c.fileNames, isEmpty);
-      c.openPreview('site/notes.md');
+      expect(find.byType(FilesPane), findsNothing);
+      expect(c.fileNames, hasLength(3));
+      showOrHideFiles(c);
       await tester.pumpAndSettle();
-      expect(find.byType(PaneTabs), findsNothing);
+      expect(find.byType(PaneTabs), findsOneWidget);
+      expect(c.shownFile, 'docs/report.md');
       d.dispose();
     }, variant: _mac);
 
     testWidgets('its width is one, across tabs', (tester) async {
       final d = await _app(tester, files: _three);
-      paneWidths.value = {'fileView': 700};
+      paneWidths.value = {'filesPane': 1000};
       await tester.pumpAndSettle();
-      double width() => tester.getSize(find.byType(FileView)).width;
-      expect(width(), 700);
+      double width() => tester.getSize(find.byType(FilesPane)).width;
+      expect(width(), 1000);
       await _tap(tester, _inPane(find.text('notes.md')));
-      expect(width(), 700);
+      expect(width(), 1000);
       await _tap(tester, _closeOf('notes.md'));
-      expect(width(), 700);
+      expect(width(), 1000);
       d.dispose();
     }, variant: _mac);
 
@@ -607,7 +608,7 @@ void main() {
     }, variant: _mac);
 
     testWidgets('the Files list opens a tab', (tester) async {
-      final d = await _app(tester, details: true);
+      final d = await _app(tester, details: true, width: 2400);
       final c = d.chats['c']!;
       await _tap(
         tester,
@@ -631,17 +632,19 @@ void main() {
   });
 
   group('⌘W', () {
-    testWidgets('closes the tab showing, and with the last the pane', (
-      tester,
-    ) async {
+    testWidgets('closes the tab showing; the last leaves the viewer blank, '
+        'the pane open', (tester) async {
       final d = await _app(tester, files: _three.take(2).toList());
       final c = d.chats['c']!;
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(c.fileNames, ['docs/plan.md']);
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(find.byType(FileView), findsNothing);
+      expect(find.byType(FilesBlank), findsOneWidget);
+      expect(filesChats.value, {'c'});
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(c.files.shown.value, isNull);
+      expect(find.byType(FilesPane), findsOneWidget);
       d.dispose();
     }, variant: _mac);
 
@@ -651,18 +654,24 @@ void main() {
       final d = await _app(tester, files: _three.take(1).toList());
       final c = d.chats['c']!..openBrowserTab('http://localhost:3000');
       await tester.pumpAndSettle();
+      final box = find.descendant(
+        of: find.byType(Composer),
+        matching: find.byType(EditableText),
+      );
       // The focus in the box: the kind shown last.
+      await _tap(tester, box);
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(c.browser.shown.value, isNull);
       expect(c.fileNames, hasLength(1));
+      await _tap(tester, box);
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(c.files.shown.value, isNull);
       // The focus in the file's view: its file, though a page showed last.
       c
-        ..openPreview(_three.first)
+        ..openInFiles(_three.first)
         ..openBrowserTab('http://localhost:3000');
       await tester.pumpAndSettle();
-      Focus.of(tester.element(find.byType(PathLine))).requestFocus();
+      Focus.of(tester.element(find.byType(PreviewBody))).requestFocus();
       await tester.pumpAndSettle();
       await _key(tester, LogicalKeyboardKey.keyW, meta: true);
       expect(c.files.shown.value, isNull);
@@ -740,17 +749,16 @@ void main() {
       tester,
     ) async {
       final d = await _app(tester, files: _three);
-      paneWidths.value = {'fileView': 300};
+      paneWidths.value = {'filesPane': 500};
       await tester.pumpAndSettle();
-      expect(tester.getSize(find.byType(FileView)).width, 300);
-      expect(_inPane(find.byTooltip('More')), findsOneWidget);
+      expect(tester.getSize(find.byType(FilesPane)).width, 500);
       expect(tester.takeException(), isNull);
       final row = tester.getRect(find.byType(PaneTabs));
       expect(row.width, greaterThan(0));
       expect(
         row.right,
         lessThanOrEqualTo(
-          tester.getTopLeft(_inPane(find.byTooltip('More'))).dx,
+          tester.getTopLeft(_inPane(find.byType(PaneEndButtons))).dx,
         ),
       );
       d.dispose();
@@ -760,6 +768,9 @@ void main() {
       tester,
     ) async {
       final d = await _app(tester, files: _many.take(3).toList());
+      // The pane at the width the preview had, its viewer at its least.
+      paneWidths.value = {'filesPane': 560};
+      await tester.pumpAndSettle();
       bool cut(String label) => tester
           .renderObject<RenderParagraph>(_inPane(find.text(label)))
           .didExceedMaxLines;
@@ -798,10 +809,10 @@ void main() {
 
     testWidgets('a file opened brings its tab into view', (tester) async {
       final d = await _app(tester, files: _many, last: true);
-      final c = d.chats['c']!..openPreview(_many.first);
+      final c = d.chats['c']!..openInFiles(_many.first);
       await tester.pumpAndSettle();
       expect(_row(tester).pixels, 0);
-      c.openPreview(_many.last);
+      c.openInFiles(_many.last);
       await tester.pumpAndSettle();
       final rect = tester.getRect(find.byType(PaneTabs));
       expect(

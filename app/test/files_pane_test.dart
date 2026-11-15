@@ -10,13 +10,17 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/file_filter.dart';
 import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
+import 'package:nushi/files_top_row.dart';
+import 'package:nushi/files_tree.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/phone/files_screen.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/preview_screen.dart';
 import 'package:nushi/preview_entry.dart';
+import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/tree_rows.dart';
 
@@ -216,6 +220,147 @@ final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 void main() {
   setUpAll(loadFonts);
 
+  group('the pane as Claude desktop has it (ADR 0123)', () {
+    testWidgets('no file open: Files alone in its top row, a blank viewer '
+        "saying where files come from, the tree at the pane's right", (
+      tester,
+    ) async {
+      final (d, _) = await _app(tester);
+      final pane = tester.getRect(_pane);
+      final row = find.descendant(
+        of: _pane,
+        matching: find.byType(FilesTopRow),
+      );
+      expect(
+        find.descendant(of: row, matching: find.text('Files')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.byType(PaneTabs)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: row, matching: find.byTooltip('Close tab')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: _pane, matching: find.byType(PathLine)),
+        findsNothing,
+      );
+      // Claude's words, without its full stops (docs/design.md).
+      expect(find.text('Open files appear here'), findsOneWidget);
+      expect(
+        find.text(
+          'Pick a file in the tree, or click a file path in the conversation',
+        ),
+        findsOneWidget,
+      );
+      // Centred in the viewer, not the pane.
+      final blank = tester.getRect(find.byType(FilesBlank));
+      final words = tester.getRect(find.text('Open files appear here'));
+      expect(words.center.dx, closeTo(blank.center.dx, 0.5));
+      final tree = tester.getRect(find.byType(FilesTree));
+      expect(tree.right, pane.right);
+      expect(blank.right, tree.left);
+      expect(tree.width, 260);
+      await closeView(tester, d);
+    }, variant: _mac);
+
+    testWidgets('one file: its name and its ✕ after Files; two: their tabs, '
+        'the first name where the one was; the tree never moves', (
+      tester,
+    ) async {
+      final (d, _) = await _app(tester);
+      final tree = tester.getRect(find.byType(FilesTree));
+      final c = d.chats['c']!..openInFiles('docs/report.md');
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(FilesTree)), tree);
+      final row = find.descendant(
+        of: _pane,
+        matching: find.byType(FilesTopRow),
+      );
+      Finder inRow(Finder f) => find.descendant(of: row, matching: f);
+      expect(inRow(find.byType(PaneTabs)), findsNothing);
+      final name = tester.getRect(inRow(find.text('report.md')));
+      expect(inRow(find.byTooltip('Close tab')), findsOneWidget);
+      expect(
+        name.left,
+        greaterThan(tester.getRect(inRow(find.text('Files'))).right),
+      );
+      c.openInFiles('docs/notes.md');
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(FilesTree)), tree);
+      expect(inRow(find.byType(PaneTabs)), findsOneWidget);
+      expect(tester.getRect(inRow(find.text('report.md'))).left, name.left);
+      // Its ✕ closes the shown file; the last leaves the viewer blank.
+      await tester.tap(inRow(find.byTooltip('Close tab')).last);
+      await tester.pumpAndSettle();
+      await tester.tap(inRow(find.byTooltip('Close tab')));
+      await tester.pumpAndSettle();
+      expect(c.fileNames, isEmpty);
+      expect(find.byType(FilesBlank), findsOneWidget);
+      expect(tester.getRect(find.byType(FilesTree)), tree);
+      await closeView(tester, d);
+    }, variant: _mac);
+
+    testWidgets("the × and the header's button hide the pane and keep its "
+        'tabs', (tester) async {
+      final (d, _) = await _app(tester);
+      final c = d.chats['c']!
+        ..openInFiles('docs/report.md')
+        ..openInFiles('docs/notes.md');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: _pane, matching: find.byTooltip('Close')),
+      );
+      await tester.pumpAndSettle();
+      expect(_pane, findsNothing);
+      expect(c.fileNames, ['docs/report.md', 'docs/notes.md']);
+      await tester.tap(find.byType(FilesButton));
+      await tester.pumpAndSettle();
+      expect(c.shownFile, 'docs/notes.md');
+      expect(find.byType(PaneTabs), findsOneWidget);
+      await closeView(tester, d);
+    }, variant: _mac);
+  });
+
+  testWidgets('a daemon older than the tree: the viewer alone, saying how '
+      'to go to a file', (tester) async {
+    viewport(tester, const Size(1700, 900));
+    showDetails.value = false;
+    final fake = FakeDaemon([chat('c', 'claude', 'Fix it')])
+      ..answer = (input) =>
+          input is PingRequest ? PingResponse(apiVersion: filesApi - 1) : null;
+    final d = await fake.connect(tester);
+    // The pane as the chat's area places it, at its width.
+    await tester.pumpWidget(
+      themed(
+        Center(
+          child: SizedBox(
+            width: 820,
+            height: 700,
+            child: FilesPane(chat: d.chats['c']!, daemon: d, onClose: () {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(_pane, findsOneWidget);
+    expect(find.byType(FilesTree), findsNothing);
+    expect(
+      tester.getRect(find.byType(FilesBlank)).width,
+      tester.getSize(_pane).width,
+    );
+    expect(
+      find.text(
+        'Go to a file with ⌘P, or click a file path in the '
+        'conversation',
+      ),
+      findsOneWidget,
+    );
+    await closeView(tester, d);
+  }, variant: _mac);
+
   testWidgets('⇧⌘E opens the tree: folders first, what git ignores left out '
       'until the eye shows it, dimmed', (tester) async {
     final (d, folder) = await _app(tester, open: false);
@@ -282,14 +427,18 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('a click on the preview’s name opens the pane at its file: '
-      'the folders above it open, its row selected', (tester) async {
+  testWidgets('a file opened opens the pane, and a click on its name shows '
+      'it in the tree: the folders above it open, its row selected', (
+    tester,
+  ) async {
     final (d, folder) = await _app(tester, open: false);
-    final c = d.chats['c']!..openPreview('app/lib/main.dart');
+    final c = d.chats['c']!..openInFiles('app/lib/main.dart');
     await tester.pumpAndSettle();
-    expect(_pane, findsNothing);
+    expect(_pane, findsOneWidget);
+    // Opening it moves nothing in the tree.
+    expect(_names(tester).take(2), ['app', 'docs']);
     final name = find.descendant(
-      of: find.byType(FileView),
+      of: find.byType(FilesPane),
       matching: find.text('main.dart'),
     );
     await tester.tap(name);
@@ -307,11 +456,11 @@ void main() {
     // Open already, it goes to another file the same way.
     c
       ..files.close(const PreviewFile('app/lib/main.dart'))
-      ..openPreview('docs/report.md');
+      ..openInFiles('docs/report.md');
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(FileView),
+        of: find.byType(FilesPane),
         matching: find.text('report.md'),
       ),
     );
@@ -325,11 +474,11 @@ void main() {
       'its folder, and nothing scrolls to it later', (tester) async {
     final (d, folder) = await _app(tester, open: false);
     folder.tree['docs']!.add(_file('draft.md', ignored: true));
-    final c = d.chats['c']!..openPreview('docs/draft.md');
+    final c = d.chats['c']!..openInFiles('docs/draft.md');
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(FileView),
+        of: find.byType(FilesPane),
         matching: find.text('draft.md'),
       ),
     );
@@ -349,11 +498,11 @@ void main() {
     folder.tree['node_modules/left-pad'] = [_file('index.md', ignored: true)];
     c
       ..files.close(const PreviewFile('docs/draft.md'))
-      ..openPreview('node_modules/left-pad/index.md');
+      ..openInFiles('node_modules/left-pad/index.md');
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(FileView),
+        of: find.byType(FilesPane),
         matching: find.text('index.md'),
       ),
     );
@@ -367,17 +516,18 @@ void main() {
     tester,
   ) async {
     final (d, _) = await _app(tester, open: false);
-    d.chats['c']!.openPreview('/Users/me/elsewhere/notes.md');
+    d.chats['c']!.openInFiles('/Users/me/elsewhere/notes.md');
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(FileView),
+        of: find.byType(FilesPane),
         matching: find.text('notes.md'),
       ),
     );
     await tester.pumpAndSettle();
-    expect(_pane, findsNothing);
-    expect(filesChats.value, isEmpty);
+    expect(_pane, findsOneWidget);
+    expect(folderTreeOf(d.chats['c']!).selected, isNull);
+    expect(folderTreeOf(d.chats['c']!).open, isEmpty);
     await closeView(tester, d);
   }, variant: _mac);
 
@@ -573,7 +723,7 @@ void main() {
     }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
     for (final (size, width) in [('wide', 1700.0), ('narrow', 720.0)]) {
-      testWidgets('renders: the tree beside a preview, $size, $name', (
+      testWidgets('renders: the tree right of the open file, $size, $name', (
         tester,
       ) async {
         final (d, _) = await _app(
@@ -581,6 +731,13 @@ void main() {
           size: Size(width, 900),
           brightness: brightness,
         );
+        expect(find.byType(FilesBlank), findsOneWidget);
+        await render(
+          tester,
+          find.byType(NushiApp),
+          'files_blank_${size}_$name',
+        );
+        final tree = tester.getRect(find.byType(FilesTree));
         await tester.tap(_row('docs'));
         await tester.pumpAndSettle();
         await tester.tap(_row('img'));
@@ -596,7 +753,12 @@ void main() {
           pane.left,
           greaterThanOrEqualTo(tester.getRect(find.byType(ChatArea)).left),
         );
-        expect(tester.getRect(find.byType(FileView)).left, pane.right);
+        // The tree at the pane's right edge, the file left of it; opening
+        // the file moved the tree not at all.
+        expect(tester.getRect(find.byType(FilesTree)), tree);
+        expect(tree.right, pane.right);
+        expect(tester.getRect(find.byType(FileView)).right, tree.left);
+        expect(tester.getRect(find.byType(FileView)).left, pane.left);
         expectTextInside(tester, width);
         await render(tester, find.byType(NushiApp), 'files_${size}_$name');
         await closeView(tester, d);

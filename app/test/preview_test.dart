@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone.dart';
@@ -271,7 +271,7 @@ void main() {
   ) async {
     final asked = <String>[];
     final d = await _app(tester, asked: asked);
-    final pane = find.byType(FileView);
+    final pane = find.byType(FilesPane);
     expect(pane, findsNothing);
 
     await tester.tap(
@@ -336,11 +336,11 @@ void main() {
   }, variant: _mac);
 
   test('a file and a subagent sit side by side', () {
-    final c = ChatState('c', '/Users/me/nushi')..openPreview('a.md');
+    final c = ChatState('c', '/Users/me/nushi')..openInFiles('a.md');
     expect(c.shownFile, 'a.md');
     c.pane.value = 'agent';
     expect(c.shownFile, 'a.md');
-    c.openPreview('b.md');
+    c.openInFiles('b.md');
     expect((c.pane.value, c.shownFile), ('agent', 'b.md'));
   });
 

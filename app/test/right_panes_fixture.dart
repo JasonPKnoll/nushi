@@ -23,19 +23,20 @@ typedef ThresholdRow = ({
 const PaneSpec _side = ChatPanes.side;
 const PaneSpec _files = ChatPanes.files;
 const PaneSpec _sub = ChatPanes.subagent;
-const PaneSpec _preview = ChatPanes.fileView;
+const PaneSpec _browser = ChatPanes.browser;
 
-/// Every set of panes a chat can have open, left to right.
+/// Every set of panes a chat can have open, left to right. Files is its
+/// viewer and its tree (820, at least 500).
 const List<ThresholdRow> thresholdRows = [
   (name: 'none', panes: [], rail: 804, narrow: null, beside: null),
   (name: 'side', panes: [_side], rail: 1184, narrow: 936, beside: 856),
-  (name: 'files', panes: [_files], rail: 1064, narrow: 816, beside: 756),
+  (name: 'files', panes: [_files], rail: 1500, narrow: 1180, beside: 860),
   (
     name: 'side+files',
     panes: [_side, _files],
-    rail: 1444,
-    narrow: 1196,
-    beside: 1056,
+    rail: 1880,
+    narrow: 1560,
+    beside: 1160,
   ),
   (name: 'subagent', panes: [_sub], rail: 944, narrow: 624, beside: 580),
   (
@@ -48,40 +49,50 @@ const List<ThresholdRow> thresholdRows = [
   (
     name: 'files+subagent',
     panes: [_files, _sub],
-    rail: 1204,
-    narrow: 884,
-    beside: 780,
+    rail: 1764,
+    narrow: 1444,
+    beside: 1080,
   ),
   (
     name: 'side+files+subagent',
     panes: [_side, _files, _sub],
-    rail: 1584,
-    narrow: 1264,
-    beside: 1080,
+    rail: 2144,
+    narrow: 1824,
+    beside: 1380,
   ),
-  (name: 'preview', panes: [_preview], rail: 1240, narrow: 920, beside: 660),
+  (name: 'browser', panes: [_browser], rail: 1240, narrow: 920, beside: 660),
   (
-    name: 'side+preview',
-    panes: [_side, _preview],
+    name: 'side+browser',
+    panes: [_side, _browser],
     rail: 1620,
     narrow: 1300,
     beside: 960,
   ),
   (
-    name: 'files+preview',
-    panes: [_files, _preview],
-    rail: 1500,
-    narrow: 1180,
-    beside: 860,
-  ),
-  (
-    name: 'side+files+preview',
-    panes: [_side, _files, _preview],
-    rail: 1880,
-    narrow: 1560,
+    name: 'files+browser',
+    panes: [_files, _browser],
+    rail: 2060,
+    narrow: 1740,
     beside: 1160,
   ),
+  (
+    name: 'side+files+browser',
+    panes: [_side, _files, _browser],
+    rail: 2440,
+    narrow: 2120,
+    beside: 1460,
+  ),
 ];
+
+/// The Files pane with its viewer alone (a daemon older than the tree):
+/// its least is the viewer's.
+const ThresholdRow filesNoTreeRow = (
+  name: 'files, no tree',
+  panes: [ChatPanes.filesNoTree],
+  rail: 1500,
+  narrow: 1180,
+  beside: 660,
+);
 
 bool _wide(List<PaneSpec> panes) => panes.any((p) => p.wide);
 

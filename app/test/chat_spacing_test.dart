@@ -145,10 +145,32 @@ Future<Daemon> _app(
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
   if (file != null) {
-    d.chats['c']!.openPreview(file);
+    d.chats['c']!.openInFiles(file);
     await tester.pumpAndSettle();
   }
   return d;
+}
+
+/// Chat c's Files pane on its own, squeezed as in a narrow window with
+/// other panes beside it (ADR 0123): its bar's buttons fold into ⋯.
+Future<void> _squeezed(
+  WidgetTester tester,
+  Daemon d,
+  Brightness brightness,
+) async {
+  await tester.pumpWidget(
+    themed(
+      tokens: brightness == Brightness.dark ? Tokens.dark : Tokens.light,
+      Center(
+        child: SizedBox(
+          width: 210,
+          height: 500,
+          child: FilesPane(chat: d.chats['c']!, daemon: d, onClose: () {}),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 /// The composer's box.
@@ -738,13 +760,17 @@ void main() {
           height: 600,
           brightness: brightness,
           file: 'docs/login-report.md',
-          pane: 300,
         );
+        await _squeezed(tester, d, brightness);
         await tester.tap(find.byTooltip('More'));
         await tester.pumpAndSettle();
         expect(find.text('Show in Finder', findRichText: true), findsOne);
-        await render(tester, find.byType(NushiApp), 'preview_menu_720_$name');
-        d.dispose();
+        await render(
+          tester,
+          find.byType(MaterialApp),
+          'preview_menu_squeezed_$name',
+        );
+        await closeView(tester, d);
       }, variant: _mac);
     }
 
@@ -761,18 +787,20 @@ void main() {
           width: width,
           height: 600,
           file: 'docs/login-report.md',
-          pane: 300,
         );
+        // Unfolded, its button says so.
+        expect(find.byTooltip('Show in Folder'), findsOne);
+        await _squeezed(tester, d, Brightness.dark);
         await tester.tap(find.byTooltip('More'));
         await tester.pumpAndSettle();
         expect(find.text('Show in Folder', findRichText: true), findsOne);
         expect(find.text('Show in Finder', findRichText: true), findsNothing);
         await render(
           tester,
-          find.byType(NushiApp),
+          find.byType(MaterialApp),
           'linux_preview_menu_${width.toInt()}',
         );
-        d.dispose();
+        await closeView(tester, d);
       }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
     }
   });

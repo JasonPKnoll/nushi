@@ -11,7 +11,7 @@ import 'package:nushi/chat_files.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panel_widgets.dart';
@@ -85,7 +85,7 @@ const _minutes = {
 /// The app on a chat with [items], the details panel shown, and the fake
 /// daemon behind it.
 Future<(Daemon, FakeDaemon)> _app(WidgetTester tester, List<Item> items) async {
-  viewport(tester, const Size(1700, 900));
+  viewport(tester, const Size(2400, 900));
   showDetails.value = true;
   paneWidths.value = {};
   collapsedWidgets.value = {};
@@ -177,7 +177,7 @@ void main() {
     expect(d.chats['c']!.shownFile, 'docs/img/chart.png');
     expect(
       find.descendant(
-        of: find.byType(FileView),
+        of: find.byType(FilesPane),
         matching: find.text('chart.png'),
       ),
       findsOneWidget,
@@ -374,7 +374,7 @@ void main() {
       tester.platformDispatcher.platformBrightnessTestValue = mode;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       togglePin(d.chats['c']!, 'mock/home.html');
-      d.chats['c']!.openPreview('docs/report.md');
+      d.chats['c']!.openInFiles('docs/report.md');
       await tester.pumpAndSettle();
       expect(_inRows(find.text('Show more')), findsOneWidget);
       // The widget on its own is its golden; the window a render.

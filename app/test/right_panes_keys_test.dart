@@ -153,7 +153,7 @@ void main() {
     final files = _r(tester, find.byType(FilesPane));
     expect(files.left, _r(tester, _rail).right);
     expect(files.right, area.right);
-    expect(_r(tester, find.byTooltip('Chat menu')).right, menu.right - 260);
+    expect(_r(tester, find.byTooltip('Chat menu')).right, menu.right - 820);
     expect(
       tester
           .widget<IconTap>(
@@ -298,16 +298,16 @@ void main() {
         width: windowFor(area, sidebar: false),
         open: _open(previews: 1),
       );
-      final preview = _r(tester, find.byType(FileView));
+      final preview = _r(tester, find.byType(FilesPane));
       final over = preview.top > _r(tester, find.byType(Pane)).top;
       await _terminalKey(tester);
       final terminal = _r(tester, find.byType(TerminalPanel));
       if (over) {
         expect(terminal.right, _r(tester, find.byType(Pane)).right);
-        expect(_r(tester, find.byType(FileView)).bottom, terminal.top);
+        expect(_r(tester, find.byType(FilesPane)).bottom, terminal.top);
       } else {
         expect(terminal.right, preview.left);
-        expect(_r(tester, find.byType(FileView)), preview);
+        expect(_r(tester, find.byType(FilesPane)), preview);
       }
       await _terminalKey(tester);
       expect(find.byType(TerminalPanel), findsNothing);
@@ -318,11 +318,11 @@ void main() {
   testWidgets(r'⌘\: the sidebar hidden gives the rail its room back', (
     tester,
   ) async {
-    // 1240 for the chat with the sidebar hidden: the rail beside the
-    // preview; 992 with it shown: tucked.
+    // 1500 for the chat with the sidebar hidden: the rail beside the
+    // Files pane; 1248 with it shown: tucked.
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(1240, sidebar: false),
+      width: windowFor(1500, sidebar: false),
       sidebar: true,
       open: _open(previews: 1),
     );
@@ -364,7 +364,7 @@ void main() {
           ..requestFocus();
     await tester.pump();
     expect(inRail.hasFocus, isTrue);
-    d.chats['c']!.openPreview('PLAN.md');
+    d.chats['c']!.openInFiles('PLAN.md');
     await tester.pumpAndSettle();
     expect(_rail, findsNothing);
     final keys = tester.widget<TerminalKeys>(find.byType(TerminalKeys)).focus;
@@ -393,18 +393,19 @@ void main() {
     testWidgets('Tab goes header, transcript, rail, then the panes left to '
         'right, never back from a pane into the header, the terminal last '
         '(${terminal ? 'open' : 'shut'})', (tester) async {
+      browserFakes();
       final (d, _) = await panesApp(
         tester,
-        width: windowFor(1900, sidebar: false),
+        width: windowFor(2200, sidebar: false),
         terminal: terminal,
-        open: _open(files: true, previews: 1),
+        open: _open(files: true, previews: 1, browser: 1),
       );
       final regions = <(String, Finder)>[
         ('terminal', find.byType(TerminalPanel)),
         ('header', find.byType(ChatHeader)),
         ('rail', _rail),
         ('files', find.byType(FilesPane)),
-        ('preview', find.byType(FileView)),
+        ('browser', find.byType(BrowserPane)),
         ('transcript', find.byType(Transcript)),
       ];
       String? region(FocusNode n) {
@@ -440,7 +441,7 @@ void main() {
       }
       // Once in a pane, never back to the header before the round's end;
       // the terminal, which keeps Tab for its shell, after all of them.
-      const order = ['header', 'transcript', 'rail', 'files', 'preview'];
+      const order = ['header', 'transcript', 'rail', 'files', 'browser'];
       for (var i = 1; i < seen.length; i++) {
         final a = order.indexOf(seen[i - 1]);
         final b = order.indexOf(seen[i]);
@@ -451,7 +452,7 @@ void main() {
           reason: '${seen[i - 1]} → ${seen[i]}',
         );
       }
-      expect(seen, containsAll(['header', 'rail', 'files', 'preview']));
+      expect(seen, containsAll(['header', 'rail', 'files', 'browser']));
       if (terminal) expect(seen.last, 'terminal');
       await closeView(tester, d);
     }, variant: _mac);
@@ -640,11 +641,11 @@ void main() {
 
     testWidgets('a pane opening or closing resizes its shell once; the '
         'details, shown or tucked, never', (tester) async {
-      // 1450 for the chat: the rail beside Files (1064), not beside Files
-      // and the preview (1500).
+      // 1520 for the chat: the rail beside Files (1500), not beside Files
+      // and a subagent's pane (1764).
       final (d, fake) = await panesApp(
         tester,
-        width: windowFor(1450, sidebar: false),
+        width: windowFor(1520, sidebar: false),
         terminal: true,
       );
       await tester.pump(const Duration(seconds: 1));
@@ -660,9 +661,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pump(const Duration(seconds: 1));
       expect(resizes(fake) - was, 0);
-      // A preview too: the rail tucks away (1500 for files and preview).
+      // A file opened in it: no pane opens, so no resize.
       was = resizes(fake);
-      d.chats['c']!.openPreview('PLAN.md');
+      d.chats['c']!.openInFiles('PLAN.md');
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      expect(resizes(fake) - was, 0);
+      // A subagent's pane too: the rail tucks away (1764 for the two).
+      d.chats['c']!.pane.value = 'a';
       await tester.pumpAndSettle();
       await tester.pump(const Duration(seconds: 1));
       expect(_rail, findsNothing);

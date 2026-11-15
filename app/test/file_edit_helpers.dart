@@ -82,7 +82,7 @@ Future<(Daemon, FakeDaemon)> openEditor(
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
-  open.forEach(d.chats['c']!.openPreview);
+  open.forEach(d.chats['c']!.openInFiles);
   await tester.pumpAndSettle();
   return (d, fake);
 }

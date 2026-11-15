@@ -188,7 +188,7 @@ class _BrowserPaneState extends State<BrowserPane>
   void _go(String text) {
     if (fileAddressOf(text) case final path?) {
       _field.unfocus();
-      widget.chat.openPreview(path);
+      widget.chat.openInFiles(path);
       return;
     }
     final url = addressOf(text);
@@ -243,47 +243,13 @@ class _BrowserPaneState extends State<BrowserPane>
         // its tabs start past the traffic lights, as a header's do.
         PaneHeader(
           plain: widget.expanded,
-          inset: previewChipInset,
-          end: previewChipInset,
-          child: Row(
-            children: [
-              Expanded(child: _tabs()),
-              const SizedBox(width: 6),
-              // Each in a box of one size, the glyphs as large as Claude's
-              // and in the text's ink, a disabled one muted (IconTap).
-              if (widget.daemon case final daemon?)
-                ServersButton(
-                  chat: widget.chat,
-                  daemon: daemon,
-                  padding: _boxed(18),
-                  collapse: widget.expanded ? expand : null,
-                ),
-              // Its rows are the app's web views' (ADR 0104).
-              if (webEmbedded)
-                BrowserMenu(
-                  tab: _tab,
-                  host: host,
-                  size: 20,
-                  padding: _boxed(20),
-                ),
-              if (expand != null)
-                IconTap.line(
-                  widget.expanded ? LineIcon.collapse : LineIcon.expand,
-                  tooltip: widget.expanded ? 'Collapse' : 'Expand',
-                  size: 18,
-                  padding: _boxed(18),
-                  color: t.text,
-                  onTap: expand,
-                ),
-              IconTap.line(
-                LineIcon.close,
-                tooltip: 'Close',
-                size: 22,
-                padding: _boxed(22),
-                color: t.text,
-                onTap: widget.onClose,
-              ),
-            ],
+          inset: PaneEndButtons.inset,
+          end: PaneEndButtons.inset,
+          // Squeezed narrower than its buttons and a chip (a narrow window,
+          // ADR 0123), it keeps Expand and Close.
+          child: LayoutBuilder(
+            builder: (context, box) =>
+                _row(host, expand, full: box.maxWidth >= _fullFrom),
           ),
         ),
         BrowserBar(
@@ -328,32 +294,68 @@ class _BrowserPaneState extends State<BrowserPane>
     );
   }
 
-  /// The side of each button's box at the title row's right end.
-  static const _box = 32.0;
+  /// The row at least this wide holds the Servers button and the menu
+  /// beside Expand, Close and a chip's start.
+  static const double _fullFrom = 6 + 4 * PaneEndButtons.box + _plusRoom;
 
-  /// The padding that sets an icon of [size] in a [_box].
-  static double _boxed(double size) => (_box - size) / 2;
+  /// The top row: the tabs, then (when [full]) Servers and ⋯, Expand and
+  /// Close.
+  Widget _row(BrowserHost? host, VoidCallback? expand, {required bool full}) =>
+      Row(
+        children: [
+          Expanded(child: _tabs()),
+          const SizedBox(width: 6),
+          // Each in a box of one size, the glyphs as large as Claude's and
+          // in the text's ink, a disabled one muted (IconTap).
+          if (widget.daemon case final daemon? when full)
+            ServersButton(
+              chat: widget.chat,
+              daemon: daemon,
+              padding: PaneEndButtons.boxed(18),
+              collapse: widget.expanded ? expand : null,
+            ),
+          // Its rows are the app's web views' (ADR 0104).
+          if (webEmbedded && full)
+            BrowserMenu(
+              tab: _tab,
+              host: host,
+              size: 20,
+              padding: PaneEndButtons.boxed(20),
+            ),
+          PaneEndButtons(
+            expanded: widget.expanded,
+            onExpand: expand,
+            onClose: widget.onClose,
+          ),
+        ],
+      );
 
   /// The tabs, chips even when there's one, as Claude's, and the + right
-  /// after them.
-  Widget _tabs() => ValueListenableBuilder(
-    valueListenable: widget.chat.browser.tabs,
-    builder: (context, open, _) => Row(
-      spacing: 2,
-      children: [
-        Flexible(
-          child: PaneTabs(
-            key: widget.tabsKey,
-            chat: widget.chat,
-            tabs: open.isEmpty ? [_tab] : open,
-            current: _tab,
-            chips: true,
+  /// after them; in a pane squeezed too narrow for the +, the tabs alone
+  /// (its buttons keep their room, ADR 0123).
+  Widget _tabs() => LayoutBuilder(
+    builder: (context, box) => ValueListenableBuilder(
+      valueListenable: widget.chat.browser.tabs,
+      builder: (context, open, _) => Row(
+        spacing: 2,
+        children: [
+          Flexible(
+            child: PaneTabs(
+              key: widget.tabsKey,
+              chat: widget.chat,
+              tabs: open.isEmpty ? [_tab] : open,
+              current: _tab,
+              chips: true,
+            ),
           ),
-        ),
-        NewBrowserTab(chat: widget.chat),
-      ],
+          if (box.maxWidth >= _plusRoom) NewBrowserTab(chat: widget.chat),
+        ],
+      ),
     ),
   );
+
+  /// The room the + takes after the tabs.
+  static const double _plusRoom = 2.0 + 28;
 
   /// The page, and over it why it didn't load when it didn't.
   Widget _page(BrowserHost host) => Stack(

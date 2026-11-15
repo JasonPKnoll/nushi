@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:nushi/controls.dart';
 
 import 'package:nushi/settings.dart';
 import 'package:nushi/sidebar_button.dart';
@@ -385,4 +386,59 @@ class TitleBand extends StatelessWidget {
             ),
           ],
         );
+}
+
+/// The buttons at a wide side pane's top row's right end, the Files pane's
+/// and the browser's alike, as Claude desktop's: Expand (Collapse while
+/// [expanded]), when [onExpand] is given, and × ([onClose]). Each sits in
+/// a box of one size, ending 8 in from the pane's edge with the row's
+/// `end`, so both panes put them at the same pixels.
+class PaneEndButtons extends StatelessWidget {
+  const new({
+    required this.onClose,
+    super.key,
+    this.expanded = false,
+    this.onExpand,
+  });
+
+  final bool expanded;
+  final VoidCallback? onExpand;
+  final VoidCallback onClose;
+
+  /// The side of each button's box.
+  static const box = 32.0;
+
+  /// The room at the row's ends, in from the pane's edges (Claude's).
+  static const inset = 8.0;
+
+  /// The padding that sets an icon of [size] in a [box].
+  static double boxed(double size) => (box - size) / 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = NushiTheme.of(context).t;
+    final expand = onExpand;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (expand != null)
+          IconTap.line(
+            expanded ? LineIcon.collapse : LineIcon.expand,
+            tooltip: expanded ? 'Collapse' : 'Expand',
+            size: 18,
+            padding: boxed(18),
+            color: t.text,
+            onTap: expand,
+          ),
+        IconTap.line(
+          LineIcon.close,
+          tooltip: 'Close',
+          size: 22,
+          padding: boxed(22),
+          color: t.text,
+          onTap: onClose,
+        ),
+      ],
+    );
+  }
 }

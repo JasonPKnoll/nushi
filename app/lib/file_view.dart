@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/diagram_page.dart';
@@ -7,113 +8,162 @@ import 'package:nushi/edit_bars.dart';
 import 'package:nushi/file_edit.dart';
 import 'package:nushi/file_text.dart';
 import 'package:nushi/native.dart';
-import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_header.dart';
 import 'package:nushi/preview_marks.dart';
-import 'package:nushi/preview_path.dart';
 import 'package:nushi/skills_list.dart';
 import 'package:nushi/source_editor.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/web_page.dart';
 import 'package:nushi/web_views.dart';
 
-/// A file the agent wrote, beside the chat where a subagent's pane opens.
-/// Its header ([PreviewHeader]):
-/// its name (a click shows it in the Files pane; with several files open,
-/// the tabs of them all, [PaneTabs]), Live while the daemon keeps it
-/// current, wrapping the lines or not while it shows a source
-/// ([WrapButton], and ⌥Z with the focus in the pane), Reload (in the app's
-/// own web view) and Open in browser (a page, not a diagram), Show in
-/// Finder and Close, which closes every tab (browser tabs too,
-/// `BrowserPane`). Under them its path line ([PathLine]): the path, which a
-/// click copies, and the source button for a file that renders (not a
-/// diagram with nothing to draw it; ADR 0106). It's one file's view, made
-/// again as its tab shows.
-class FileView extends StatefulWidget {
-  const new({
-    required this.chat,
-    required this.daemon,
-    required this.path,
-    required this.onClose,
-    super.key,
-    this.tabsKey,
-  });
+/// The file the Files pane's viewer shows (ADR 0123), and what lives as
+/// long as it shows: its watch, its web view or diagram, its edit's coming
+/// (ADR 0096), whether its Source shows. Made as its tab shows and let go
+/// as another does; the pane's top row (Live), its bar (the path, the
+/// source button, the actions) and the viewer ([FileView]) all read it.
+final class ShownFile {
+  new(this.chat, this.daemon, this.path)
+    : watch = FileWatch(daemon, chat.id, path),
+      kind = previewKind(path) ?? PreviewKind.code {
+    final kind = this.kind;
+    page = kind.page && kind != PreviewKind.mermaid ? native.web.page() : null;
+    diagram = kind == PreviewKind.mermaid ? native.web.diagram() : null;
+    source.value = chat.files.sources.contains(path);
+    watch.addListener(_fileCame);
+  }
 
   final ChatState chat;
   final Daemon daemon;
-  final String path; // as the tool row names it
-  final VoidCallback onClose;
+  final String path; // as its tab names it
+  final FileWatch watch;
+  final PreviewKind kind;
 
-  /// The key of its [PaneTabs], from outside a view that's keyed by file,
-  /// so the tabs' row outlives it.
-  final Key? tabsKey;
+  /// The web view of a page, or the diagram's, by its kind.
+  late final PageHost? page;
+  late final DiagramHost? diagram;
 
-  @override
-  State<FileView> createState() => _FileViewState();
-}
+  /// Whether a file that renders shows its Source; kept per file, while
+  /// its tab is open (`FileTabs.sources`).
+  final source = ValueNotifier<bool>(false);
 
-class _FileViewState extends State<FileView> with FileTabsFocus {
-  late final _watch = FileWatch(widget.daemon, widget.chat.id, widget.path);
-  late final PreviewKind _kind = previewKind(widget.path) ?? PreviewKind.code;
-  late final PageHost? _page = _kind.page && _kind != PreviewKind.mermaid
-      ? native.web.page()
-      : null;
-  late final DiagramHost? _diagram = _kind == PreviewKind.mermaid
-      ? native.web.diagram()
-      : null;
-  late bool _source = widget.chat.files.sources.contains(widget.path);
-  final _focus = FocusNode(debugLabel: 'preview');
-
-  @override
-  void initState() {
-    super.initState();
-    _watch.addListener(_fileCame);
-  }
-
-  /// Whether this pane's watch has sent a message yet.
+  /// Whether its watch has sent a message yet.
   bool _heard = false;
 
   /// The file's edits, while it's being edited (ADR 0096).
-  FileEdit? get _edit => widget.chat.edits[widget.path];
+  FileEdit? get edit => chat.edits[path];
 
   /// A file that came is edited when it can be (text the editor gives
   /// back byte for byte; not an image or a PDF); an edit hears of each
   /// version, and goes once it has nothing unsaved and the file went or
   /// can't be edited now.
   void _fileCame() {
-    final f = _watch.file;
-    if (f == null || widget.daemon.daemonApi < editApi) return;
+    final f = watch.file;
+    if (f == null || daemon.daemonApi < editApi) return;
     final first = !_heard;
     _heard = true;
-    if (_edit case final edit?) {
+    if (edit case final edit?) {
       edit.receive(f, first: first);
       if (!edit.unsaved && (f.missing || edit.readOnly != null)) {
-        widget.chat.dropEdit(widget.path);
+        chat.dropEdit(path);
       }
       return;
     }
-    if (_kind == PreviewKind.image || _kind == PreviewKind.pdf) return;
+    if (kind == PreviewKind.image || kind == PreviewKind.pdf) return;
     if (f.missing || notEditable(f) != null) return;
     final (file, _) = decodeFile(f.data);
-    widget.chat.edit(
-      widget.path,
-      () =>
-          FileEdit(widget.daemon, widget.chat.id, widget.path, file!, f.sha256),
-    );
+    chat.edit(path, () => FileEdit(daemon, chat.id, path, file!, f.sha256));
   }
 
   /// Why the file shows read-only, when it can't be edited (an edit's
   /// own reason shows in its bars).
-  String? _readOnly() {
-    final f = _watch.file;
-    if (f == null || f.missing || _edit != null || _watch.notText) return null;
-    if (widget.daemon.daemonApi < editApi) return null;
+  String? readOnly() {
+    final f = watch.file;
+    if (f == null || f.missing || edit != null || watch.notText) return null;
+    if (daemon.daemonApi < editApi) return null;
     return notEditable(f);
   }
 
+  /// Its absolute path, as the daemon found it once it has.
+  String get abs => watch.file?.path ?? absoluteIn(chat.folder, path);
+
+  /// Shows it in Finder (Folder on Linux).
+  void reveal() => revealInFinder(abs).ignore();
+
+  /// Whether it has the source button: a file that renders, but a diagram
+  /// only with something to draw it (Linux has none, ADR 0104).
+  bool get switches =>
+      kind.rendered && (kind != PreviewKind.mermaid || diagram != null);
+
+  /// Whether it shows the file's text, a source view: code, a diagram with
+  /// nothing to draw it, or the Source of one that renders. Only then do
+  /// its lines wrap or not.
+  bool get showsSource =>
+      kind == PreviewKind.code && !watch.notText ||
+      kind.rendered && (source.value || !switches);
+
+  /// Shows its Source, or its rendering again.
+  void showSource({required bool on}) {
+    source.value = on;
+    if (on) {
+      chat.files.sources.add(path);
+    } else {
+      chat.files.sources.remove(path);
+    }
+  }
+
+  /// A page's actions: Reload (in the app's own web view, ADR 0104) and
+  /// Open in browser; each its icon, tooltip, icon size and what it does.
+  List<(IconData, String, double, VoidCallback)> actions(BuildContext context) {
+    final page = this.page;
+    if (page == null) return const [];
+    return [
+      if (webEmbedded)
+        (Icons.refresh, 'Reload', 15, () => page.reload().ignore()),
+      (
+        Icons.open_in_new,
+        'Open in browser',
+        14,
+        () => openInBrowserOrSay(context, Uri.file(abs)).ignore(),
+      ),
+    ];
+  }
+
+  void dispose() {
+    watch
+      ..removeListener(_fileCame)
+      ..dispose();
+    source.dispose();
+    page?.dispose();
+    diagram?.dispose();
+  }
+}
+
+/// The Files pane's viewer of one file ([ShownFile]): its edit's bars
+/// over the file, rendered or as source, or its editor (ADR 0096). ⌥Z
+/// wraps a source's lines with the focus in it. It's one file's view, made
+/// again as its tab shows; the pane's rows over it are the pane's.
+class FileView extends StatefulWidget {
+  const new({required this.shown, super.key});
+
+  final ShownFile shown;
+
+  @override
+  State<FileView> createState() => _FileViewState();
+}
+
+class _FileViewState extends State<FileView> {
+  final _focus = FocusNode(debugLabel: 'file view');
+
+  ShownFile get _shown => widget.shown;
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
   /// The editor in the source's place, while the file is being edited.
-  Widget? _editor({required bool wrap}) => switch (_edit) {
+  Widget? _editor({required bool wrap}) => switch (_shown.edit) {
     final edit? => SourceEditor(
       key: ObjectKey(edit),
       edit: edit,
@@ -123,37 +173,12 @@ class _FileViewState extends State<FileView> with FileTabsFocus {
     null => null,
   };
 
-  @override
-  void dispose() {
-    _watch.removeListener(_fileCame);
-    _focus.dispose();
-    _watch.dispose();
-    _page?.dispose();
-    _diagram?.dispose();
-    super.dispose();
-  }
-
-  String get _abs =>
-      _watch.file?.path ?? absoluteIn(widget.chat.folder, widget.path);
-
-  void _reveal() => revealInFinder(_abs).ignore();
-
-  /// Whether it has the source button: a file that renders, but a diagram
-  /// only with something to draw it (Linux has none, ADR 0104).
-  bool get _switches =>
-      _kind.rendered && (_kind != PreviewKind.mermaid || _diagram != null);
-
-  /// Whether it shows the file's text, a source view: code, a diagram with
-  /// nothing to draw it, or the Source of one that renders. Only then do its
-  /// lines wrap or not.
-  bool get _showsSource =>
-      _kind == PreviewKind.code && !_watch.notText ||
-      _kind.rendered && (_source || !_switches);
-
   KeyEventResult _key(FocusNode _, KeyEvent e) {
-    if (e is KeyUpEvent || !_showsSource) return KeyEventResult.ignored;
+    if (e is KeyUpEvent || !_shown.showsSource) return KeyEventResult.ignored;
     // In the editor ⌥Z types its character.
-    if (_edit != null && !_focus.hasPrimaryFocus) return KeyEventResult.ignored;
+    if (_shown.edit != null && !_focus.hasPrimaryFocus) {
+      return KeyEventResult.ignored;
+    }
     if (!wrapKey.accepts(e, HardwareKeyboard.instance)) {
       return KeyEventResult.ignored;
     }
@@ -161,82 +186,35 @@ class _FileViewState extends State<FileView> with FileTabsFocus {
     return KeyEventResult.handled;
   }
 
-  void _showSource(bool source) {
-    setState(() => _source = source);
-    final sources = widget.chat.files.sources;
-    if (source) {
-      sources.add(widget.path);
-    } else {
-      sources.remove(widget.path);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = NushiTheme.of(context);
-    final t = theme.t;
-    final kind = _kind;
-    final page = _page;
-    final diagram = _diagram;
-    final actions = <(IconData, String, double, VoidCallback)>[
-      if (page != null) ...[
-        // A page in the browser reloads there (ADR 0104).
-        if (webEmbedded)
-          (Icons.refresh, 'Reload', 15, () => page.reload().ignore()),
-        (
-          Icons.open_in_new,
-          'Open in browser',
-          14,
-          () => openInBrowserOrSay(context, Uri.file(_abs)).ignore(),
-        ),
-      ],
-    ];
+    final t = NushiTheme.of(context).t;
+    final shown = _shown;
+    final chat = shown.chat;
     return Focus(
       focusNode: _focus,
       onKeyEvent: _key,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PreviewHeader(
-            daemon: widget.daemon,
-            chat: widget.chat,
-            path: widget.path,
-            tabsKey: widget.tabsKey,
-            watch: _watch,
-            kind: kind,
-            page: page != null,
-            actions: actions,
-            wraps: () => _showsSource,
-            onReveal: _reveal,
-            onClose: widget.onClose,
-          ),
-          LayoutBuilder(
-            builder: (context, pane) => PathLine(
-              folder: widget.chat.folder,
-              path: widget.path,
-              // The source button under Close.
-              end: previewHeaderEnd(pane.maxWidth, page: page != null),
-              trailing: _switches
-                  ? SourceButton(source: _source, onChanged: _showSource)
-                  : null,
-            ),
-          ),
           ListenableBuilder(
-            listenable: widget.chat.editsChanged,
-            builder: (context, _) => switch (_edit) {
+            listenable: chat.editsChanged,
+            builder: (context, _) => switch (shown.edit) {
               final edit? => EditBars(
                 edit: edit,
-                onDiscard: () => widget.chat.dropEdit(widget.path),
+                onDiscard: () => chat.dropEdit(shown.path),
               ),
               null => const SizedBox.shrink(),
             },
           ),
           Expanded(
-            // A click in a source takes the focus to the pane, for ⌥Z;
+            // A click in a source takes the focus to the view, for ⌥Z;
             // a page's web view and the editor keep their own.
             child: Listener(
               onPointerDown: (_) {
-                if (_showsSource && _edit == null && !_focus.hasFocus) {
+                if (shown.showsSource &&
+                    shown.edit == null &&
+                    !_focus.hasFocus) {
                   _focus.requestFocus();
                 }
               },
@@ -244,21 +222,21 @@ class _FileViewState extends State<FileView> with FileTabsFocus {
                 color: t.base,
                 // An edit coming or going swaps the source and the editor.
                 child: ListenableBuilder(
-                  listenable: widget.chat.editsChanged,
+                  listenable: Listenable.merge([
+                    chat.editsChanged,
+                    shown.source,
+                  ]),
                   builder: (context, _) => PreviewBody(
-                    watch: _watch,
-                    source: _source,
-                    onReveal: _reveal,
+                    watch: shown.watch,
+                    source: shown.source.value,
+                    onReveal: shown.reveal,
                     editor: _editor,
-                    readOnly: _readOnly,
-                    page: switch ((page, diagram)) {
+                    readOnly: shown.readOnly,
+                    page: switch ((shown.page, shown.diagram)) {
                       (final page?, _) => (watch) => WebPage(
                         host: page,
                         watch: watch,
-                        roots: [
-                          widget.chat.folder,
-                          ?widget.chat.worktree?.path,
-                        ],
+                        roots: [chat.folder, ?chat.worktree?.path],
                       ),
                       (_, final diagram?) => (watch) => DiagramView(
                         host: diagram,

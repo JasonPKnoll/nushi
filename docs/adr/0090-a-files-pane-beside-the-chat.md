@@ -27,3 +27,5 @@ The roadmap's Files view wanted "a file tree of the chat's folder to open any fi
 - A whole-folder listing up front: a repository with node_modules would send hundreds of thousands of names.
 
 **Amendment (2026-11-15):** the Files pane, with the other side panes, is right of the details panel and runs the chat pane's full height, its top row level with the chat's header ([ADR 0123](0123-side-panes-right-of-the-rail.md)); it's still left of the preview.
+
+**Amendment (2026-11-15): the tree is inside the Files pane, right of the open files** ([ADR 0123](0123-side-panes-right-of-the-rail.md)'s amendment), as Claude desktop's: the pane is [viewer | tree], the tree at the window's edge with its filter field ("Filter files", the git-ignored eye at its end) on top, and a file opens in the pane's viewer, never moving the tree. "The tree inside the preview pane" (rejected below because the pane existed only with a file open) is what this now is: the pane exists with no file open, its viewer blank.

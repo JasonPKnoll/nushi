@@ -9,7 +9,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_bar.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/preview_path.dart';
@@ -72,13 +73,13 @@ Future<Daemon> _app(
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
-  d.chats['c']!.openPreview(file);
+  d.chats['c']!.openInFiles(file);
   await tester.pumpAndSettle();
   return d;
 }
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(FileView), matching: f);
+    find.descendant(of: find.byType(FilesPane), matching: f);
 
 void main() {
   setUpAll(loadFonts);
@@ -127,11 +128,12 @@ void main() {
     final button = _inPane(find.byType(SourceButton));
     expect(_inPane(find.byTooltip('View source')), findsOneWidget);
     final at = tester.getRect(button);
-    // At the pane's right, under Close.
-    expect(
-      at.right,
-      closeTo(tester.getRect(_inPane(find.byTooltip('Close'))).right, 0.5),
-    );
+    // In the Files pane's bar, right of the path.
+    final bar = tester.getRect(_inPane(find.byType(FilesBar)));
+    expect(at.top, greaterThanOrEqualTo(bar.top));
+    expect(at.bottom, lessThanOrEqualTo(bar.bottom));
+    final path = tester.getRect(_inPane(find.byType(PathLine)));
+    expect(at.left, greaterThan(path.right - 1));
     expect(
       tester
           .widget<IconTap>(

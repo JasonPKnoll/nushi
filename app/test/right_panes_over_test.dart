@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_view.dart';
-import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/transcript.dart';
 
+import 'browser_fixture.dart' show browserFakes;
 import 'fake_daemon.dart' show loadFonts;
 import 'harness.dart';
 import 'right_panes_fixture.dart';
@@ -27,16 +28,16 @@ const PanesOpen _three = (
   subagent: false,
   command: false,
   previews: 1,
-  browser: 0,
+  browser: 1,
 );
 
-const PanesOpen _filesPreview = (
+const PanesOpen _filesBrowser = (
   side: false,
   files: true,
   subagent: false,
   command: false,
   previews: 1,
-  browser: 0,
+  browser: 1,
 );
 
 final Finder _transcript = find.byWidgetPredicate(
@@ -66,10 +67,13 @@ void main() {
   testWidgets('over the transcript: the panes from the top with their own '
       "rows, the chat's header, transcript and terminal at its least under "
       "them, the first one's shadow on it", (tester) async {
-    // 1100 for the chat: under the 1160 the three need at their least.
+    // 1400 for the chat: under the 1460 the three need at their least,
+    // and with the sidebar hidden room for all three past the title
+    // buttons (1100 of 1211), so none is squeezed.
+    browserFakes();
     final (d, _) = await panesApp(
       tester,
-      width: windowFor(1100, sidebar: false),
+      width: windowFor(1400, sidebar: false),
       terminal: true,
       open: _three,
     );
@@ -95,9 +99,9 @@ void main() {
     // The panes, each at its least, left to right to the pane's right
     // edge, from its top to its bottom, each top row level with the
     // header.
-    final types = [SideChat, FilesPane, FileView];
+    final types = [SideChat, FilesPane, BrowserPane];
     final panes = [for (final t in types) tester.getRect(find.byType(t))];
-    for (final (i, w) in [300.0, 200.0, 300.0].indexed) {
+    for (final (i, w) in [300.0, 500.0, 300.0].indexed) {
       expect(panes[i].width, w);
       expect(panes[i].top, area.top);
       expect(panes[i].bottom, area.bottom);
@@ -108,11 +112,11 @@ void main() {
     }
     expect(panes.last.right, area.right);
     // They cover the chat's right.
-    expect(panes.first.left, area.left + 1100 - 800);
+    expect(panes.first.left, area.left + 1400 - 1100);
     expect(panes.first.left, lessThan(header.right));
     expect(_shadowed(tester, SideChat), isTrue);
     expect(_shadowed(tester, FilesPane), isFalse);
-    expect(_shadowed(tester, FileView), isFalse);
+    expect(_shadowed(tester, BrowserPane), isFalse);
     expect(tester.takeException(), isNull);
     await closeView(tester, d);
   }, variant: _mac);
@@ -121,15 +125,16 @@ void main() {
       'the header move a point at most, and the header never spans them', (
     tester,
   ) async {
-    // Files and the preview need 860 of the chat at their least: the line
-    // is at a window of 1128 with the sidebar.
-    final line = windowFor(860, sidebar: true);
+    // Files and the browser need 1160 of the chat at their least: the
+    // line is at a window of 1428 with the sidebar.
+    final line = windowFor(1160, sidebar: true);
+    browserFakes();
     final (d, _) = await panesApp(
       tester,
       width: line + 4,
       sidebar: true,
       terminal: true,
-      open: _filesPreview,
+      open: _filesBrowser,
     );
     Rect? files;
     Rect? header;
@@ -144,7 +149,7 @@ void main() {
       expect(h.top, area.top, reason: 'at $w');
       expect(
         h.right,
-        lessThanOrEqualTo(tester.getRect(find.byType(FileView)).left),
+        lessThanOrEqualTo(tester.getRect(find.byType(BrowserPane)).left),
       );
       if (files != null) {
         expect((f.left - files.left).abs(), lessThanOrEqualTo(1), reason: '$w');

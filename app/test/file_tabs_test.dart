@@ -85,7 +85,7 @@ void main() {
     test("a subagent's pane closes the browser and leaves the files and "
         'their edits', () {
       final c = ChatState('c', folder)
-        ..openPreview('a.md')
+        ..openInFiles('a.md')
         ..openBrowserTab('http://localhost:3000');
       c.pane.value = 'agent';
       expect(c.browser.shown.value, isNull);
@@ -96,7 +96,7 @@ void main() {
     });
 
     test('remembers which kind of tab showed last', () {
-      final c = ChatState('c', folder)..openPreview('a.md');
+      final c = ChatState('c', folder)..openInFiles('a.md');
       expect(c.lastTabbed, TabKind.file);
       c.openBrowserTab();
       expect(c.lastTabbed, TabKind.browser);

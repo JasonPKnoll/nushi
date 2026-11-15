@@ -5,7 +5,6 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
@@ -130,7 +129,7 @@ TreeRowView _view(WidgetTester tester, String name) =>
     tester.widget<TreeRowView>(_row(name));
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(FileView), matching: f);
+    find.descendant(of: find.byType(FilesPane), matching: f);
 
 /// The spans the preview's source shows: more once it is highlighted.
 int _spans(WidgetTester tester) {

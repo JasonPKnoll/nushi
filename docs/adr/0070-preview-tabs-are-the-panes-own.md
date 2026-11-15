@@ -27,3 +27,5 @@ The owner wants to look at more than one file at a time. A first build (3b39a57,
 - An overflow menu for what doesn't fit: more controls in a thin row, for what scrolling already does.
 
 **Amendment (2026-11-15):** the preview pane runs the chat pane's full height, right of the details panel, so its title row with the tabs is level with the chat's header, the window's top row, not under it ([ADR 0123](0123-side-panes-right-of-the-rail.md)). Still one row.
+
+**Amendment (2026-11-15): the tabs are the Files pane's** ([ADR 0123](0123-side-panes-right-of-the-rail.md)'s amendment). The file view is the Files pane's viewer, and its row is the pane's top row, which says Files at its left: the one file's name, or the tabs, come after Files rather than in a title's place, since the pane is Files, not one file. The one file's name has its tab's ✕ after it, as the pane's × now hides Files (keeping the tabs, as ⇧⌘E does) rather than closing the files. The last file closed, with its ✕ or ⌘W, leaves the viewer blank and the pane open. Browser tabs are the browser pane's own (ADR 0094); every way of opening a file opens the Files pane on it (`openInFiles`).

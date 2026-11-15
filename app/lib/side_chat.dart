@@ -233,6 +233,9 @@ class _Row extends StatelessWidget {
   /// Under this, Keep as chat's words leave the name no room: its icon.
   static const wordsFrom = 240.0;
 
+  /// Under this, the row's own icon leaves its three buttons no room.
+  static const iconFrom = 140.0;
+
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
@@ -242,8 +245,12 @@ class _Row extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, box) => Row(
         children: [
-          Icon(Icons.forum_outlined, size: 14, color: t.textSecondary),
-          const SizedBox(width: 8),
+          // Squeezed in a narrow window (ADR 0123), its buttons keep their
+          // room and its icon goes.
+          if (box.maxWidth >= iconFrom) ...[
+            Icon(Icons.forum_outlined, size: 14, color: t.textSecondary),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: PaneTitle(
               title: Text(

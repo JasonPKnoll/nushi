@@ -282,7 +282,7 @@ void main() {
 
   testWidgets('preview: the design note the agent wrote', (tester) async {
     final (d, _) = await _app(tester, _small, select: 'feed', details: false);
-    d.chats['feed']!.openPreview('docs/design/feed-cursor.md');
+    d.chats['feed']!.openInFiles('docs/design/feed-cursor.md');
     await _pump(tester, 10);
     await _shoot(tester, 'preview');
     d.dispose();

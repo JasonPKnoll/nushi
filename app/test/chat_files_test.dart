@@ -10,7 +10,7 @@ import 'package:nushi/chat_files.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
-import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/open_file.dart';
@@ -139,7 +139,7 @@ Future<Daemon> _app(WidgetTester tester) async {
 
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
-Finder get _pane => find.byType(FileView);
+Finder get _pane => find.byType(FilesPane);
 
 Finder _inPane(Finder f) => find.descendant(of: _pane, matching: f);
 

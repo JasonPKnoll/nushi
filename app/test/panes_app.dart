@@ -195,7 +195,7 @@ Future<void> openPanesIn(WidgetTester tester, Daemon d, PanesOpen open) async {
   if (open.side) c.side.value = ChatState('s', '/Users/me')..title = 'Side';
   if (open.files) filesChats.value = {...filesChats.value, 'c'};
   for (var i = 0; i < open.previews; i++) {
-    c.openPreview(['PLAN.md', 'auth/redirect.go', 'NOTES.md'][i % 3]);
+    c.openInFiles(['PLAN.md', 'auth/redirect.go', 'NOTES.md'][i % 3]);
   }
   for (var i = 0; i < open.browser; i++) {
     c.openBrowserTab('http://localhost:${3000 + i}');
