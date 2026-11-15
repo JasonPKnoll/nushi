@@ -26,6 +26,9 @@ const _python =
     '        stir(tea)\n'
     '    return tea\n';
 
+/// The same, indented with two spaces, as Dart, JS and YAML are.
+final String _python2 = _python.replaceAll('    ', '  ');
+
 /// The x of each guide [of] paints.
 List<double> _guides(WidgetTester tester, Finder of) {
   final xs = <double>[];
@@ -56,8 +59,30 @@ void main() {
         2,
         0,
       ]);
-      expect(indentLevels(['    a', '\ta', '   a'], 2), [2, 1, 1]);
+      expect(indentLevels(['\ta', '\t\ta', '  a'], 2), [1, 2, 1]);
       expect(indentLevels(['\t\ta'], 8), [2]);
+    });
+
+    test('a file indenting with spaces steps what it indents by, whatever '
+        'the tab size: 2-space code gets a guide per level', () {
+      final two = ['a', '  b', '    c', '      d', '  e', 'f'];
+      for (final size in tabSizes) {
+        expect(indents(two, size).levels, [0, 1, 2, 3, 1, 0]);
+        expect(indents(two, size).unit, 2);
+      }
+      final four = ['a', '    b', '        c', '    d'];
+      for (final size in tabSizes) {
+        expect(indents(four, size).levels, [0, 1, 2, 1]);
+        expect(indents(four, size).unit, 4);
+      }
+      // Its most common step wins over an odd one (an aligned argument).
+      expect(indents(['a', '  b', '    c', '       d', '  e'], 4).unit, 2);
+      // Nothing indented: the tab size.
+      expect(indents(['a', 'b'], 8).unit, 8);
+      // Tabs: a tab's size, with a stray space-indented line.
+      final tabs = indents(['a', '\tb', '\t\tc', '  d'], 4);
+      expect(tabs.levels, [0, 1, 2, 0]);
+      expect(tabs.unit, 4);
     });
 
     test('a blank line takes the lesser of the lines around it; one at the '
@@ -153,11 +178,22 @@ void main() {
         whitespaceColor(NushiTheme.of(context).t),
       );
 
+      // At a tab size of 2 the file still steps its own 4.
       await show(guides: true, size: 2);
-      expect(_guides(tester, _line('pour')), hasLength(4));
+      expect(_guides(tester, _line('pour')), hasLength(2));
 
       await show(guides: false);
       expect(_guides(tester, _line('pour')), isEmpty);
+
+      // A 2-space file at the tab size of 4: a guide per level, 2 apart.
+      await tester.pumpWidget(
+        themed(SourceView(_python2, path: 'brew.py', wrap: wrap, guides: true)),
+      );
+      await tester.pump();
+      final two = _guides(tester, _line('pour'));
+      expect(two, hasLength(2));
+      expect(two[1] - two[0], closeTo(2 * column, 1));
+      expect(_guides(tester, _line('if tea')), hasLength(1));
     });
   }
 
@@ -212,11 +248,43 @@ void main() {
     await endEditor(tester, d);
   }, variant: onMac);
 
+  testWidgets('the editor steps a 2-space file’s own 2 at a tab size of 4', (
+    tester,
+  ) async {
+    final (d, _) = await openEditor(
+      tester,
+      {'brew.py': utf8.encode(_python2)},
+      open: const ['brew.py'],
+    );
+    final xs = <double>{};
+    expect(
+      tester.renderObject(
+        find.descendant(
+          of: find.byType(IndentGuideOverlay),
+          matching: find.byType(CustomPaint),
+        ),
+      ),
+      paints..everything((method, args) {
+        if (method == #drawLine) xs.add((args[0] as Offset).dx);
+        return true;
+      }),
+    );
+    final sorted = xs.toList()..sort();
+    expect(sorted, hasLength(2));
+    final column = columnWidth(
+      NushiTheme.of(tester.element(find.byType(SourceEditor)))
+          .code(Colors.black, size: 12),
+      TextScaler.noScaling,
+    );
+    expect(sorted[1] - sorted[0], closeTo(2 * column, 1));
+    await endEditor(tester, d);
+  }, variant: onMac);
+
   for (final (name, tokens) in [
     ('dark', Tokens.dark),
     ('light', Tokens.light),
   ]) {
-    testWidgets('guides in the source and the editor, 4 and 2, $name', (
+    testWidgets('guides in a 4-space and a 2-space source, $name', (
       tester,
     ) async {
       viewport(tester, const Size(520, 140));
@@ -229,13 +297,12 @@ void main() {
               color: tokens.base,
               child: Row(
                 children: [
-                  for (final size in [4, 2])
+                  for (final text in [_python, _python2])
                     Expanded(
                       child: SourceView(
-                        _python,
+                        text,
                         path: 'brew.txt',
                         wrap: false,
-                        tabSize: size,
                         guides: true,
                       ),
                     ),

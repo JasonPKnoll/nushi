@@ -65,7 +65,7 @@ class _SourceViewState extends State<SourceView> {
   List<Uint32List?>? _spans;
   int _reads = 0; // a highlight lands only for the latest read
   int? _columns; // the widest line's, worked out when first unwrapped
-  List<int>? _levels; // each line's indent, worked out when guides show
+  Indents? _indents; // each line's indent, worked out when guides show
 
   /// Each wrapping's list, to find the line at its top (a key of their
   /// own: one shared would carry the scroll offset across); and its
@@ -91,7 +91,7 @@ class _SourceViewState extends State<SourceView> {
     // The file changed: read again where it scrolled to.
     if (old.text != widget.text || old.path != widget.path) _read();
     if (old.wrap != widget.wrap) _keepTopLine();
-    if (old.tabSize != widget.tabSize) _columns = _levels = null;
+    if (old.tabSize != widget.tabSize) _columns = _indents = null;
   }
 
   @override
@@ -113,7 +113,7 @@ class _SourceViewState extends State<SourceView> {
     if (_lines.length > 1 && _lines.last.isEmpty) _lines.removeLast();
     _spans = null;
     _columns = null;
-    _levels = null;
+    _indents = null;
     if (sourceLanguage(widget.path, _text) case final language?) {
       highlightSides(language, '', _text).then((s) {
         if (mounted && read == _reads && s[1] != null) {
@@ -264,11 +264,12 @@ class _SourceViewState extends State<SourceView> {
     }
 
     String number(int i) => '${i + 1}'.padLeft(digits);
-    // Indent guides, a tab's columns apart.
-    final step = widget.tabSize * char;
-    int level(int i) => widget.guides
-        ? (_levels ??= indentLevels(_lines, widget.tabSize))[i]
-        : 0;
+    // Indent guides, a level's columns apart (the file's own, [indents]).
+    final counted = widget.guides
+        ? (_indents ??= indents(_lines, widget.tabSize))
+        : null;
+    final step = (counted?.unit ?? widget.tabSize) * char;
+    int level(int i) => counted?.levels[i] ?? 0;
     // Scrolled past the end, the last line can come to the top.
     EdgeInsets padded(double viewport) {
       final pad = widget.padding ?? EdgeInsets.zero;

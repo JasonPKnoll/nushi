@@ -242,7 +242,7 @@ class _SourceEditorState extends State<SourceEditor> {
                 lines: _lines,
                 controller: widget.edit.controller,
                 gutter: _gutter,
-                step: tabSize.value * columnWidth(code, TextScaler.noScaling),
+                column: columnWidth(code, TextScaler.noScaling),
                 size: tabSize.value,
                 color: whitespaceColor(NushiTheme.of(context).t),
               ),
