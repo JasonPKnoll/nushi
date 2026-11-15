@@ -47,6 +47,7 @@ class Resizable extends StatefulWidget {
     this.top = false,
     this.locked = false,
     this.line = true,
+    this.onDrag,
   });
 
   final String name;
@@ -62,6 +63,11 @@ class Resizable extends StatefulWidget {
   /// the window with a gap beside it: its edge shows only under the pointer.
   final bool line;
   final Widget child;
+
+  /// Told the width a drag gives it, in whole points, each time that
+  /// changes, and null once the drag ends (and the width is saved): what
+  /// lays out beside it can decide on the width as dragged (ADR 0123).
+  final ValueChanged<double?>? onDrag;
 
   /// How far in from the pane's side the edge takes the pointer.
   static const edgeWidth = 5.0;
@@ -107,7 +113,9 @@ double paneWidth(String name, double initial) =>
     paneWidths.value[name] ?? initial;
 
 class _ResizableState extends State<Resizable> {
+  double? _asked; // where the pointer has taken the edge
   double? _dragged; // the width the drag asks for, not yet clamped
+  double? _told; // the width [Resizable.onDrag] was last told
   bool _hover = false;
 
   double _width() => (_dragged ?? paneWidth(widget.name, widget.initial)).clamp(
@@ -115,11 +123,26 @@ class _ResizableState extends State<Resizable> {
     max(widget.min, widget.max),
   );
 
-  void _start() => setState(() => _dragged = _width());
+  void _start() => setState(() => _asked = _dragged = _width());
+
+  // A drag's width is a whole number of points, and moves once the pointer
+  // is a point from it: a pointer's sub-pixel jitter doesn't change it.
+  void _drag(double by) {
+    final asked = _asked = _asked! + by;
+    if ((asked - _dragged!).abs() < 1) return;
+    setState(() => _dragged = asked.roundToDouble());
+    final width = _width();
+    if (width == _told) return;
+    _told = width;
+    widget.onDrag?.call(width);
+  }
 
   void _end() {
     _set(_width().roundToDouble());
-    setState(() => _dragged = null);
+    setState(() => _asked = _dragged = null);
+    if (_told == null) return;
+    _told = null;
+    widget.onDrag?.call(null);
   }
 
   void _set(double? width) => paneWidths.value = {
@@ -134,7 +157,6 @@ class _ResizableState extends State<Resizable> {
       final t = NushiTheme.of(context).t;
       final active = _hover || _dragged != null;
       final top = widget.top;
-      void drag(double d) => setState(() => _dragged = _dragged! + d);
       final edge = MouseRegion(
         cursor: top
             ? SystemMouseCursors.resizeRow
@@ -147,10 +169,10 @@ class _ResizableState extends State<Resizable> {
           onHorizontalDragStart: top ? null : (_) => _start(),
           onHorizontalDragUpdate: top
               ? null
-              : (d) => drag(widget.left ? -d.delta.dx : d.delta.dx),
+              : (d) => _drag(widget.left ? -d.delta.dx : d.delta.dx),
           onHorizontalDragEnd: top ? null : (_) => _end(),
           onVerticalDragStart: top ? (_) => _start() : null,
-          onVerticalDragUpdate: top ? (d) => drag(-d.delta.dy) : null,
+          onVerticalDragUpdate: top ? (d) => _drag(-d.delta.dy) : null,
           onVerticalDragEnd: top ? (_) => _end() : null,
           child: Align(
             alignment: top

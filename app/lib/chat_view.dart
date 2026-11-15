@@ -282,11 +282,7 @@ class _ChatViewState extends State<ChatView> {
               onClose: () => toggleFiles(chat),
             ),
           ),
-        if (id != null)
-          SidePane.of(
-            ChatPanes.subagent,
-            child: _pane(id),
-          ),
+        if (id != null) SidePane.of(ChatPanes.subagent, child: _pane(id)),
         if (preview != null)
           SidePane.of(
             ChatPanes.preview,

@@ -7,6 +7,7 @@ import 'package:nushi/conventions.dart';
 import 'package:nushi/gen/nushi/v1/nushi.connect.client.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart' as pb;
 import 'package:nushi/keys.dart';
+import 'package:nushi/motion.dart';
 import 'package:nushi/terminal_find.dart';
 import 'package:xterm2/xterm.dart';
 
@@ -241,14 +242,40 @@ class TermSession extends ChangeNotifier {
     terminal
       ..resize(1, 1)
       ..onResize = (cols, rows, _, _) {
-        client
-            .resizeTerminal(
-              pb.ResizeTerminalRequest(terminalId: id, cols: cols, rows: rows),
-            )
-            .ignore();
+        _resize((cols, rows));
         if (_sub == null) _attach();
       };
   }
+
+  /// How often, at most, the shell is told its size while it changes (a
+  /// pane's edge dragged beside the terminal): the emulator reflows at
+  /// once, the PTY on the first change and then the last of each spell.
+  static const Duration resizeEvery = Waits.coalesce;
+
+  Timer? _resizing; // the spell's, while it lasts
+  (int, int)? _wanted; // the size it ends at, not yet sent
+
+  void _resize((int, int) size) {
+    if (_resizing != null) {
+      _wanted = size;
+      return;
+    }
+    _sendSize(size);
+    _resizing = Timer(resizeEvery, _resized);
+  }
+
+  void _resized() {
+    _resizing = null;
+    final size = _wanted;
+    _wanted = null;
+    if (size != null && !_disposed) _resize(size);
+  }
+
+  void _sendSize((int, int) size) => client
+      .resizeTerminal(
+        pb.ResizeTerminalRequest(terminalId: id, cols: size.$1, rows: size.$2),
+      )
+      .ignore();
 
   void _attach() {
     // The first message is the replay (maybe empty): what it decodes to,
@@ -313,6 +340,7 @@ class TermSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _resizing?.cancel();
     unawaited(_sub?.cancel());
     controller.dispose();
     focus.dispose();
