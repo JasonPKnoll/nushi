@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/app_actions.dart';
+import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/controls.dart';
@@ -18,6 +19,7 @@ import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/tree_rows.dart';
 
+import 'browser_fixture.dart' show browserFakes;
 import 'fake_daemon.dart' show loadFonts;
 import 'harness.dart';
 import 'right_panes_fixture.dart';
@@ -306,6 +308,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getRect(pane).left, tester.getRect(header).right);
     expect(tester.takeException(), isNull);
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('beside the browser, hiding the tree moves their boundary: '
+      'Files narrows to its least without the tree and the browser takes '
+      'the room back', (tester) async {
+    // A 1300: 940 for the panes beside the transcript's least. With the
+    // tree Files gives 320 of its 820 down to its 500, then the browser
+    // 120 of its 560; without, Files gives all 440, to 380 (its least is
+    // 300).
+    browserFakes();
+    final (d, _) = await panesApp(
+      tester,
+      width: windowFor(1300, sidebar: false),
+      details: false,
+      open: (
+        side: false,
+        files: true,
+        subagent: false,
+        command: false,
+        previews: 1,
+        browser: 1,
+      ),
+    );
+    final files = find.byType(FilesPane);
+    final browser = find.byType(BrowserPane);
+    expect(tester.getRect(files).width, 500);
+    expect(tester.getRect(browser).width, 440);
+    final right = tester.getRect(browser).right;
+    filesTree.value = false;
+    await tester.pumpAndSettle();
+    expect(tester.getRect(files).width, 380);
+    expect(tester.getRect(browser).width, 560);
+    expect(tester.getRect(files).right, tester.getRect(browser).left);
+    expect(tester.getRect(browser).right, right);
+    filesTree.value = true;
+    await tester.pumpAndSettle();
+    expect(tester.getRect(files).width, 500);
+    expect(tester.getRect(browser).width, 440);
     await closeView(tester, d);
   }, variant: _mac);
 

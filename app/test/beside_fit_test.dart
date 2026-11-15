@@ -59,7 +59,7 @@ void main() {
     expect(ChatView.leastBesideWide, 360);
     expect(ChatView.leastBesideDetails, 484);
     expect(ChatView.minWidth, 556);
-    for (final row in [...thresholdRows, filesNoTreeRow]) {
+    for (final row in everyRow) {
       expect(railFrom(row.panes), row.rail, reason: row.name);
       expect(narrowFrom(row.panes), row.narrow, reason: row.name);
       expect(besideFrom(row.panes), row.beside, reason: row.name);
@@ -68,7 +68,7 @@ void main() {
 
   test('each row of the table holds at its lines and half a point either '
       'side', () {
-    for (final row in thresholdRows) {
+    for (final row in everyRow) {
       final panes = row.panes;
       final sum = panes.fold(0.0, (w, p) => w + p.initial);
       final least = leastBeside(panes);
@@ -110,7 +110,7 @@ void main() {
 
   test('swept across every width, the rail and over each flip once and are '
       'never both on', () {
-    for (final row in thresholdRows) {
+    for (final row in everyRow) {
       for (final want in [true, false]) {
         bool? rail;
         bool? over;
@@ -169,7 +169,7 @@ void main() {
 
   test("stepped a point at a time across every line, the panes' left edge "
       "and the header's width never jump", () {
-    for (final row in thresholdRows.where((r) => r.panes.isNotEmpty)) {
+    for (final row in everyRow.where((r) => r.panes.isNotEmpty)) {
       for (final MapEntry(key: name, value: saved) in savedSets.entries) {
         for (final want in [true, false]) {
           double? edge;
@@ -270,7 +270,7 @@ void main() {
 
   test('a drag, from the least to the most, never moves the panes over or '
       "off, and its width is the edge's own clamp", () {
-    for (final row in thresholdRows.where((r) => r.panes.isNotEmpty)) {
+    for (final row in everyRow.where((r) => r.panes.isNotEmpty)) {
       for (final room in [
         row.narrow! + 200,
         (row.narrow! + row.beside!) / 2,
@@ -325,7 +325,7 @@ void main() {
   });
 
   test('the rail is an input to nothing', () {
-    for (final row in thresholdRows) {
+    for (final row in everyRow) {
       for (var room = 600.0; room <= 2200; room += 7) {
         final live = {
           for (final p in row.panes.take(1)) p.name: p.initial + 40,
@@ -364,7 +364,7 @@ void main() {
   test("it gives the same answer whatever was asked before, in the panes' "
       'order', () {
     final asks = [
-      for (final row in thresholdRows)
+      for (final row in everyRow)
         for (final room in const [700.0, 1100.0, 1500.0, 1900.0]) (row, room),
     ];
     final first = [for (final (row, room) in asks) fit(room, row.panes)];
@@ -430,7 +430,7 @@ void main() {
       paneWidths.removeListener(count);
       showDetails.removeListener(count);
     });
-    for (final row in thresholdRows) {
+    for (final row in everyRow) {
       for (var room = 300.0; room <= 2600; room += 50) {
         fit(room, row.panes, saved: paneWidths.value);
       }
@@ -461,7 +461,7 @@ void main() {
     });
 
     test('it fills the room, and no width jumps as the room narrows', () {
-      for (final row in thresholdRows) {
+      for (final row in everyRow) {
         final widths = {for (final p in row.panes) p.name: p.min};
         Map<String, double>? last;
         for (var room = 2400.0; room >= 100; room -= 1) {

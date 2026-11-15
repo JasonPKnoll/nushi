@@ -94,6 +94,53 @@ const ThresholdRow filesNoTreeRow = (
   beside: 660,
 );
 
+const PaneSpec _noTree = ChatPanes.filesNoTree;
+
+/// Every row with Files, its tree hidden (⇧⌘Y): the same widths, so the
+/// rail and the narrowing are where they were, and a least 200 less, so
+/// the panes stay beside down to 200 less.
+const List<ThresholdRow> noTreeRows = [
+  filesNoTreeRow,
+  (
+    name: 'side+files, no tree',
+    panes: [_side, _noTree],
+    rail: 1880,
+    narrow: 1560,
+    beside: 960,
+  ),
+  (
+    name: 'files+subagent, no tree',
+    panes: [_noTree, _sub],
+    rail: 1764,
+    narrow: 1444,
+    beside: 880,
+  ),
+  (
+    name: 'side+files+subagent, no tree',
+    panes: [_side, _noTree, _sub],
+    rail: 2144,
+    narrow: 1824,
+    beside: 1180,
+  ),
+  (
+    name: 'files+browser, no tree',
+    panes: [_noTree, _browser],
+    rail: 2060,
+    narrow: 1740,
+    beside: 960,
+  ),
+  (
+    name: 'side+files+browser, no tree',
+    panes: [_side, _noTree, _browser],
+    rail: 2440,
+    narrow: 2120,
+    beside: 1260,
+  ),
+];
+
+/// [thresholdRows] and [noTreeRows].
+const List<ThresholdRow> everyRow = [...thresholdRows, ...noTreeRows];
+
 bool _wide(List<PaneSpec> panes) => panes.any((p) => p.wide);
 
 double _sum(List<PaneSpec> panes) => panes.fold(0.0, (w, p) => w + p.initial);
