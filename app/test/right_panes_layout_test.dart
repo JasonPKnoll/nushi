@@ -259,10 +259,19 @@ void main() {
                 of: pane,
                 matching: find.byType(PreviewTabs),
               );
-              if (tabs.evaluate().isNotEmpty) {
-                final r = _rect(tester, tabs);
-                expect(r.top, greaterThanOrEqualTo(row.top));
-                expect(r.bottom, lessThanOrEqualTo(row.bottom));
+              // Each kind here has two tabs or more, or a browser's.
+              expect(tabs, findsOneWidget);
+              final plus = find.descendant(
+                of: pane,
+                matching: find.byType(NewBrowserTab),
+              );
+              if (kind.types.last == BrowserPane) {
+                expect(plus, findsOneWidget);
+              }
+              for (final f in [tabs, if (plus.evaluate().isNotEmpty) plus]) {
+                final r = _rect(tester, f);
+                expect(r.top, greaterThanOrEqualTo(row.top), reason: '$f');
+                expect(r.bottom, lessThanOrEqualTo(row.bottom), reason: '$f');
               }
               final below = kind.types.last == BrowserPane
                   ? find.byType(BrowserBar)
