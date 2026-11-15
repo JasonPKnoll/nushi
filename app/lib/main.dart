@@ -378,21 +378,27 @@ class _NushiAppState extends State<NushiApp> {
               ...chatKeys,
               if (!native.window.menuBar) quitKey: const RunActIntent(.quit),
             },
-            // Focused when nothing in the window is, so the keys still
-            // come here (an empty pane, after a click on the sidebar).
-            // A character typed there, or on the transcript, goes into the
-            // chat's box (ADR 0121).
-            child: Focus(
-              autofocus: true,
+            // A scope under these keys: a text field a click outside lets
+            // go of (the framework's unfocus on the desktop) gives the focus
+            // to its scope, and the route's, above them, heard none of them.
+            // A character typed with the focus on it, or on the Focus in it,
+            // or on the transcript, goes into the chat's box (ADR 0121).
+            child: FocusScope(
               onKeyEvent: (node, e) => typeIntoBox(widget.daemon, node, e),
-              child: Scaffold(
-                // The Scaffold's text style blends to a new theme's over
-                // 200 ms, rebuilding every text below on each frame;
-                // this one switches at once, with the theme.
-                body: Material(
-                  type: MaterialType.transparency,
-                  animationDuration: Duration.zero,
-                  child: _Shell(widget.daemon),
+              // Focused when nothing in the window is, so the keys still
+              // come here (an empty pane, after a click on the sidebar).
+              child: Focus(
+                autofocus: true,
+                onKeyEvent: (node, e) => typeIntoBox(widget.daemon, node, e),
+                child: Scaffold(
+                  // The Scaffold's text style blends to a new theme's over
+                  // 200 ms, rebuilding every text below on each frame;
+                  // this one switches at once, with the theme.
+                  body: Material(
+                    type: MaterialType.transparency,
+                    animationDuration: Duration.zero,
+                    child: _Shell(widget.daemon),
+                  ),
                 ),
               ),
             ),
