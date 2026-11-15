@@ -679,6 +679,17 @@ void main() {
       d.dispose();
     }, variant: _mac);
 
+    testWidgets('leaves the files of a hidden Files pane', (tester) async {
+      final d = await _app(tester, files: _three.take(2).toList());
+      final c = d.chats['c']!;
+      showOrHideFiles(c);
+      await tester.pumpAndSettle();
+      expect(find.byType(FilesPane), findsNothing);
+      await _key(tester, LogicalKeyboardKey.keyW, meta: true);
+      expect(c.fileNames, hasLength(2));
+      d.dispose();
+    }, variant: _mac);
+
     testWidgets('leaves a preview out of sight', (tester) async {
       final d = await _app(tester, files: _three.take(2).toList());
       final c = d.chats['c']!..tab.value = ChatTab.changes;

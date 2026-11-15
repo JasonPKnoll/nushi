@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/diff_box.dart';
 import 'package:nushi/file_edit.dart';
+import 'package:nushi/files_open.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/preview.dart' show ReadOnlyLine, baseName;
 import 'package:nushi/preview_entry.dart';
@@ -233,10 +234,11 @@ Future<void> closeTabSaving(
 void closeBrowser(ChatState chat) => chat.browser.shown.value = null;
 
 /// What ⌘W closes in [chat]: the tab showing in the pane that has the focus
-/// (a file's view or the browser), else in the one whose tab showed last,
+/// (the Files pane or the browser), else in the one whose tab showed last,
 /// else in the other; null with no tab showing.
 PreviewEntry? tabToClose(ChatState chat) {
-  final file = chat.files.shown.value;
+  // A file shows only while the Files pane does: hidden, its tabs wait.
+  final file = filesOpen(chat) ? chat.files.shown.value : null;
   final page = chat.browser.shown.value;
   final at = FocusManager.instance.primaryFocus?.context;
   final focused = switch (at) {
