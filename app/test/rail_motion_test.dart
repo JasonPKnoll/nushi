@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
+import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/motion.dart';
@@ -89,6 +90,44 @@ void main() {
     expect(tester.getRect(_rail), at);
     await closeView(tester, d);
   }, variant: _mac);
+
+  for (final way in ['another chat', 'another tab']) {
+    testWidgets('first seen tucked ($way and back), it slides in from the '
+        'right as the pane closes', (tester) async {
+      final (d, _) = await panesApp(tester, width: width);
+      final c = d.chats['c']!;
+      final at = tester.getRect(_rail);
+      c.openPreview('PLAN.md');
+      await tester.pumpAndSettle();
+      // The chat's area made again with the rail tucked from the start.
+      if (way == 'another chat') {
+        d.select('d');
+        await tester.pumpAndSettle();
+        d.select('c');
+      } else {
+        c.tab.value = ChatTab.changes;
+        await tester.pumpAndSettle();
+        c.tab.value = ChatTab.chat;
+      }
+      await tester.pumpAndSettle();
+      expect(_rail, findsNothing);
+      c.preview.value = null;
+      await tester.pump();
+      // From past its place on the right, never from the left of it.
+      expect(tester.getRect(_rail).left, greaterThan(at.left + 200));
+      var last = tester.getRect(_rail).left;
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(Motion.enter ~/ 8);
+        final now = tester.getRect(_rail).left;
+        expect(now, lessThanOrEqualTo(last));
+        expect(now, greaterThanOrEqualTo(at.left));
+        last = now;
+      }
+      await tester.pumpAndSettle();
+      expect(tester.getRect(_rail), at);
+      await closeView(tester, d);
+    }, variant: _mac);
+  }
 
   testWidgets('turned back mid-way, it goes from where it is, the same '
       'panel', (tester) async {

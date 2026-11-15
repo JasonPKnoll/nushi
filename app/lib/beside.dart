@@ -201,6 +201,10 @@ class _BesideState extends State<Beside> {
         // What glides: what's open beside [main], whether the panes lie
         // over it, and the sidebar, which moves everything sideways.
         final token = [...now, if (over) 'over', sidebarShut].join(',');
+        // The rail has its token from the first build it's in, tucked or
+        // not: coming back, it slides in, never gliding from where it was
+        // laid out tucked.
+        if (details != null) _tokens.putIfAbsent(details.name, () => token);
         for (final slot in now) {
           if (_shown.contains(slot)) _tokens[slot] = token;
           _tokens.putIfAbsent(slot, () => token);
