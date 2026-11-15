@@ -6,7 +6,7 @@ Shortcuts below are the Mac's. On Linux, use Ctrl where the Mac uses ⌘, and Al
 
 ![A Markdown design note previewed beside the chat that wrote it](https://raw.githubusercontent.com/afrase/nushi/main/docs/images/preview.png)
 
-## Open a preview
+## Open a file
 
 When the agent writes a document, page, image or diagram, its row in the chat has a **Preview** button. Click it and the file opens in the **Files** pane beside the chat, right of the details panel, from the window's top to its bottom (in a narrow window it lies over the chat's right side instead). Where the row is narrow (a subagent's pane), the button is inside the row: click the row to open it first.
 
@@ -83,6 +83,6 @@ When the agent suggests a shell command in a code block, click **▷** next to t
 - ⌥⌘1 to ⌥⌘9 switch between terminals, and ⌘F searches a terminal's scrollback. On Linux, use Alt+1 to Alt+9 and Ctrl+Shift+F.
 - Restarting the daemon closes your terminals. Archiving or deleting a chat closes its terminals too.
 - On Linux, HTML pages, SVG, PDFs and browser tabs show a placeholder with an **Open in** button for your default browser. Mermaid diagrams show as source, in files and in messages.
-- Some files are read-only in the preview, for example files over 1 MB or files you don't have permission to write. The reason shows above the text.
+- Some files are read-only in the Files pane, for example files over 1 MB or files you don't have permission to write. The reason shows above the text.
 - ⌥Z turns line wrapping on or off in a code preview.
 - On the [Phone](Phone), previews open full screen, with no tabs and no editing.
