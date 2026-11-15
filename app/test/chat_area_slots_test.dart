@@ -8,6 +8,7 @@ import 'package:nushi/files_pane.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/transcript.dart';
 
@@ -65,6 +66,65 @@ void main() {
     await tester.pump(const Duration(seconds: 2)); // the width's saved
     d.chats['c']!.pane.value = null;
     filesChats.value = {};
+    await tester.pumpAndSettle();
+    expect(views, 0);
+    expect(tester.widget(transcript), same(first));
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('the rail tucking and coming back, by a pane opening and by '
+      'its edge dragged, rebuilds neither the chat view nor its '
+      'transcript', (tester) async {
+    // A chat area of 1100: the preview needs the rail's room (1240).
+    final (d, _) = await panesApp(
+      tester,
+      width: windowFor(1100, sidebar: false),
+    );
+    var views = 0;
+    debugOnRebuildDirtyWidget = (e, _) {
+      if (e.widget is ChatView) views++;
+    };
+    addTearDown(() => debugOnRebuildDirtyWidget = null);
+    final transcript = find.byWidgetPredicate(_chatTranscript);
+    final first = tester.widget(transcript);
+    bool tucked() =>
+        find.byType(DetailsPanel).evaluate().isEmpty &&
+        find.byType(DetailsPanel, skipOffstage: false).evaluate().isNotEmpty;
+    expect(tucked(), isFalse);
+    final c = d.chats['c']!..openPreview('PLAN.md');
+    await tester.pumpAndSettle();
+    expect(tucked(), isTrue);
+    expect(tester.widget(transcript), same(first));
+    c.preview.value = null;
+    await tester.pumpAndSettle();
+    expect(tucked(), isFalse);
+    // A subagent's pane (264) leaves the rail its room, until its edge is
+    // dragged past 420 (the transcript would keep under 360), and back.
+    c.pane.value = 'a';
+    await tester.pumpAndSettle();
+    expect(tucked(), isFalse);
+    final pane = tester.getRect(find.byType(SubagentPane));
+    final drag = await tester.startGesture(
+      Offset(pane.left + Resizable.edgeWidth / 2, pane.center.dy),
+    );
+    await drag.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    var flips = 0;
+    var was = tucked();
+    for (final by in [
+      for (var i = 0; i < 40; i++) -5.0,
+      for (var i = 0; i < 40; i++) 5.0,
+    ]) {
+      await drag.moveBy(Offset(by, 0));
+      await tester.pumpAndSettle();
+      if (tucked() != was) flips++;
+      was = tucked();
+      expect(tester.widget(transcript), same(first));
+    }
+    expect(flips, 2);
+    await drag.up();
+    await tester.pump(const Duration(seconds: 2)); // the width's saved
+    c.pane.value = null;
     await tester.pumpAndSettle();
     expect(views, 0);
     expect(tester.widget(transcript), same(first));
