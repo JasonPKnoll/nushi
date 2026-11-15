@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/beside_fit.dart';
@@ -101,6 +102,11 @@ void main() {
           await tester.pumpAndSettle();
         }
 
+        // Named for the sidebar and the platform too, so neither run
+        // writes over another's.
+        final named =
+            '${sidebar ? 'sidebar' : 'nosidebar'}_${defaultTargetPlatform.name}';
+
         for (final (w, shows) in [
           (rail + 1, true),
           (rail, true),
@@ -109,11 +115,11 @@ void main() {
           await at(w);
           expect(_rail(), shows, reason: 'at $w');
           if (row.panes.isNotEmpty) expect(_over(tester, row.panes), false);
-          if (!sidebar && w == rail || !sidebar && w == rail - 1) {
+          if (w != rail + 1) {
             await render(
               tester,
               find.byType(NushiApp),
-              'rail_line_${row.name}_${w.toInt()}',
+              'rail_line_${row.name}_${w.toInt()}_$named',
             );
           }
         }
@@ -123,13 +129,11 @@ void main() {
             await at(w);
             expect(_rail(), false, reason: 'at $w');
             expect(_over(tester, row.panes), over, reason: 'at $w');
-            if (!sidebar) {
-              await render(
-                tester,
-                find.byType(NushiApp),
-                'beside_line_${row.name}_${w.toInt()}',
-              );
-            }
+            await render(
+              tester,
+              find.byType(NushiApp),
+              'beside_line_${row.name}_${w.toInt()}_$named',
+            );
           }
         }
         expect(showDetails.value, isTrue);
