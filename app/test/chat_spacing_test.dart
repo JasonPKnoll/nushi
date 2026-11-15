@@ -107,8 +107,8 @@ final _items = <Item>[
   ),
 ];
 
-/// The app on a chat with [items] ([_items] if not given), its preview open
-/// with [file], [pane] wide if given.
+/// The app on a chat with [items] ([_items] if not given), the Files pane
+/// open on [file] if given, the panes at their widths.
 Future<Daemon> _app(
   WidgetTester tester, {
   required double width,
@@ -116,11 +116,10 @@ Future<Daemon> _app(
   Brightness? brightness,
   double height = 1000,
   String? file,
-  double? pane,
 }) async {
   viewport(tester, Size(width, height), brightness: brightness);
   showDetails.value = false;
-  paneWidths.value = {'fileView': ?pane};
+  paneWidths.value = {};
   final c = chat('c', 'claude', 'Fix the login redirect after it expires');
   final fake = FakeDaemon([c])
     ..answer = ((input) => input is GetChatRequest
