@@ -105,6 +105,85 @@ void main() {
     await tester.pump(const Duration(seconds: 2)); // the width's saved
   });
 
+  group('a pane gone mid-drag leaves nothing deciding for it', () {
+    // 1000 wide: the pane at its 300 leaves the view 500 beside the 200 of
+    // the rail, which shows; dragged to 550, the view would keep 250 and
+    // the rail tucks away.
+    final open = ValueNotifier(true);
+    final cover = ValueNotifier<String?>(null);
+    Widget app() => MaterialApp(
+      theme: const NushiTheme(Tokens.dark).toThemeData(),
+      home: ListenableBuilder(
+        listenable: Listenable.merge([open, cover]),
+        builder: (context, _) => Beside(
+          main: const SizedBox.expand(),
+          least: 300,
+          cover: cover.value,
+          details: SidePane.fixed(
+            'details',
+            width: 200,
+            child: const SizedBox.expand(key: Key('rail')),
+          ),
+          panes: [
+            if (open.value)
+              SidePane(
+                'p',
+                initial: 300,
+                min: 200,
+                cap: 800,
+                child: const SizedBox.expand(key: Key('pane')),
+              ),
+          ],
+        ),
+      ),
+    );
+    Finder rail() => find.byKey(const Key('rail'));
+
+    Future<TestGesture> tuck(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1000, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      paneWidths.value = {};
+      open.value = true;
+      cover.value = null;
+      await tester.pumpWidget(app());
+      expect(rail(), findsOneWidget);
+      final drag = await tester.startGesture(edge(tester));
+      await drag.moveBy(const Offset(-20, 0));
+      await tester.pump();
+      await drag.moveBy(const Offset(-250, 0));
+      await tester.pumpAndSettle();
+      expect(width(tester), 550);
+      expect(rail(), findsNothing);
+      return drag;
+    }
+
+    testWidgets('closed while its edge is held', (tester) async {
+      final drag = await tuck(tester);
+      open.value = false; // a key, or the agent
+      await tester.pumpAndSettle(); // gone, its edge with it
+      await drag.up();
+      await tester.pumpAndSettle();
+      expect(paneWidths.value, isEmpty);
+      open.value = true;
+      await tester.pumpAndSettle();
+      expect(width(tester), 300);
+      expect(rail(), findsOneWidget);
+    });
+
+    testWidgets('over all while its edge is held', (tester) async {
+      final drag = await tuck(tester);
+      cover.value = 'p'; // Expand, from a key
+      await tester.pumpAndSettle();
+      await drag.up();
+      cover.value = null;
+      await tester.pumpAndSettle();
+      expect(paneWidths.value, isEmpty);
+      expect(width(tester), 300);
+      expect(rail(), findsOneWidget);
+    });
+  });
+
   testWidgets('a platform view keeps clear of the edge, on whichever side', (
     tester,
   ) async {

@@ -150,6 +150,13 @@ class _ResizableState extends State<Resizable> {
     widget.onDrag?.call(null);
   }
 
+  @override
+  void didUpdateWidget(Resizable old) {
+    super.didUpdateWidget(old);
+    // Locked mid-drag, its edge is gone and the drag with it.
+    if (widget.locked && !old.locked) _asked = _dragged = _told = null;
+  }
+
   void _set(double? width) => paneWidths.value = {
     ...{...paneWidths.value}..remove(widget.name),
     widget.name: ?width,

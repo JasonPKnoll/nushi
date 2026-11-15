@@ -117,8 +117,15 @@ class _BesideState extends State<Beside> {
   /// coming in slides, it doesn't glide.
   final _tokens = <String, Object>{};
 
-  /// The widths of the panes being dragged, as their edges say.
+  /// The widths of the panes being dragged, as their edges say: only open
+  /// ones not over all. A pane closed, or covering it all, mid-drag never
+  /// says its drag ended (its edge is gone), so what it said last would
+  /// otherwise stay and decide for it when it's back at its saved width.
   final _live = <String, double>{};
+
+  /// Whether [name] is a pane whose drag decides: open, and not over all.
+  bool _drags(String name) =>
+      name != widget.cover && widget.panes.any((p) => p.name == name);
 
   /// The room as last laid out, and whether the rail showed in it.
   double _room = 0;
@@ -161,7 +168,7 @@ class _BesideState extends State<Beside> {
   /// A pane's edge is dragged to [width] (null: let go): the rail shows or
   /// tucks as the room it leaves says, and nothing else is built again.
   void _dragged(String name, double? width) {
-    if (width == null) {
+    if (width == null || !_drags(name)) {
       _live.remove(name);
     } else {
       _live[name] = width;
@@ -175,6 +182,7 @@ class _BesideState extends State<Beside> {
       valueListenable: paneWidths,
       builder: (context, _, _) {
         final room = _room = box.maxWidth;
+        _live.removeWhere((name, _) => !_drags(name));
         final fit = _fit(room);
         final scene = widget.scene;
         final details = widget.details;
