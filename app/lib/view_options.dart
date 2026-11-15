@@ -131,8 +131,23 @@ final treeSideChoice = ViewChoice<TreeSide>(
   ],
 );
 
+/// Tab size: the columns between a source's tab stops (ADR 0096).
+final tabSizeChoice = ViewChoice<int>(
+  pref: tabSize,
+  label: 'Tab size',
+  viewLabel: 'Tab Size',
+  values: [
+    for (final (size, act) in [
+      (2, Act.tabSize2),
+      (4, Act.tabSize4),
+      (8, Act.tabSize8),
+    ])
+      (size, '$size', act, 'Tab size $size in Files'),
+  ],
+);
+
 /// The view options of a few values.
-final List<ViewChoice<Object?>> viewChoices = [treeSideChoice];
+final List<ViewChoice<Object?>> viewChoices = [treeSideChoice, tabSizeChoice];
 
 /// The choice whose View submenu [act] stands for, if any.
 ViewChoice<Object?>? viewChoiceOf(Act act) {

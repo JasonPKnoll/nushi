@@ -16,6 +16,7 @@ import 'package:nushi/preview_entry.dart';
 import 'package:nushi/preview_sniff.dart';
 import 'package:nushi/preview_text.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/source_spans.dart' show defaultTabSize;
 import 'package:nushi/source_view.dart';
 import 'package:nushi/spinner.dart';
 import 'package:nushi/syntax_languages.dart' show codeNames;
@@ -338,6 +339,7 @@ class PreviewBody extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(28, 22, 28, 28),
     this.editor,
     this.readOnly,
+    this.tabSize = defaultTabSize,
   });
 
   final FileWatch watch;
@@ -355,6 +357,10 @@ class PreviewBody extends StatelessWidget {
   /// it a PDF says to open it on the Mac.
   final Widget Function(FileWatch watch)? page;
   final EdgeInsets padding;
+
+  /// A source's columns between tab stops: the Mac's Files pane's setting,
+  /// the phone's [defaultTabSize].
+  final int tabSize;
 
   @override
   Widget build(BuildContext context) {
@@ -434,6 +440,7 @@ class PreviewBody extends StatelessWidget {
                 path: watch.path,
                 padding: padding,
                 wrap: wrap,
+                tabSize: tabSize,
               );
               final why = readOnly?.call();
               if (why == null || why.isEmpty) return view;

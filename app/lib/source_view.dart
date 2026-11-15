@@ -33,12 +33,16 @@ class SourceView extends StatefulWidget {
     super.key,
     this.padding,
     this.wrap = true,
+    this.tabSize = defaultTabSize,
   });
 
   final String text;
   final String path;
   final EdgeInsets? padding;
   final bool wrap;
+
+  /// The columns between tab stops.
+  final int tabSize;
 
   @override
   State<SourceView> createState() => _SourceViewState();
@@ -75,6 +79,7 @@ class _SourceViewState extends State<SourceView> {
     // The file changed: read again where it scrolled to.
     if (old.text != widget.text || old.path != widget.path) _read();
     if (old.wrap != widget.wrap) _keepTopLine();
+    if (old.tabSize != widget.tabSize) _columns = null;
   }
 
   @override
@@ -181,13 +186,13 @@ class _SourceViewState extends State<SourceView> {
   int get _widest => _columns ??= _lines.fold<int>(0, (widest, line) {
     final n = min(line.length, _maxLine);
     final note = line.length > _maxLine ? 24 : 0;
-    final most = line.contains('\t') ? tabSize : 2;
+    final most = line.contains('\t') ? widget.tabSize : 2;
     if (most * n + note <= widest) return widest;
     var w = 0;
     for (var i = 0; i < n; i++) {
       final c = line.codeUnitAt(i);
       w += c == 0x09
-          ? tabColumns(w)
+          ? tabColumns(w, widget.tabSize)
           : c >= 0x1100 && (c < 0xD800 || c > 0xDFFF)
           ? 2
           : 1;
@@ -233,6 +238,7 @@ class _SourceViewState extends State<SourceView> {
             spansOf(t, line, _spans?.elementAtOrNull(i)),
             fontSize: style.fontSize!,
             column: char,
+            tabSize: widget.tabSize,
             spacing: spacing,
           ),
           if (cut)

@@ -20,7 +20,7 @@ import 'package:nushi/tile_picture.dart';
 /// changed files show flat and diffs unified, which chats show their
 /// terminals and their Files pane, whether it lists ignored files and
 /// shows its tree and on which side, whether its clicks open preview tabs,
-/// the
+/// its tab size, the
 /// terminal's font, the app's and code's fonts, whether the chat takes the
 /// whole width,
 /// whether the sidebar is hidden, the Jira task list's groups and assignee
@@ -85,6 +85,17 @@ final Pref<bool> filesTree = _plain('filesTree', true);
 /// next click's file takes its place until it's kept (a double click, an
 /// edit, a pin). Off, every file opened keeps its tab.
 final Pref<bool> previewTabs = _plain('previewTabs', true);
+
+/// The columns between tab stops in the Files pane's source and editor
+/// (ADR 0096): 2, 4 (at first) or 8, Claude desktop's Tab size. Anything
+/// else saved reads as 4.
+final tabSize = Pref<int>(
+  'tabSize',
+  (v) => v is int && tabSizes.contains(v) ? v : 4,
+);
+
+/// The tab sizes there are.
+const tabSizes = [2, 4, 8];
 
 /// Which side of the Files pane its tree is on, as Claude desktop's File
 /// tree position: Automatic (the side away from the transcript, the

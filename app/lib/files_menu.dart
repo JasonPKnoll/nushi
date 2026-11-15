@@ -50,6 +50,7 @@ List<MenuEntry> filesMenu(
     _toggle(previewTabsOption),
     MenuEntry.divider,
     for (final o in sourceToggles) _toggle(o),
+    _choice(tabSizeChoice),
     if (folded.isNotEmpty) ...[MenuEntry.divider, ...folded],
   ];
 }

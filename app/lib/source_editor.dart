@@ -64,7 +64,12 @@ class _SourceEditorState extends State<SourceEditor> {
   void initState() {
     super.initState();
     _focus.addListener(_focusChanged);
+    tabSize.addListener(_tabSizeChanged);
   }
+
+  /// Tab size set: the lines' runs are made again, to the new stops
+  /// (`FileEdit`'s spans read it), in the same editor and its edits.
+  void _tabSizeChanged() => widget.edit.controller.forceRepaint();
 
   @override
   void didChangeDependencies() {
@@ -74,6 +79,7 @@ class _SourceEditorState extends State<SourceEditor> {
 
   @override
   void dispose() {
+    tabSize.removeListener(_tabSizeChanged);
     _unfollow();
     _find.dispose();
     _focus.dispose();
@@ -118,7 +124,7 @@ class _SourceEditorState extends State<SourceEditor> {
   late final Map<Type, Action<Intent>> _tabActions = {
     CodeShortcutIndentIntent: _tabAction<CodeShortcutIndentIntent>(tabIndent),
     CodeShortcutOutdentIntent: _tabAction<CodeShortcutOutdentIntent>(
-      tabOutdent,
+      (v) => tabOutdent(v, size: tabSize.value),
     ),
     CodeShortcutNewLineIntent: _tabAction<CodeShortcutNewLineIntent>(
       tabNewLine,

@@ -27,13 +27,18 @@ TextStyle _code(BuildContext context) {
 
 /// Where the character at [offset] in [line] starts, drawn as
 /// [tabStops] makes it with its strut, in columns.
-double _at(String line, int offset) {
+double _at(String line, int offset, {int size = 4}) {
   const style = TextStyle(fontFamily: NushiTheme.codeFont, fontSize: 12);
   final column = columnWidth(style, TextScaler.noScaling);
   final p = TextPainter(
     text: TextSpan(
       style: style,
-      children: tabStops([TextSpan(text: line)], fontSize: 12, column: column),
+      children: tabStops(
+        [TextSpan(text: line)],
+        fontSize: 12,
+        column: column,
+        tabSize: size,
+      ),
     ),
     textDirection: TextDirection.ltr,
     strutStyle: StrutStyle.fromTextStyle(style, forceStrutHeight: true),
@@ -84,14 +89,37 @@ Future<void> _copy(WidgetTester tester) async {
 void main() {
   setUpAll(loadFonts);
 
-  test('a tab reaches the next stop of four columns', () {
-    expect(tabSize, 4);
+  test('a tab reaches the next stop of four columns, or of 2 or 8 (Tab '
+      'size)', () {
+    expect(defaultTabSize, 4);
+    expect(tabSize.value, 4, reason: 'four at first');
     expect(
-      [for (var c = 0; c < 9; c++) tabColumns(c)],
+      [for (var c = 0; c < 9; c++) tabColumns(c, 4)],
       [
         4, 3, 2, 1, 4, 3, 2, 1, 4, //
       ],
     );
+    expect([for (var c = 0; c < 5; c++) tabColumns(c, 2)], [2, 1, 2, 1, 2]);
+    expect(
+      [for (var c = 0; c < 9; c++) tabColumns(c, 8)],
+      [8, 7, 6, 5, 4, 3, 2, 1, 8],
+    );
+    for (final size in tabSizes) {
+      expect(_at('\tx', 1, size: size), closeTo(size, 0.01));
+      expect(_at('ab\tc', 3, size: size), closeTo(size == 2 ? 4 : size, 0.01));
+      // A wide character then a tab: to the stop after its two columns
+      // (its run's size; how wide a fallback font draws it is its own).
+      final runs = tabStops(
+        [const TextSpan(text: '漢\tx')],
+        fontSize: 10,
+        column: 6,
+        tabSize: size,
+      );
+      expect(
+        runs.firstWhere((r) => r.text == '\t').style!.fontSize,
+        10 * tabColumns(2, size),
+      );
+    }
     // At the start of a line, and after another.
     expect(_at('\tx', 1), closeTo(4, 0.01));
     expect(_at('\t\tx', 2), closeTo(8, 0.01));
@@ -117,6 +145,7 @@ void main() {
       ],
       fontSize: 10,
       column: 6,
+      tabSize: 4,
     );
     expect(TextSpan(children: runs).toPlainText(), '\tx\ty\tz');
     // Columns 0, 5 and 9: to 4, 8 and 12, each its own size.
@@ -234,6 +263,70 @@ void main() {
       await endEditor(tester, d);
     }, variant: onMac);
   }
+
+  testWidgets('Tab size moves the stops as it changes, in the source view '
+      'and in the same editor, its edits kept and nothing written', (
+    tester,
+  ) async {
+    viewport(tester, const Size(900, 600));
+    await tester.pumpWidget(
+      themed(
+        ValueListenableBuilder(
+          valueListenable: tabSize,
+          builder: (context, size, _) =>
+              SourceView(tabbed, path: 'main.go', wrap: false, tabSize: size),
+        ),
+      ),
+    );
+    await tester.pump();
+    final context = tester.element(find.byType(SourceView));
+    final column = columnWidth(
+      DefaultTextStyle.of(context).style.merge(_code(context)),
+      TextScaler.noScaling,
+    );
+    double sourceX(int offset) {
+      final p = _sourceLine(tester, 'if p.x');
+      double left(int at) => p
+          .getBoxesForSelection(
+            TextSelection(baseOffset: at, extentOffset: at + 1),
+          )
+          .first
+          .left;
+      return (left(offset) - left(0)) / column;
+    }
+
+    for (final size in tabSizes) {
+      tabSize.value = size;
+      await tester.pump();
+      expect(sourceX(1), closeTo(size, 0.01), reason: '$size');
+    }
+
+    tabSize.value = 4;
+    final (d, fake) = await openEditor(tester, {
+      'main.go': utf8.encode(tabbed),
+    });
+    final e = editOf(d);
+    final editor = tester.state(find.byType(SourceEditor));
+    await typeIn(tester, e, 'x');
+    final writes = fake.writes.length;
+    final editorColumn = columnWidth(
+      _code(tester.element(find.byType(SourceEditor))),
+      TextScaler.noScaling,
+    );
+    double editorX(int offset) =>
+        _editorLine(tester, 13).getOffset(TextPosition(offset: offset))!.dx /
+        editorColumn;
+    expect(editorX(1), closeTo(4, 0.01));
+    for (final size in [8, 2, 4]) {
+      tabSize.value = size;
+      await tester.pump();
+      expect(editorX(1), closeTo(size, 0.01), reason: '$size');
+      expect(tester.state(find.byType(SourceEditor)), same(editor));
+    }
+    expect(e.unsaved, isTrue);
+    expect(fake.writes.length, writes, reason: 'no save on the way');
+    await endEditor(tester, d);
+  }, variant: onMac);
 
   testWidgets('the source view copies its real tabs', (tester) async {
     viewport(tester, const Size(900, 600));

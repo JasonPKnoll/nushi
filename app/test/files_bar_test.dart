@@ -357,6 +357,7 @@ void main() {
       '—',
       'Word wrap',
       'Show whitespace',
+      'Tab size',
     ]);
     expect(_checked('Show file tree'), isTrue);
     expect(_checked('Preview tabs'), isTrue);

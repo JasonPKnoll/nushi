@@ -31,3 +31,6 @@ The owner, looking at a file in the preview: "If I clicked the file in the view 
 - Backups of unsaved text on disk, saying who changed a file, approval-card lines: left for if it's used enough.
 
 **Amendment (2026-11-15): a subagent's pane no longer takes the files' place** (ADR 0123). Files' tabs and the browser's are apart, and a subagent's pane takes only the browser's, so the rule that kept files with unsaved edits beside it is gone: a file's tabs and its edits always stay.
+
+**Amendment (2026-11-16): Tab size is a setting** (Claude desktop's Files ⋯ has Tab size › 2, 4, 8). "A fixed four, not a setting" above is undone: the Mac's source and editor draw a tab to the next stop of `tabSize` columns (2, 4 at first, or 8; one for the app), set from the Files pane's ⋯, View › Tab Size and the palette, and live: the editor's lines are drawn again to the new stops in the same editor (`forceRepaint`), its edits kept and nothing saved on the way. ⇧Tab takes off a tab's columns of spaces at most. The phone keeps four.
+

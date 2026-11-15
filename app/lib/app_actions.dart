@@ -140,6 +140,10 @@ enum Act {
   // The viewer's own key: elsewhere ⌥Z types a character.
   wrap(shows: wrapKey, menu: ActMenu.view, menuLabel: 'Wrap Lines'),
   whitespace(menu: ActMenu.view, menuLabel: 'Show Whitespace'),
+  // View › Tab Size's submenu, its values' rows.
+  tabSize2(menu: ActMenu.view, menuLabel: 'Tab Size'),
+  tabSize4,
+  tabSize8,
   chatWidth,
   unifiedDiff(menu: ActMenu.view, menuLabel: 'Show Diffs Unified'),
   terminal(key: toggleTerminalKey),

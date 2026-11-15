@@ -70,6 +70,7 @@ final _saved = <String, Object?>{
   'filesTree': false,
   'filesTreeSide': 'left',
   'previewTabs': false,
+  'tabSize': 8,
   'dismissedUpdate': '0.1.17',
   'fromANewerApp': {'kept': true},
   'worktrees': ['/a'],
@@ -121,6 +122,7 @@ List<ValueNotifier<Object?>> get _all => [
   filesTree,
   filesTreeSide,
   previewTabs,
+  tabSize,
   dismissedUpdate,
 ];
 
@@ -146,9 +148,10 @@ void main() {
     expect(filesTree.value, isFalse);
     expect(filesTreeSide.value, TreeSide.left);
     expect(previewTabs.value, isFalse);
+    expect(tabSize.value, 8);
     // A built-in named by its id is the theme shown (ADR 0086).
     expect(colorTheme.value, 'tokyo-night');
-    expect(_all.map((p) => p.value), hasLength(44)); // each made
+    expect(_all.map((p) => p.value), hasLength(45)); // each made
     showDetails.value = true;
     await pumpEventQueue();
     expect(readSaved(), {
