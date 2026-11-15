@@ -84,6 +84,12 @@ func main() {
 	// Until the daemon holds its socket, its lines go to stderr, which the
 	// launcher points at nushid.log.
 	slog.SetDefault(slog.New(logs.Handler(os.Stderr)))
+	switch relaunched, err := hideConsole(); {
+	case relaunched:
+		return // the daemon started again with a console of no window takes over
+	case err != nil:
+		slog.Warn("console not hidden; a program the daemon starts may open a window", "err", err)
+	}
 	if login {
 		fatal(execLogin())
 	}
