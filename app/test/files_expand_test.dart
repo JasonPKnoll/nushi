@@ -12,17 +12,25 @@ import 'package:nushi/files_pane.dart';
 import 'package:nushi/files_tree.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/settings.dart';
-import 'package:nushi/sidebar_button.dart' show hiddenHeaderStart;
+import 'package:nushi/sidebar_button.dart'
+    show TitleButtons, hiddenHeaderStart, sidebarShut;
 import 'package:nushi/source_editor.dart';
+import 'package:nushi/theme/theme.dart';
 
 import 'browser_fixture.dart';
 import 'fake_daemon.dart' show loadFonts;
 import 'file_edit_helpers.dart';
 import 'harness.dart';
+import 'panes_app.dart';
 
 // The Files pane's Expand, the browser's (ADR 0094) made the cover's for
 // either pane (ADR 0123): it takes the whole chat pane until Collapse, Esc,
 // the pane hidden, a browser tab shown, a terminal or another tab.
+
+const _both = TargetPlatformVariant({
+  TargetPlatform.macOS,
+  TargetPlatform.linux,
+});
 
 Finder _inFiles(String tooltip) => find.descendant(
   of: find.byType(FilesPane),
@@ -169,19 +177,34 @@ void main() {
 
   testWidgets('expanded with the sidebar hidden, Files starts past the '
       'title buttons', (tester) async {
-    sidebarHidden.value = true;
-    final (d, _) = await openEditor(tester, {
-      'main.go': utf8.encode('package main\n'),
-    });
+    final (d, _) = await panesApp(
+      tester,
+      width: 1700,
+      open: (
+        side: false,
+        files: true,
+        subagent: false,
+        command: false,
+        previews: 1,
+        browser: 0,
+      ),
+    );
+    expect(sidebarShut, isTrue);
     await _tap(tester, _expand);
     final files = find.descendant(
       of: find.byType(FilesPane),
       matching: find.text('Files'),
     );
-    expect(tester.getRect(files).left, greaterThanOrEqualTo(hiddenHeaderStart));
+    // In the window: the pane starts a margin in, and its header past the
+    // title buttons from there.
+    expect(
+      tester.getRect(files).left,
+      greaterThanOrEqualTo(NushiTheme.windowPad + hiddenHeaderStart),
+    );
+    expect(tester.getRect(files).left, greaterThan(TitleButtons.right));
     await render(tester, find.byType(Pane), 'files_expanded_1700');
-    await endEditor(tester, d);
-  }, variant: macOnly);
+    await closeView(tester, d);
+  }, variant: _both);
 
   testWidgets('⌘W stays in the Files pane with the keys: blank, beside the '
       'browser or covering it, it closes none of its tabs', (tester) async {
