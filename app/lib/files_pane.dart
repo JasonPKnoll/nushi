@@ -155,11 +155,17 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
             valueListenable: filesTreeSide,
             builder: (context, side, _) {
               final right = treeOnRight(side);
+              // The viewer and the tree each a group: Tab goes through one
+              // and then the other in the order they read, the tree's
+              // search before its rows on either side (the viewer, as tall
+              // as both, would otherwise take its leftmost part first).
               final viewer = Expanded(
                 key: const ValueKey('viewer'),
-                child: shown == null
-                    ? FilesBlank(tree: tree)
-                    : FileView(key: ObjectKey(shown), shown: shown),
+                child: FocusTraversalGroup(
+                  child: shown == null
+                      ? FilesBlank(tree: tree)
+                      : FileView(key: ObjectKey(shown), shown: shown),
+                ),
               );
               final edge = BorderSide(color: t.line);
               final files = Resizable(
@@ -178,7 +184,9 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
                   decoration: BoxDecoration(
                     border: right ? Border(left: edge) : Border(right: edge),
                   ),
-                  child: FilesTree(chat: _chat, daemon: widget.daemon),
+                  child: FocusTraversalGroup(
+                    child: FilesTree(chat: _chat, daemon: widget.daemon),
+                  ),
                 ),
               );
               return Column(
