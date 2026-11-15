@@ -195,10 +195,76 @@ void main() {
           .hasFocus,
       isTrue,
     );
+    // A second tab, then ⌘W for each: the first closes one, the second
+    // the last, and the rail has the pane's edge again.
+    await _palette(tester, 'new browser tab');
     final c = d.chats['c']!;
-    c.closePreview(c.preview.value!);
-    await tester.pumpAndSettle();
+    expect(c.previewTabs.value, hasLength(2));
+    await _cmd(tester, LogicalKeyboardKey.keyW);
+    expect(c.previewTabs.value, hasLength(1));
+    expect(_r(tester, find.byType(BrowserPane)), browser);
+    await _cmd(tester, LogicalKeyboardKey.keyW);
     expect(find.byType(BrowserPane), findsNothing);
+    expect(_r(tester, _rail).right, _r(tester, find.byType(Pane)).right);
+    await closeView(tester, d);
+  }, variant: _both);
+
+  testWidgets('a browser tab that tucks the rail: ⌘R reloads its page, Back '
+      'and Forward go through the chats and back to it as it was, and ⌘W '
+      'on its last tab brings the rail back', (tester) async {
+    final fakes = browserFakes();
+    final (d, _) = await panesApp(
+      tester,
+      width: windowFor(1100, sidebar: false),
+    );
+    // A place to go back to.
+    d.select('d');
+    await tester.pumpAndSettle();
+    d.select('c');
+    await tester.pumpAndSettle();
+    final c = d.chats['c']!..openBrowserTab('http://localhost:3000');
+    await tester.pumpAndSettle();
+    expect(_rail, findsNothing);
+    final browser = _r(tester, find.byType(BrowserPane));
+    final header = _r(tester, find.byType(ChatHeader));
+    // ⌘R (Control+R on Linux): the page again, nothing moved.
+    await _cmd(tester, LogicalKeyboardKey.keyR);
+    expect(fakes.hosts.single.reloads, 1);
+    expect(_r(tester, find.byType(BrowserPane)), browser);
+    // Back and Forward: ⌘[ and ⌘] on the Mac, Alt+Left and Alt+Right on
+    // Linux.
+    Future<void> step({required bool back}) async {
+      if (_linux) {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+        await tester.sendKeyEvent(
+          back ? LogicalKeyboardKey.arrowLeft : LogicalKeyboardKey.arrowRight,
+        );
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+        await tester.pumpAndSettle();
+      } else {
+        await _cmd(
+          tester,
+          back
+              ? LogicalKeyboardKey.bracketLeft
+              : LogicalKeyboardKey.bracketRight,
+        );
+      }
+    }
+
+    await step(back: true);
+    expect(d.selectedId, 'd');
+    expect(find.byType(BrowserPane), findsNothing);
+    expect(_rail, findsOneWidget);
+    await step(back: false);
+    expect(d.selectedId, 'c');
+    expect(_rail, findsNothing);
+    expect(_r(tester, find.byType(BrowserPane)), browser);
+    expect(_r(tester, find.byType(ChatHeader)), header);
+    // ⌘W on its only tab: closed, the rail back.
+    await _cmd(tester, LogicalKeyboardKey.keyW);
+    expect(c.preview.value, isNull);
+    expect(find.byType(BrowserPane), findsNothing);
+    expect(_rail, findsOneWidget);
     expect(_r(tester, _rail).right, _r(tester, find.byType(Pane)).right);
     await closeView(tester, d);
   }, variant: _both);

@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_panes.dart';
+import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/files_pane.dart';
@@ -15,6 +17,8 @@ import 'package:nushi/panes.dart';
 import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/side_chat.dart';
+import 'package:nushi/sidebar.dart';
+import 'package:nushi/sidebar_beside.dart';
 import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/transcript.dart';
@@ -192,8 +196,82 @@ void main() {
     viewport(tester, Size(width + 400, 900));
     await tester.pumpAndSettle();
     expect(_rail(), false);
+    // Nor when the panes close, one and then the other, narrow again.
+    viewport(tester, Size(width, 900));
+    await tester.pumpAndSettle();
+    final c = d.chats['c']!;
+    c.closePreview(c.preview.value!);
+    await tester.pumpAndSettle();
+    expect(find.byType(PreviewPane), findsNothing);
+    expect(_rail(), false);
+    toggleFiles(c);
+    await tester.pumpAndSettle();
+    expect(find.byType(FilesPane), findsNothing);
+    expect(_rail(), false);
+    expect(find.byType(DetailsPanel, skipOffstage: false), findsNothing);
+    expect(_tip(tester), 'Show details');
+    expect(showDetails.value, isFalse);
     await closeView(tester, d);
   }, variant: _mac);
+
+  for (final tucked in [false, true]) {
+    testWidgets('a peek at the hidden sidebar, the rail '
+        '${tucked ? 'tucked' : 'shown'} beside the preview, flips nothing: '
+        'the rail stays as it was and no pane moves', (tester) async {
+      // At the preview's line the rail just fits; a point under, it's
+      // tucked. The peek lies over the chat, so it takes none of the room.
+      final row = thresholdRows.firstWhere((r) => r.name == 'preview');
+      final line = windowFor(row.rail, sidebar: false);
+      final (d, _) = await panesApp(
+        tester,
+        width: tucked ? line - 1 : line,
+        open: _openOf(row.panes),
+      );
+      expect(_rail(), !tucked);
+      Map<String, Rect> rects() => {
+        'header': tester.getRect(find.byType(ChatHeader)),
+        'preview': tester.getRect(find.byType(PreviewPane)),
+        'menu': tester.getRect(find.byTooltip('Chat menu')),
+        if (!tucked) 'rail': tester.getRect(find.byType(DetailsPanel)),
+      };
+      final before = rects();
+      var flips = 0;
+      final shows = _rail();
+      void check(String when) {
+        if (_rail() != shows) flips++;
+        expect(rects(), before, reason: when);
+      }
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(600, 400));
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(
+        tester.getCenter(find.byTooltip('Show the sidebar\u2002⌘\\')),
+      );
+      // Each frame of its slide in, then at rest.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        check('sliding in, frame $i');
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(Sidebar), findsOneWidget);
+      expect(sidebarHidden.value, isTrue, reason: 'a peek');
+      check('peeking');
+      // The pointer off it: it slides away, and still nothing moved.
+      await mouse.moveTo(Offset(before['preview']!.center.dx, 400));
+      await tester.pump(SidebarBeside.grace);
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        check('sliding away, frame $i');
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(Sidebar), findsNothing);
+      check('gone');
+      expect(flips, 0);
+      expect(showDetails.value, isTrue);
+      await closeView(tester, d);
+    }, variant: _mac);
+  }
 
   group('it comes back when there is room again:', () {
     // The subagent's pane at the line, less a point: tucked.
@@ -497,6 +575,36 @@ void main() {
     );
     expect(find.byType(SideChat, skipOffstage: false), findsNothing);
     expect(find.byType(PreviewPane), findsOneWidget);
+    expect(_rail(), true);
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('a chat whose session is gone is laid out as a live one: '
+      'its side chat, a session of its own, takes its room (only archiving '
+      "ends it), so the rail tucks at the preview's line", (tester) async {
+    final (d, _) = await panesApp(
+      tester,
+      width: windowFor(1240, sidebar: false),
+      open: _openOf([ChatPanes.side, ChatPanes.preview]),
+    );
+    final c = d.chats['c']!..listed(ChatStatus(sessionGone: true));
+    await tester.pumpAndSettle();
+    expect(c.sessionGone, isTrue);
+    // The chat's composer gives way to the notice; the side chat keeps its
+    // own.
+    bool composerOf(String id) => find
+        .byWidgetPredicate((w) => w is Composer && w.chat.id == id)
+        .evaluate()
+        .isNotEmpty;
+    expect(composerOf('c'), isFalse);
+    expect(composerOf('s'), isTrue);
+    expect(find.byType(SideChat), findsOneWidget);
+    expect(find.byType(PreviewPane), findsOneWidget);
+    expect(_rail(), false);
+    // The room back without the side chat: the rail shows again, as in an
+    // archived chat at this width.
+    c.sideHidden.value = true;
+    await tester.pumpAndSettle();
     expect(_rail(), true);
     await closeView(tester, d);
   }, variant: _mac);

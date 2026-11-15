@@ -7,13 +7,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/app_actions.dart';
 import 'package:nushi/browser_page.dart';
 import 'package:nushi/browser_pane.dart';
+import 'package:nushi/chat_header.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/details_panel.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/markdown.dart' show openWebOutside;
 import 'package:nushi/native.dart';
 import 'package:nushi/outside_page.dart';
+import 'package:nushi/panes.dart';
 import 'package:nushi/preview_entry.dart';
 import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
@@ -128,6 +131,38 @@ void main() {
       findsOneWidget,
     );
     expect(_in<PreviewPane>(find.byType(SourceView)), findsOneWidget);
+    await closeView(tester, d);
+  }, variant: linuxOnly);
+
+  testWidgets('beside the details rail, right of it, the placeholder keeps '
+      'its button in the pane, under its top row', (tester) async {
+    final opened = pagesOutside();
+    final (_, d) = await _app(tester);
+    showDetails.value = true;
+    await tester.pumpAndSettle();
+    d.chats['c']!.openPreview('site/index.html');
+    await tester.pumpAndSettle();
+    await render(tester, find.byType(NushiApp), 'outside_preview_rail_1700');
+    final pane = tester.getRect(find.byType(PreviewPane));
+    final rail = tester.getRect(find.byType(DetailsPanel));
+    expect(pane.left, rail.right);
+    expect(pane.right, tester.getRect(find.byType(Pane)).right);
+    // The pane's top row is level with the chat's header; the button is
+    // in the body under it, whole.
+    expect(
+      tester.getRect(find.byType(ChatHeader)).bottom,
+      pane.top + PaneHeader.height,
+    );
+    final button = tester.getRect(_openButton);
+    expect(button.top, greaterThanOrEqualTo(pane.top + PaneHeader.height));
+    expect(
+      pane.contains(button.topLeft) && pane.contains(button.bottomRight),
+      isTrue,
+    );
+    expectTextInside(tester, 1700);
+    await tester.tap(_openButton);
+    await tester.pumpAndSettle();
+    expect(opened, [Uri.file('/Users/me/nushi/site/index.html')]);
     await closeView(tester, d);
   }, variant: linuxOnly);
 
