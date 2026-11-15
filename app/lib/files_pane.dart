@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -137,6 +139,10 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
     );
   }
 
+  /// The tree's width as its edge is dragged, until the drag ends (and the
+  /// width is saved): the bar's path follows it with the tree on the left.
+  double? _treeDragged;
+
   Widget _panes(ShownFile? shown, Tokens t, {required bool tree}) =>
       LayoutBuilder(
         builder: (context, box) {
@@ -144,49 +150,77 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
           // Under the least of both, the two narrow alike (treeWidth).
           final squeezed = w < filesTreeLeast + filesViewerLeast;
           final most = squeezed ? treeWidth(w, filesTreeInitial) : treeMost(w);
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              FilesTopRow(
-                chat: _chat,
-                daemon: widget.daemon,
-                shown: shown,
-                tabsKey: widget.tabsKey,
-                expanded: widget.expanded,
-                onExpand: widget.onExpand,
-                onClose: widget.onClose,
-              ),
-              FilesBar(chat: _chat, daemon: widget.daemon, shown: shown),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: shown == null
-                          ? FilesBlank(tree: tree)
-                          : FileView(key: ObjectKey(shown), shown: shown),
-                    ),
-                    if (tree)
-                      Resizable(
-                        name: 'filesTree',
-                        initial: filesTreeInitial,
-                        min: squeezed ? most : filesTreeLeast,
-                        max: most,
-                        left: true,
-                        locked: squeezed,
-                        // Its own hairline, which a locked edge keeps.
-                        line: false,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            border: Border(left: BorderSide(color: t.line)),
-                          ),
-                          child: FilesTree(chat: _chat, daemon: widget.daemon),
-                        ),
-                      ),
-                  ],
+          final least = squeezed ? most : filesTreeLeast;
+          return ValueListenableBuilder(
+            valueListenable: filesTreeSide,
+            builder: (context, side, _) {
+              final right = treeOnRight(side);
+              final viewer = Expanded(
+                key: const ValueKey('viewer'),
+                child: shown == null
+                    ? FilesBlank(tree: tree)
+                    : FileView(key: ObjectKey(shown), shown: shown),
+              );
+              final edge = BorderSide(color: t.line);
+              final files = Resizable(
+                key: const ValueKey('tree'),
+                name: 'filesTree',
+                initial: filesTreeInitial,
+                min: least,
+                max: most,
+                // Its edge on the viewer's side.
+                left: right,
+                locked: squeezed,
+                // Its own hairline, which a locked edge keeps.
+                line: false,
+                onDrag: (width) => setState(() => _treeDragged = width),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: right ? Border(left: edge) : Border(right: edge),
+                  ),
+                  child: FilesTree(chat: _chat, daemon: widget.daemon),
                 ),
-              ),
-            ],
+              );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilesTopRow(
+                    chat: _chat,
+                    daemon: widget.daemon,
+                    shown: shown,
+                    tabsKey: widget.tabsKey,
+                    expanded: widget.expanded,
+                    onExpand: widget.onExpand,
+                    onClose: widget.onClose,
+                  ),
+                  // With the tree on the left the path starts past it,
+                  // over the viewer.
+                  ValueListenableBuilder(
+                    valueListenable: paneWidths,
+                    builder: (context, _, _) => FilesBar(
+                      chat: _chat,
+                      daemon: widget.daemon,
+                      shown: shown,
+                      start: tree && !right
+                          ? (_treeDragged ??
+                                    paneWidth('filesTree', filesTreeInitial))
+                                .clamp(least, max(least, most))
+                          : 0,
+                    ),
+                  ),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (tree && !right) files,
+                        viewer,
+                        if (tree && right) files,
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       );

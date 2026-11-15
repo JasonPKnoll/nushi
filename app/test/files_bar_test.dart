@@ -96,7 +96,10 @@ double _top(Element e) =>
 /// The open menu's rows, top to bottom: each row's label, '—' for a line.
 List<String> _menuRows(WidgetTester tester) {
   final rows = <(double, String)>[
-    for (final e in find.byType(MenuItemButton).evaluate())
+    for (final e
+        in find
+            .byWidgetPredicate((w) => w is MenuItemButton || w is SubmenuButton)
+            .evaluate())
       (
         _top(e),
         tester
@@ -346,6 +349,7 @@ void main() {
       'Go to file or search',
       '—',
       'Show file tree',
+      'File tree position',
       '—',
       'Collapse all folders',
       '—',

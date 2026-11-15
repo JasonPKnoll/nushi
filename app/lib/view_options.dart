@@ -68,6 +68,59 @@ final whitespaceOption = ViewToggle(
 /// The view options that are on or off, in the ⋯'s order.
 final List<ViewToggle> viewToggles = [wrapOption, whitespaceOption];
 
+/// A view option of a few values: its [pref], the ⋯'s row ([label], the
+/// value now at its right, a submenu of [values]) and the View menu's
+/// submenu ([viewLabel], its first value's [Act] standing for it there,
+/// the value now disabled: the menu bar has no checks). Each value is its
+/// name, its action and the palette's row for it, listed while it isn't
+/// the value.
+final class ViewChoice<T> {
+  const new({
+    required this.pref,
+    required this.label,
+    required this.viewLabel,
+    required this.values,
+  });
+
+  final Pref<T> pref;
+  final String label;
+  final String viewLabel;
+  final List<(T value, String name, Act act, String palette)> values;
+
+  /// The value's name now.
+  String get current => values
+      .firstWhere((v) => v.$1 == pref.value, orElse: () => values.first)
+      .$2;
+}
+
+/// File tree position: Automatic, Left or Right ([treeOnRight]).
+final treeSideChoice = ViewChoice<TreeSide>(
+  pref: filesTreeSide,
+  label: 'File tree position',
+  viewLabel: 'File Tree Position',
+  values: [
+    (
+      TreeSide.automatic,
+      'Automatic',
+      Act.treeAutomatic,
+      'Place the file tree automatically',
+    ),
+    (TreeSide.left, 'Left', Act.treeLeft, 'Put the file tree on the left'),
+    (TreeSide.right, 'Right', Act.treeRight, 'Put the file tree on the right'),
+  ],
+);
+
+/// The view options of a few values.
+final List<ViewChoice<Object?>> viewChoices = [treeSideChoice];
+
+/// The choice whose View submenu [act] stands for, if any.
+ViewChoice<Object?>? viewChoiceOf(Act act) {
+  for (final c in viewChoices) {
+    if (c.values.first.$3 == act) return c;
+  }
+  return null;
+}
+
 /// Shows [chat]'s Files pane with its tree, or, while the pane shows, the
 /// tree or not ([filesTree]): ⇧⌘Y, the pane's button, its ⋯, View › Show
 /// File Tree and the palette. From the Changes tab it's the Chat tab's.
@@ -113,6 +166,19 @@ List<AppAction> viewActions(ChatState? shown, Daemon d) => [
     enabled: shown != null && d.daemonApi >= filesApi,
     run: () => toggleFileTree(shown!),
   ),
+  // Each value but the one now, where a chat shows; the tree's only where
+  // it can show.
+  for (final c in viewChoices)
+    for (final (value, _, act, title) in c.values)
+      AppAction(
+        act,
+        title,
+        enabled:
+            c.pref.value != value &&
+            shown != null &&
+            (c != treeSideChoice || d.daemonApi >= filesApi),
+        run: () => c.pref.value = value,
+      ),
   AppAction(
     .collapseFolders,
     'Collapse all folders',

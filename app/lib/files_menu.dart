@@ -38,6 +38,7 @@ List<MenuEntry> filesMenu(
       shortcut: keyLabel(fileTreeKey),
       onPick: tree ? () => toggleFileTree(chat) : null,
     ),
+    _choice(treeSideChoice, on: tree),
     MenuEntry.divider,
     MenuEntry(
       'Collapse all folders',
@@ -51,3 +52,20 @@ List<MenuEntry> filesMenu(
     if (folded.isNotEmpty) ...[MenuEntry.divider, ...folded],
   ];
 }
+
+/// [choice]'s row: its value now at the right, its values in a submenu,
+/// the one now checked; unavailable unless [on].
+MenuEntry _choice<T>(ViewChoice<T> choice, {bool on = true}) => MenuEntry(
+  choice.label,
+  detail: choice.current,
+  submenu: on
+      ? [
+          for (final (value, name, _, _) in choice.values)
+            MenuEntry(
+              name,
+              checked: choice.pref.value == value,
+              onPick: () => choice.pref.value = value,
+            ),
+        ]
+      : const [],
+);

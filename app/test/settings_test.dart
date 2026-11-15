@@ -68,6 +68,7 @@ final _saved = <String, Object?>{
   'dockBadge': false,
   'wrap': false,
   'filesTree': false,
+  'filesTreeSide': 'left',
   'dismissedUpdate': '0.1.17',
   'fromANewerApp': {'kept': true},
   'worktrees': ['/a'],
@@ -117,6 +118,7 @@ List<ValueNotifier<Object?>> get _all => [
   dockBadge,
   wrapLines,
   filesTree,
+  filesTreeSide,
   dismissedUpdate,
 ];
 
@@ -140,9 +142,10 @@ void main() {
     expect(dismissedUpdate.value, '0.1.17');
     expect(wrapLines.value, isFalse);
     expect(filesTree.value, isFalse);
+    expect(filesTreeSide.value, TreeSide.left);
     // A built-in named by its id is the theme shown (ADR 0086).
     expect(colorTheme.value, 'tokyo-night');
-    expect(_all.map((p) => p.value), hasLength(42)); // each made
+    expect(_all.map((p) => p.value), hasLength(43)); // each made
     showDetails.value = true;
     await pumpEventQueue();
     expect(readSaved(), {

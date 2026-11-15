@@ -19,7 +19,7 @@ import 'package:nushi/tile_picture.dart';
 /// side panes' widths (not the details panel's, which is fixed), whether
 /// changed files show flat and diffs unified, which chats show their
 /// terminals and their Files pane, whether it lists ignored files and
-/// shows its tree, the
+/// shows its tree and on which side, the
 /// terminal's font, the app's and code's fonts, whether the chat takes the
 /// whole width,
 /// whether the sidebar is hidden, the Jira task list's groups and assignee
@@ -78,6 +78,23 @@ final Pref<bool> filesIgnored = _plain('filesIgnored', false);
 /// ⇧⌘Y, its second row's button, its ⋯ and View › Show File Tree): one
 /// for every chat, as Claude desktop's.
 final Pref<bool> filesTree = _plain('filesTree', true);
+
+/// Which side of the Files pane its tree is on, as Claude desktop's File
+/// tree position: Automatic (the side away from the transcript, the
+/// right while the panes are right of it), Left or Right.
+final filesTreeSide = Pref<TreeSide>(
+  'filesTreeSide',
+  (v) => TreeSide.values.asNameMap()[v] ?? TreeSide.automatic,
+  write: (side) => side.name,
+);
+
+/// The Files pane's tree's side ([filesTreeSide]).
+enum TreeSide { automatic, left, right }
+
+/// Whether the tree is at the Files pane's right on [side]: Automatic puts
+/// it away from the transcript, which is left of every side pane (ADR
+/// 0123). The one place to change should the panes' order change.
+bool treeOnRight(TreeSide side) => side != TreeSide.left;
 
 /// The Jira site used last (shown in the Jira view, or an issue picked from
 /// it for a chat): a key typed alone is looked for there.

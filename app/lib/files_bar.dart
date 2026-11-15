@@ -68,6 +68,7 @@ class FilesBar extends StatelessWidget {
       child: ListenableBuilder(
         listenable: Listenable.merge([
           for (final o in viewToggles) o.pref,
+          for (final c in viewChoices) c.pref,
           filesTree,
           folderTreeOf(chat),
           ?shown?.watch,

@@ -212,6 +212,7 @@ class _NushiAppState extends State<NushiApp> {
   /// the tree's, and which chats have Files open.
   static final List<Listenable> _viewPrefs = [
     for (final o in viewToggles) o.pref,
+    for (final c in viewChoices) c.pref,
     filesTree,
     filesChats,
   ];
@@ -236,8 +237,24 @@ class _NushiAppState extends State<NushiApp> {
 
   List<PlatformMenuItem> _items(ActMenu menu) => [
     for (final a in Act.values)
-      if (a.menu == menu) _item(a),
+      if (a.menu == menu)
+        if (viewChoiceOf(a) case final choice?) _choice(choice) else _item(a),
   ];
+
+  /// A Files option of a few values as a submenu, the value now disabled:
+  /// the menu bar draws no checks.
+  PlatformMenu _choice(ViewChoice<Object?> choice) => PlatformMenu(
+    label: choice.viewLabel,
+    menus: [
+      for (final (value, name, _, _) in choice.values)
+        PlatformMenuItem(
+          label: name,
+          onSelected: choice.pref.value == value
+              ? null
+              : () => choice.pref.value = value,
+        ),
+    ],
+  );
 
   /// The window, under the system's menu bar where there's one: the
   /// actions' keys work without it (the Shortcuts in [_makeWindow]).

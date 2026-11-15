@@ -131,6 +131,10 @@ enum Act {
   // The Files pane's options, in its ⋯'s order (view_options.dart): their
   // View items' labels follow what each is now.
   fileTree(key: fileTreeKey, menu: ActMenu.view, menuLabel: 'Show File Tree'),
+  // View › File Tree Position's submenu, its values' rows.
+  treeAutomatic(menu: ActMenu.view, menuLabel: 'File Tree Position'),
+  treeLeft,
+  treeRight,
   collapseFolders(menu: ActMenu.view, menuLabel: 'Collapse All Folders'),
   // The viewer's own key: elsewhere ⌥Z types a character.
   wrap(shows: wrapKey, menu: ActMenu.view, menuLabel: 'Wrap Lines'),
