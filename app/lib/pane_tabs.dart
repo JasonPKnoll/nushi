@@ -57,10 +57,6 @@ const double previewNameInset = 5;
 /// The room a tab keeps for its ✕, shown or not, so its name doesn't move.
 const double _closeRoom = 18;
 
-/// The room at the ends of a title row of chips, the browser's (as
-/// Claude's, a little in from the pane's edges).
-const double previewChipInset = 8;
-
 /// A chip's height, the room between chips, its icon's size, the room
 /// before it and after it, the room a chip keeps for its ✕ and after it,
 /// and the most a chip's name takes before it's cut: one long title leaves
