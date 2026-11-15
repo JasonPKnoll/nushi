@@ -171,8 +171,7 @@ class _ChatAreaState extends State<ChatArea> {
   /// under it is shown, not closed unseen ([_terminalShown] puts the tab
   /// back for one that opens).
   void _toggleTerminal() {
-    if (_cover.value != null &&
-        terminalChats.value.contains(widget.chat.id)) {
+    if (_cover.value != null && terminalChats.value.contains(widget.chat.id)) {
       _cover.value = null;
       return;
     }
