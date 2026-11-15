@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/indent_guides.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_editor.dart';
 import 'package:nushi/source_spans.dart';
@@ -31,6 +32,24 @@ ScrollPosition _down(WidgetTester tester, Finder of) => tester
           .first,
     )
     .position;
+
+/// Scrolls the editor to its end; then where its last line is: its top
+/// from the editor's top, or with [bottom] its foot from the editor's
+/// foot, where re_editor laid it out (as the indent guides read it).
+Future<double> _lastLine(WidgetTester tester, {bool bottom = false}) async {
+  final p = _down(tester, find.byType(SourceEditor));
+  p.jumpTo(p.maxScrollExtent);
+  await tester.pump();
+  final overlay = tester.widget<IndentGuideOverlay>(
+    find.byType(IndentGuideOverlay),
+  );
+  final gutter =
+      overlay.gutter.currentContext!.findRenderObject()! as RenderBox;
+  final line = overlay.lines.value!.paragraphs.firstWhere((l) => l.index == 79);
+  final top = gutter.localToGlobal(Offset.zero).dy + line.offset.dy;
+  final editor = tester.getRect(find.byType(SourceEditor));
+  return bottom ? editor.bottom - (top + line.height) : top - editor.top;
+}
 
 void main() {
   test('the room under the last line puts it at the top, never less than '
@@ -83,18 +102,18 @@ void main() {
     );
     double most() => _down(tester, find.byType(SourceEditor)).maxScrollExtent;
     final off = most();
+    // Scrolled to its end: off, the last line's foot at the bottom inset;
+    // on, its top at the top inset, the view's 22 (file_view.dart).
+    expect(await _lastLine(tester, bottom: true), closeTo(28, 1));
     scrollPastEnd.value = true;
     await tester.pumpAndSettle();
-    final on = most();
-    final height = tester.getSize(find.byType(SourceEditor)).height;
-    // The room it adds: the view less a line and both insets.
-    expect(on - off, greaterThan(height - 2 * 28 - 22 - 20));
-    expect(on - off, lessThan(height));
-    // A taller view has as far to go: the room follows its height, so the
-    // last line still comes to the top.
+    expect(most(), greaterThan(off));
+    expect(await _lastLine(tester), closeTo(22, 1));
+    // A taller view: the room follows its height, so the last line still
+    // comes to the top.
     viewport(tester, const Size(1700, 1000));
     await tester.pumpAndSettle();
-    expect(most(), closeTo(on, 1));
+    expect(await _lastLine(tester), closeTo(22, 1));
     await endEditor(tester, d);
   }, variant: onMac);
 }
