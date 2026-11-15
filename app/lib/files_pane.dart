@@ -197,6 +197,7 @@ class _FilesPaneState extends State<FilesPane> {
                       ? 'Hide what git ignores'
                       : 'Show what git ignores',
                   size: 15,
+                  padding: IconTap.header,
                   color: shown ? t.text : null,
                   onTap: () => filesIgnored.value = !shown,
                 ),
@@ -205,6 +206,7 @@ class _FilesPaneState extends State<FilesPane> {
                 LineIcon.close,
                 tooltip: 'Close',
                 size: 15,
+                padding: IconTap.header,
                 onTap: widget.onClose,
               ),
             ],

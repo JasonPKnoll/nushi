@@ -19,18 +19,24 @@ import 'package:nushi/tool_parts.dart' show plainPath;
 // A file preview's header (preview_pane.dart): its name or its tabs, Live,
 // the wrap button, its actions, Show in Finder and Close.
 
+/// What each of the row's buttons takes more than it did (ADR 0122's
+/// header size, its top row now level with the chat's header, ADR 0123):
+/// each width below grows by it for each button, so the name keeps the
+/// room it had.
+const double _wider = 2 * (IconTap.header - 5);
+
 /// Below this width the pane's header has no room for every button (a page
 /// has three and Close, beside Live and the switch): they fold into a ⋯.
-const double _foldsBelow = 380;
+const double _foldsBelow = 380 + 4 * _wider;
 
 /// From this wide the pane's header has the gutters and leaves the name about
 /// what it had: a page's has two more buttons.
-const double _roomyFrom = 460;
-const double _roomyWithPageFrom = 520;
+const double _roomyFrom = 460 + 2 * _wider;
+const double _roomyWithPageFrom = 520 + 4 * _wider;
 
 /// From this wide it has 24 between groups too. Below, at the pane's 560 to
 /// start with, that room is three short names' tabs (ADR 0072).
-const double _gapsFrom = 640;
+const double _gapsFrom = 640 + 4 * _wider;
 
 /// The header's row of `PreviewPane`: the file's [kind] icon and name (a
 /// click shows it in the Files pane; with several files open, the tabs of
@@ -173,6 +179,7 @@ class PreviewHeader extends StatelessWidget {
                             MenuIcon.line(
                               LineIcon.more,
                               tooltip: 'More',
+                              padding: IconTap.header,
                               filter: false,
                               entries: [
                                 if (wraps)
@@ -196,12 +203,14 @@ class PreviewHeader extends StatelessWidget {
                                 icon,
                                 tooltip: tooltip,
                                 size: size,
+                                padding: IconTap.header,
                                 onTap: onTap,
                               ),
                             IconTap.line(
                               LineIcon.folderOpen,
                               tooltip: conventions.reveal,
                               size: 14,
+                              padding: IconTap.header,
                               onTap: onReveal,
                             ),
                           ],
@@ -209,6 +218,7 @@ class PreviewHeader extends StatelessWidget {
                             LineIcon.close,
                             tooltip: 'Close',
                             size: 15,
+                            padding: IconTap.header,
                             onTap: onClose,
                           ),
                         ],

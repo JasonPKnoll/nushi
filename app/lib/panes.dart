@@ -250,6 +250,11 @@ class PaneHeader extends StatelessWidget {
   /// The chat header's height too (ADR 0111; 44 until then, ADR 0072).
   static const height = 56.0;
 
+  /// How far in from a pane's right a row ending in the header's own icon
+  /// buttons (`IconTap.header`) ends them, as the chat's header does (ADR
+  /// 0111): the button's box brings the rest of the room.
+  static const buttonsEnd = 12.0;
+
   /// Below this a pane's header keeps its row's room over the gutters: a side
   /// chat's title and buttons take most of the narrowest pane.
   static const gutterFrom = 320.0;

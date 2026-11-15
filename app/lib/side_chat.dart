@@ -52,6 +52,7 @@ class SideChat extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             PaneHeader(
+              end: PaneHeader.buttonsEnd,
               child: Row(
                 children: [
                   Icon(Icons.forum_outlined, size: 14, color: t.textSecondary),
@@ -93,12 +94,14 @@ class SideChat extends StatelessWidget {
                       keyLabel(sideChatKey),
                     ),
                     size: 15,
+                    padding: IconTap.header,
                     onTap: onHide,
                   ),
                   IconTap(
                     Icons.close,
                     tooltip: 'End the side chat',
                     size: 15,
+                    padding: IconTap.header,
                     onTap: onClose,
                   ),
                 ],

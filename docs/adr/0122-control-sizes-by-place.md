@@ -28,3 +28,5 @@ Every button, menu field and segmented control was 26 high with a 13-point label
 - Every control 30: the details panel, a to-do row and a table's row get crowded, and a 30-high Log beside a line of 12-point text looks heavy.
 - A size argument on each call: 134 buttons to keep in step, and a new one picks at random.
 - The Mac's own 24/28: smaller than the owner wants, and Nushi's 13-point text in a 24-high box is what looked cramped.
+
+**Amendment (2026-11-15):** a side pane's top row is now level with the chat's header (ADR 0123), so its icon buttons (the side chat's, Files', a subagent's or a command's, the preview's) are the header's 32 (`IconTap.header`) too, a row of them ending 12 from the pane's edge as the header does (`PaneHeader.buttonsEnd`); the preview folds its buttons into ⋯ that much sooner.

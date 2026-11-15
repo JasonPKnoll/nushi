@@ -64,10 +64,12 @@ Widget stopButton(
   ChatState chat,
   String callId, {
   double size = 14,
+  double padding = 5,
 }) => IconTap(
   Icons.stop_rounded,
   tooltip: 'Stop',
   size: size,
+  padding: padding,
   onTap: () => stopTask(context, daemon, chat, callId),
 );
 
