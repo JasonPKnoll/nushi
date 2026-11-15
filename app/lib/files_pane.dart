@@ -240,32 +240,37 @@ class FilesBlank extends StatelessWidget {
     final t = theme.t;
     return ColoredBox(
       color: t.base,
+      // Squeezed narrow, the words wrap taller than the viewer: they
+      // scroll, rather than overflowing.
       child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(NushiTheme.gutter),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 280),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LineIcon.folder.view(size: 20, color: t.textMuted),
-                const SizedBox(height: 12),
-                Text(
-                  'Open files appear here',
-                  textAlign: TextAlign.center,
-                  style: theme.ui(t.text),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  tree
-                      ? 'Pick a file in the tree, or click a file path in '
-                            'the conversation'
-                      : 'Go to a file with ${keyLabel(openFileKey)}, or '
-                            'click a file path in the conversation',
-                  textAlign: TextAlign.center,
-                  style: theme.ui(t.textMuted, size: 12),
-                ),
-              ],
+        child: SingleChildScrollView(
+          primary: false,
+          child: Padding(
+            padding: const EdgeInsets.all(NushiTheme.gutter),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 280),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LineIcon.folder.view(size: 20, color: t.textMuted),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Open files appear here',
+                    textAlign: TextAlign.center,
+                    style: theme.ui(t.text),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    tree
+                        ? 'Pick a file in the tree, or click a file path in '
+                              'the conversation'
+                        : 'Go to a file with ${keyLabel(openFileKey)}, or '
+                              'click a file path in the conversation',
+                    textAlign: TextAlign.center,
+                    style: theme.ui(t.textMuted, size: 12),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

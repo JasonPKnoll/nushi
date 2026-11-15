@@ -115,6 +115,12 @@ void main() {
     expect(await _sweep(tester, file: 'files_bar.dart'), isEmpty);
   }, variant: _both);
 
+  testWidgets('nothing in the pane overflows, the tree’s rows too', (
+    tester,
+  ) async {
+    expect(await _sweep(tester), isEmpty);
+  }, variant: _both);
+
   testWidgets('squeezed, the source button is in the ⋯', (tester) async {
     final (d, _) = await panesApp(tester, width: 1700);
     viewport(tester, const Size(600, 600));
