@@ -204,10 +204,11 @@ bool canCollapseFolders(ChatState chat, Daemon daemon) =>
     fileTreeShown(chat, daemon) && folderTreeOf(chat).anyOpen;
 
 /// The View menu's label for [act] as it is now, [chat] being the one
-/// shown; null for an action that isn't a view option's.
-String? viewMenuLabel(Act act, ChatState? chat) {
+/// shown; null for an action that isn't a view option's. The tree's says
+/// what picking it does ([toggleFileTree]), as the palette's row does.
+String? viewMenuLabel(Act act, ChatState? chat, Daemon daemon) {
   if (act == Act.fileTree) {
-    final shown = chat != null && filesOpen(chat) && filesTree.value;
+    final shown = chat != null && fileTreeShown(chat, daemon);
     return shown ? 'Hide File Tree' : 'Show File Tree';
   }
   for (final o in viewToggles) {

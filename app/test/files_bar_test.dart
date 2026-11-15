@@ -248,6 +248,29 @@ void main() {
     await closeView(tester, d);
   }, variant: _both);
 
+  testWidgets('on Changes with Files open, View and the palette both say '
+      'Show, picking it shows the tree on the Chat tab, and the label '
+      'follows the tab', (tester) async {
+    final (d, _) = await panesApp(tester, width: 1700, open: _files);
+    final c = d.chats['c']!..tab.value = ChatTab.changes;
+    await tester.pumpAndSettle();
+    expect(filesTree.value, isTrue);
+    expect(_viewMenu(tester), contains('Show File Tree'));
+    expect(_palette(tester, d, Act.fileTree).title, 'Show the file tree');
+    _viewMenu(tester, pick: 'Show File Tree');
+    await tester.pumpAndSettle();
+    expect(c.tab.value, ChatTab.chat);
+    expect(filesTree.value, isTrue);
+    expect(find.byType(FilesTree), findsOneWidget);
+    // No pref changed on the way: the menu followed the tab.
+    expect(_viewMenu(tester), contains('Hide File Tree'));
+    expect(_palette(tester, d, Act.fileTree).title, 'Hide the file tree');
+    c.tab.value = ChatTab.changes;
+    await tester.pumpAndSettle();
+    expect(_viewMenu(tester), contains('Show File Tree'));
+    await closeView(tester, d);
+  }, variant: _mac);
+
   testWidgets('with Files closed, ⇧⌘Y opens it with its tree, from the '
       'Changes tab too', (tester) async {
     final (d, _) = await panesApp(tester, width: 1700, details: false);

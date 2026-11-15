@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:nushi/alerts.dart';
 import 'package:nushi/app_actions.dart';
 import 'package:nushi/app_log.dart';
+import 'package:nushi/chat.dart';
 import 'package:nushi/chat_area.dart';
 import 'package:nushi/chat_keys.dart';
 import 'package:nushi/comment_drafts_mac.dart';
@@ -88,6 +89,7 @@ class _NushiAppState extends State<NushiApp> {
     watchPairings(_navigator, widget.daemon.client);
     _alerts = ChatAlerts(widget.daemon);
     widget.daemon.addListener(_pinChanged);
+    _followTab();
     sidebarHidden.addListener(_sidebarChanged);
     // The Files pane's options' labels (view_options.dart).
     for (final p in _viewPrefs) {
@@ -166,16 +168,37 @@ class _NushiAppState extends State<NushiApp> {
   bool _back = false;
   bool _forward = false;
 
+  /// View › Show/Hide File Tree as last built: it follows the shown chat
+  /// and its tab ([_tabOf]), the daemon's tree and the prefs.
+  String? _treeLabel;
+
+  /// The chat whose tab the menu bar follows: the shown one.
+  ChatState? _tabOf;
+
+  /// Follows the shown chat's tab ([_tabOf]).
+  void _followTab() {
+    final shown = widget.daemon.selected;
+    if (identical(shown, _tabOf)) return;
+    _tabOf?.tab.removeListener(_pinChanged);
+    _tabOf = shown?..tab.addListener(_pinChanged);
+  }
+
   void _pinChanged() {
     final d = widget.daemon;
+    _followTab();
     final pinned = (d.selected?.pin ?? 0) > 0;
     final back = d.canGoBack;
     final forward = d.canGoForward;
-    if (pinned != _pinned || back != _back || forward != _forward) {
+    final tree = viewMenuLabel(Act.fileTree, d.selected, d);
+    if (pinned != _pinned ||
+        back != _back ||
+        forward != _forward ||
+        tree != _treeLabel) {
       setState(() {
         _pinned = pinned;
         _back = back;
         _forward = forward;
+        _treeLabel = tree;
       });
     }
   }
@@ -203,6 +226,7 @@ class _NushiAppState extends State<NushiApp> {
     }
     diffUnified.removeListener(_sidebarChanged);
     widget.daemon.removeListener(_pinChanged);
+    _tabOf?.tab.removeListener(_pinChanged);
     _alerts.dispose();
     _lifecycle.dispose();
     super.dispose();
@@ -227,7 +251,9 @@ class _NushiAppState extends State<NushiApp> {
       Act.pin when _pinned => 'Unpin Chat',
       Act.sidebar when sidebarShut => 'Show Sidebar',
       Act.unifiedDiff when diffUnified.value => 'Show Diffs Side by Side',
-      _ => viewMenuLabel(act, widget.daemon.selected) ?? act.menuLabel!,
+      _ =>
+        viewMenuLabel(act, widget.daemon.selected, widget.daemon) ??
+            act.menuLabel!,
     },
     shortcut: act.key,
     onSelected: () => _run(act),
