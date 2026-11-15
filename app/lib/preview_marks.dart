@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:nushi/controls.dart';
-import 'package:nushi/keys.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
@@ -15,28 +14,10 @@ const wrapKey = SingleActivator(LogicalKeyboardKey.keyZ, alt: true);
 /// Wraps the lines of every preview's source, or stops wrapping them.
 void toggleWrap() => wrapLines.value = !wrapLines.value;
 
-/// What wrapping's button and palette row say: what they'll do.
+/// What wrapping's palette row and the phone's button say: what they'll
+/// do.
 String wrapLabel({required bool wrap}) =>
     wrap ? 'Don’t wrap lines' : 'Wrap lines';
-
-/// The button over a file's source in the Mac's preview that wraps its
-/// lines or not ([wrapLines]), held while they wrap, [wrapKey] in its
-/// tooltip.
-class WrapButton extends StatelessWidget {
-  const new({super.key});
-
-  @override
-  Widget build(BuildContext context) => ValueListenableBuilder(
-    valueListenable: wrapLines,
-    builder: (context, wrap, _) => IconTap(
-      Icons.wrap_text,
-      tooltip: withKey(wrapLabel(wrap: wrap), keyLabel(wrapKey)),
-      size: 15,
-      held: wrap,
-      onTap: toggleWrap,
-    ),
-  );
-}
 
 /// The green mark of a preview the daemon keeps current; its dot pulses
 /// once each time [version] (the file as last sent) changes.

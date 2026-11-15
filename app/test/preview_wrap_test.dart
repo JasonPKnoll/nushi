@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/app_actions.dart';
+import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/files_bar.dart';
 import 'package:nushi/files_pane.dart';
@@ -18,7 +19,6 @@ import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/phone/preview_screen.dart';
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_marks.dart' show WrapButton;
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_view.dart';
@@ -192,7 +192,11 @@ void main() {
       'wrapping over, in step, and it’s remembered', (tester) async {
     final d = await _app(tester);
     expect(wrapLines.value, isTrue, reason: 'on at first');
-    expect(find.byType(WrapButton), findsNothing, reason: 'the ⋯ has it');
+    // No wrap button of its own on the Mac: the ⋯ has it.
+    expect(
+      find.byWidgetPredicate((w) => w is IconTap && w.icon == Icons.wrap_text),
+      findsNothing,
+    );
     expect(_viewMenu(tester), contains('Don’t Wrap Lines'));
     expect(_palette(tester, d), 'Don’t wrap lines in Files');
     expect(_across(tester), isNull);
