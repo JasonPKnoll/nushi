@@ -181,7 +181,7 @@ Everything clickable is one of these (`controls.dart` and its parts, ADR [0049](
 - **A show/hide toggle never moves when pressed** (ADR [0111](adr/0111-surfaces-and-floating-panes.md), [0118](adr/0118-title-buttons-stay-put.md)): the header's buttons and the sidebar's button stay put whatever they show or hide. The one exception: a side pane, opening at the header's right, takes the buttons' place and they move left (ADR [0123](adr/0123-side-panes-right-of-the-rail.md)); the details and the terminal never move them.
 - **A named third-party theme uses its published colours** and known variants (ADR [0086](adr/0086-color-themes.md)); only Nushi's own roles pick other steps of its palette.
 - **Settings copy is short**: a label and at most a line under it.
-- **Tooltips are muted, the key fainter, no brackets**: `textSecondary` words on `lifted`, the key in `tooltipKey` after an en space (`withKey`), as Claude desktop draws them.
+- **Tooltips are muted, the key fainter, no brackets, one key**: `textSecondary` words on `lifted`, the key in `tooltipKey` after an en space (`withKey`), as Claude desktop draws them. A tooltip names its control and that control's own key; other keys that do something near it (⌃Tab past the header's tabs) are the menu bar's and the palette's to show.
 - **Copying Claude desktop means its actual behaviour**, from the app or the owner's screenshots, not a guess at it (ADR [0094](adr/0094-browser-tabs-for-local-web-servers.md)'s amendments).
 - **Nushi is unopinionated**: options and warnings over enforced flows.
 

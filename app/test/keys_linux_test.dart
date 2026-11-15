@@ -136,12 +136,7 @@ void main() {
       );
       expect(find.byTooltip('Show terminal\u2002Ctrl+`'), findsOneWidget);
       if (width > 1000) {
-        expect(
-          find.byTooltip(
-            'Ctrl+Alt+2   Ctrl+Tab the next tab, Ctrl+Shift+Tab the one before',
-          ),
-          findsOneWidget,
-        );
+        expect(find.byTooltip('Changes\u2002Ctrl+Alt+2'), findsOneWidget);
       }
       // Control held alone numbers the chats, as ⌘ does on the Mac.
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);

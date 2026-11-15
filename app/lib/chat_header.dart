@@ -392,7 +392,7 @@ class ChatHeader extends StatelessWidget {
                       else if (folds.tabs)
                         MenuField(
                           compact: true,
-                          tooltip: _stepTabs,
+                          tooltip: withKey('Next tab', keyLabel(nextTabKey)),
                           entries: [
                             for (final (each, label) in _tabs(chat))
                               MenuEntry(
@@ -420,7 +420,10 @@ class ChatHeader extends StatelessWidget {
                           },
                           onChanged: onTab,
                           roomy: true,
-                          tooltip: (t) => '${keyLabel(tabKey(t))}   $_stepTabs',
+                          tooltip: (t) => withKey(
+                            _tabs(chat).firstWhere((s) => s.$1 == t).$2,
+                            keyLabel(tabKey(t)),
+                          ),
                         ),
                       if (!folds.tabsInMore)
                         SizedBox(width: roomy ? NushiTheme.barGap : 6),
@@ -589,11 +592,6 @@ class ChatHeader extends StatelessWidget {
     if (chat.pull != null) (ChatTab.pull, 'Pull request'),
   ];
 }
-
-/// How the tabs are stepped through, as their tooltips say.
-String get _stepTabs =>
-    '${keyLabel(nextTabKey)} the next tab, ${keyLabel(previousTabKey)} the '
-    'one before';
 
 /// The room the chat's color's chip takes, its gap to the title in it.
 const double _dotRoom = ColorChip.width + 8;

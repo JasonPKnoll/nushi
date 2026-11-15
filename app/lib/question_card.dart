@@ -169,14 +169,15 @@ class _QuestionCardState extends State<QuestionCard> {
     final options = onQuestion ? _qs[_tab].field.options : <Option>[];
     final digit = int.tryParse(e.character ?? '') ?? 0;
     final shift = HardwareKeyboard.instance.isShiftPressed;
+    // ⌃Tab and ⌃⇧Tab go on to the chat's tabs (`chat_keys.dart`).
+    final tab =
+        k == LogicalKeyboardKey.tab &&
+        !HardwareKeyboard.instance.isControlPressed;
     if (digit >= 1 && digit <= options.length && digit <= 9) {
       _pick(digit - 1);
-    } else if (_many &&
-        (k == LogicalKeyboardKey.arrowRight ||
-            k == LogicalKeyboardKey.tab && !shift)) {
+    } else if (_many && (k == LogicalKeyboardKey.arrowRight || tab && !shift)) {
       _go(_tab + 1);
-    } else if (_many &&
-        (k == LogicalKeyboardKey.arrowLeft || k == LogicalKeyboardKey.tab)) {
+    } else if (_many && (k == LogicalKeyboardKey.arrowLeft || tab)) {
       _go(_tab - 1);
     } else if (options.isNotEmpty &&
         (k == LogicalKeyboardKey.arrowDown ||
