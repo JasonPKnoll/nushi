@@ -2,13 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:fixnum/fixnum.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
+import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/native.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/window_drag_linux.dart';
 
 import 'fake_daemon.dart';
 import 'fake_shells.dart';
@@ -85,7 +89,8 @@ const PanesOpen noPanes = (
 
 /// The app on chat c ([panesItems]), its window [width] by [height], the
 /// sidebar shown or hidden, the details wanted or not, the terminal open
-/// or not and [open]'s panes open, the chat archived or not. The fake is
+/// or not and [open]'s panes open, the chat archived or not, holding
+/// [items] ([panesItems] by default). The fake is
 /// returned, to count what was asked.
 Future<(Daemon, FakeDaemon)> panesApp(
   WidgetTester tester, {
@@ -98,7 +103,14 @@ Future<(Daemon, FakeDaemon)> panesApp(
   Brightness? brightness,
   PanesOpen open = noPanes,
   Map<String, double> widths = const {},
+  List<Item>? items,
 }) async {
+  // On Linux, its window and conventions, as a real Linux machine has.
+  if (defaultTargetPlatform == TargetPlatform.linux) {
+    native
+      ..window = const LinuxWindow()
+      ..conventions = linuxConventions;
+  }
   viewport(tester, Size(width, height), brightness: brightness);
   showDetails.value = details;
   sidebarHidden.value = !sidebar;

@@ -36,6 +36,12 @@ import 'right_panes_fixture.dart';
 
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
+/// Linux too: the same layout (ADR 0123).
+const _both = TargetPlatformVariant({
+  TargetPlatform.macOS,
+  TargetPlatform.linux,
+});
+
 /// A kind of pane, how to open it, what it opens as (its specs, left to
 /// right) and the widget each is.
 typedef _Kind = ({
@@ -262,7 +268,7 @@ void main() {
               expect(_rect(tester, below).top, row.bottom);
             }
             await closeView(tester, d);
-          }, variant: _mac);
+          }, variant: width == 1700 && !sidebar && !terminal ? _both : _mac);
         }
       }
     }

@@ -158,11 +158,23 @@ class LiveText extends StatefulWidget {
 }
 
 class _LiveTextState extends State<LiveText> {
-  // Only while live: every subagent's line stays built (ADR 0026).
+  // Only while live: every subagent's line stays built (ADR 0026). Not
+  // while its tickers are off either: built but not drawn (the details
+  // rail tucked away, ADR 0123), it has no one to show the time to.
   Timer? _tick;
+  bool _ticks = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ticks = TickerMode.valuesOf(context).enabled;
+    if (ticks == _ticks) return;
+    _ticks = ticks;
+    _sync();
+  }
 
   void _sync() {
-    if (!widget.live) {
+    if (!widget.live || !_ticks) {
       _tick?.cancel();
       _tick = null;
     } else {

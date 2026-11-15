@@ -15,6 +15,7 @@ import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_tab.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/terminal_panel.dart';
+import 'package:nushi/type_to_box.dart';
 
 /// A chat in the main area (ADR 0111, 0123): one pane of its transcript, its
 /// folder's changes or its pull request, its details rail at the
@@ -75,6 +76,9 @@ class _ChatAreaState extends State<ChatArea> {
       if (mounted) _showAsked();
     });
     _pull = ChatPull.of(widget.daemon, widget.chat)..follow();
+    // Where the focus goes when what had it goes (the terminal hidden, the
+    // details tucked away): typing there still writes in the box (ADR 0121).
+    typesThrough.add(_keys);
   }
 
   @override
@@ -95,6 +99,7 @@ class _ChatAreaState extends State<ChatArea> {
     }
     _pull.unfollow();
     _expanded.dispose();
+    typesThrough.remove(_keys);
     _keys.dispose();
     super.dispose();
   }
