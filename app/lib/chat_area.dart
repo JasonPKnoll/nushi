@@ -347,6 +347,7 @@ class _ChatAreaState extends State<ChatArea> {
                     chat.side,
                     chat.sideHidden,
                     filesChats,
+                    filesTree,
                     _cover,
                   ]),
                   builder: (context, _) => _beside(

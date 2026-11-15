@@ -83,6 +83,14 @@ enum LineIcon {
   /// A submenu's: a chevron to the right.
   chevron,
 
+  /// Collapse all folders (the Files pane's, Claude desktop's): two arrows
+  /// meeting at a bar across.
+  collapseAll,
+
+  /// The Files pane's tree, shown or hidden (Claude desktop's): a list of
+  /// three bulleted lines.
+  fileTree,
+
   /// Remove (an allowed site): a bin, its lid's handle on top and two
   /// lines down its tapered body.
   trash,
@@ -290,6 +298,31 @@ enum LineIcon {
         ..lineTo(20, 9.5)
         ..moveTo(20, 4)
         ..lineTo(11, 13),
+    collapseAll =>
+      Path()
+        ..moveTo(5, 12)
+        ..lineTo(19, 12)
+        ..moveTo(12, 3)
+        ..lineTo(12, 9)
+        ..moveTo(9, 6)
+        ..lineTo(12, 9)
+        ..lineTo(15, 6)
+        ..moveTo(12, 21)
+        ..lineTo(12, 15)
+        ..moveTo(9, 18)
+        ..lineTo(12, 15)
+        ..lineTo(15, 18),
+    fileTree =>
+      Path()
+        ..addOval(_bullet(6))
+        ..addOval(_bullet(12))
+        ..addOval(_bullet(18))
+        ..moveTo(9.5, 6)
+        ..lineTo(20, 6)
+        ..moveTo(9.5, 12)
+        ..lineTo(20, 12)
+        ..moveTo(9.5, 18)
+        ..lineTo(20, 18),
     expand =>
       Path()
         ..moveTo(14, 4)
@@ -464,6 +497,10 @@ enum LineIcon {
   /// as Claude's dots beside its strokes.
   static Rect _dot(double x) =>
       Rect.fromCircle(center: Offset(x, 12), radius: 0.8);
+
+  /// A list's bullet at the left, at [y]: a dot as [_dot]'s.
+  static Rect _bullet(double y) =>
+      Rect.fromCircle(center: Offset(4.5, y), radius: 0.8);
 
   /// The icon, [size] square, in the room an [Icon] of that size takes.
   Widget view({required double size, required Color color}) => SizedBox.square(

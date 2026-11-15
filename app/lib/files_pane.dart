@@ -118,69 +118,78 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
   @override
   Widget build(BuildContext context) {
     final t = NushiTheme.of(context).t;
-    final tree = widget.daemon.daemonApi >= filesApi;
     final shown = _shown;
     // Esc collapses it from anywhere in it, once what it's in has had it
     // (the filter clears its text, the find bar closes).
     final expand = widget.expanded ? widget.onExpand : null;
     return CallbackShortcuts(
       bindings: {const SingleActivator(LogicalKeyboardKey.escape): ?expand},
-      child: Focus(focusNode: _pane, child: _panes(shown, t, tree)),
+      child: Focus(
+        focusNode: _pane,
+        // The tree hidden (⇧⌘Y), or a daemon older than it: the viewer
+        // takes its room, and the pane keeps its width.
+        child: ValueListenableBuilder(
+          valueListenable: filesTree,
+          builder: (context, on, _) =>
+              _panes(shown, t, tree: on && widget.daemon.daemonApi >= filesApi),
+        ),
+      ),
     );
   }
 
-  Widget _panes(ShownFile? shown, Tokens t, bool tree) => LayoutBuilder(
-    builder: (context, box) {
-      final w = box.maxWidth;
-      // Under the least of both, the two narrow alike (treeWidth).
-      final squeezed = w < filesTreeLeast + filesViewerLeast;
-      final most = squeezed ? treeWidth(w, filesTreeInitial) : treeMost(w);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FilesTopRow(
-            chat: _chat,
-            daemon: widget.daemon,
-            shown: shown,
-            tabsKey: widget.tabsKey,
-            expanded: widget.expanded,
-            onExpand: widget.onExpand,
-            onClose: widget.onClose,
-          ),
-          FilesBar(shown: shown),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: shown == null
-                      ? FilesBlank(tree: tree)
-                      : FileView(key: ObjectKey(shown), shown: shown),
-                ),
-                if (tree)
-                  Resizable(
-                    name: 'filesTree',
-                    initial: filesTreeInitial,
-                    min: squeezed ? most : filesTreeLeast,
-                    max: most,
-                    left: true,
-                    locked: squeezed,
-                    // Its own hairline, which a locked edge keeps.
-                    line: false,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border(left: BorderSide(color: t.line)),
-                      ),
-                      child: FilesTree(chat: _chat, daemon: widget.daemon),
+  Widget _panes(ShownFile? shown, Tokens t, {required bool tree}) =>
+      LayoutBuilder(
+        builder: (context, box) {
+          final w = box.maxWidth;
+          // Under the least of both, the two narrow alike (treeWidth).
+          final squeezed = w < filesTreeLeast + filesViewerLeast;
+          final most = squeezed ? treeWidth(w, filesTreeInitial) : treeMost(w);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilesTopRow(
+                chat: _chat,
+                daemon: widget.daemon,
+                shown: shown,
+                tabsKey: widget.tabsKey,
+                expanded: widget.expanded,
+                onExpand: widget.onExpand,
+                onClose: widget.onClose,
+              ),
+              FilesBar(chat: _chat, daemon: widget.daemon, shown: shown),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: shown == null
+                          ? FilesBlank(tree: tree)
+                          : FileView(key: ObjectKey(shown), shown: shown),
                     ),
-                  ),
-              ],
-            ),
-          ),
-        ],
+                    if (tree)
+                      Resizable(
+                        name: 'filesTree',
+                        initial: filesTreeInitial,
+                        min: squeezed ? most : filesTreeLeast,
+                        max: most,
+                        left: true,
+                        locked: squeezed,
+                        // Its own hairline, which a locked edge keeps.
+                        line: false,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border(left: BorderSide(color: t.line)),
+                          ),
+                          child: FilesTree(chat: _chat, daemon: widget.daemon),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       );
-    },
-  );
 }
 
 /// The viewer with no file open, as Claude desktop's: a folder, "Open

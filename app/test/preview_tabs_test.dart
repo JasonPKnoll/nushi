@@ -17,6 +17,7 @@ import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
+import 'package:nushi/files_top_row.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/palette.dart';
@@ -363,7 +364,13 @@ void main() {
         ),
         findsNothing,
       );
-      expect(_inPane(find.byType(MenuAnchor)), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(FilesTopRow),
+          matching: find.byType(MenuAnchor),
+        ),
+        findsNothing,
+      );
       expect(find.byTooltip('/Users/me/nushi/docs/report.md'), findsOneWidget);
       d.dispose();
     }, variant: _mac);

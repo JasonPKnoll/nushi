@@ -44,6 +44,7 @@ import 'package:nushi/tool_parts.dart' show plainPath;
 import 'package:nushi/trust_card.dart';
 import 'package:nushi/type_to_box.dart';
 import 'package:nushi/update_toast.dart';
+import 'package:nushi/view_options.dart';
 import 'package:nushi/widgets.dart' show confirm;
 
 void main() => runZonedGuarded(() {
@@ -88,8 +89,10 @@ class _NushiAppState extends State<NushiApp> {
     _alerts = ChatAlerts(widget.daemon);
     widget.daemon.addListener(_pinChanged);
     sidebarHidden.addListener(_sidebarChanged);
-    wrapLines.addListener(_sidebarChanged);
-    showWhitespace.addListener(_sidebarChanged);
+    // The Files pane's options' labels (view_options.dart).
+    for (final p in _viewPrefs) {
+      p.addListener(_sidebarChanged);
+    }
     diffUnified.addListener(_sidebarChanged);
     // The app coming to the front shows its chat again; the daemon knows
     // whether the window shows (focused or not) or is hidden, and the
@@ -195,14 +198,23 @@ class _NushiAppState extends State<NushiApp> {
   @override
   void dispose() {
     sidebarHidden.removeListener(_sidebarChanged);
-    wrapLines.removeListener(_sidebarChanged);
-    showWhitespace.removeListener(_sidebarChanged);
+    for (final p in _viewPrefs) {
+      p.removeListener(_sidebarChanged);
+    }
     diffUnified.removeListener(_sidebarChanged);
     widget.daemon.removeListener(_pinChanged);
     _alerts.dispose();
     _lifecycle.dispose();
     super.dispose();
   }
+
+  /// What the View menu's Files options say follows: each option's pref,
+  /// the tree's, and which chats have Files open.
+  static final List<Listenable> _viewPrefs = [
+    for (final o in viewToggles) o.pref,
+    filesTree,
+    filesChats,
+  ];
 
   PlatformMenuItem _appearance(String label, ThemeMode mode) =>
       PlatformMenuItem(label: label, onSelected: () => appearance.value = mode);
@@ -213,10 +225,8 @@ class _NushiAppState extends State<NushiApp> {
     label: switch (act) {
       Act.pin when _pinned => 'Unpin Chat',
       Act.sidebar when sidebarShut => 'Show Sidebar',
-      Act.wrap when wrapLines.value => 'Don’t Wrap Lines',
-      Act.whitespace when showWhitespace.value => 'Hide Whitespace',
       Act.unifiedDiff when diffUnified.value => 'Show Diffs Side by Side',
-      _ => act.menuLabel!,
+      _ => viewMenuLabel(act, widget.daemon.selected) ?? act.menuLabel!,
     },
     shortcut: act.key,
     onSelected: () => _run(act),

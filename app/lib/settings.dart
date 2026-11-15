@@ -18,7 +18,8 @@ import 'package:nushi/tile_picture.dart';
 /// are collapsed and their order, what each chat's Changes view shows, the
 /// side panes' widths (not the details panel's, which is fixed), whether
 /// changed files show flat and diffs unified, which chats show their
-/// terminals and their Files pane, whether it lists ignored files, the
+/// terminals and their Files pane, whether it lists ignored files and
+/// shows its tree, the
 /// terminal's font, the app's and code's fonts, whether the chat takes the
 /// whole width,
 /// whether the sidebar is hidden, the Jira task list's groups and assignee
@@ -72,6 +73,11 @@ final Pref<Set<String>> terminalChats = _set('terminals', chats: true);
 /// ignores.
 final Pref<Set<String>> filesChats = _set('files', chats: true);
 final Pref<bool> filesIgnored = _plain('filesIgnored', false);
+
+/// Whether the Files pane shows its tree beside its viewer (on at first;
+/// ⇧⌘Y, its second row's button, its ⋯ and View › Show File Tree): one
+/// for every chat, as Claude desktop's.
+final Pref<bool> filesTree = _plain('filesTree', true);
 
 /// The Jira site used last (shown in the Jira view, or an issue picked from
 /// it for a chat): a key typed alone is looked for there.

@@ -38,6 +38,7 @@ import 'package:nushi/spell_check.dart';
 import 'package:nushi/status_bar.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/update_toast.dart';
+import 'package:nushi/view_options.dart';
 import 'package:nushi/web_views.dart' show webEmbedded;
 import 'package:nushi/widgets.dart';
 
@@ -86,6 +87,10 @@ const nextTypoKey = Cmd(
 /// ⇧⌘E: the Files pane (VS Code's key for its Explorer).
 const filesKey = Cmd(LogicalKeyboardKey.keyE, shift: true);
 
+/// ⇧⌘Y: the Files pane's tree, shown or hidden (Claude desktop's key).
+/// The View menu's item has it too, so it comes while WebKit has the keys.
+const fileTreeKey = Cmd(LogicalKeyboardKey.keyY, shift: true);
+
 /// ⌘S: the preview's file, edited (ADR 0096). The editor leaves it to
 /// the app.
 const saveKey = Cmd(LogicalKeyboardKey.keyS);
@@ -123,10 +128,14 @@ enum Act {
   forward(key: forwardKey),
   details,
   files(key: filesKey, menu: ActMenu.view, menuLabel: 'Files'),
-  chatWidth,
-  // The preview's own key: elsewhere ⌥Z types a character.
+  // The Files pane's options, in its ⋯'s order (view_options.dart): their
+  // View items' labels follow what each is now.
+  fileTree(key: fileTreeKey, menu: ActMenu.view, menuLabel: 'Show File Tree'),
+  collapseFolders(menu: ActMenu.view, menuLabel: 'Collapse All Folders'),
+  // The viewer's own key: elsewhere ⌥Z types a character.
   wrap(shows: wrapKey, menu: ActMenu.view, menuLabel: 'Wrap Lines'),
   whitespace(menu: ActMenu.view, menuLabel: 'Show Whitespace'),
+  chatWidth,
   unifiedDiff(menu: ActMenu.view, menuLabel: 'Show Diffs Unified'),
   terminal(key: toggleTerminalKey),
   rewind(keyText: 'Esc Esc'), // the composer's
@@ -370,24 +379,11 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
       enabled: shown != null && d.daemonApi >= filesApi,
       run: () => showOrHideFiles(shown!),
     ),
+    ...viewActions(shown, d),
     AppAction(
       .chatWidth,
       chatFullWidth.value ? 'Center the chat' : 'Show the chat at full width',
       run: () => chatFullWidth.value = !chatFullWidth.value,
-    ),
-    AppAction(
-      .wrap,
-      '${wrapLabel(wrap: wrapLines.value)} in the preview',
-      run: toggleWrap,
-    ),
-    AppAction(
-      .whitespace,
-      showWhitespace.value
-          ? 'Hide whitespace in the preview'
-          : 'Show whitespace in the preview',
-      // Where a chat shows, as its previews do.
-      enabled: shown != null,
-      run: () => showWhitespace.value = !showWhitespace.value,
     ),
     AppAction(
       .unifiedDiff,

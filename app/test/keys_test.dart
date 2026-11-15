@@ -58,6 +58,7 @@ void main() {
     expect(
       [
         keyLabel(filesKey),
+        keyLabel(fileTreeKey),
         keyLabel(chatTabKey),
         keyLabel(nextTypoKey),
         keyLabel(previousChatKey),
@@ -67,7 +68,7 @@ void main() {
         keyLabel(toggleTerminalKey),
         keyLabel(wrapKey),
       ],
-      ['⇧⌘E', '⌃⌘1', '⌘;', '⌥⌘↑', '⌘3', '⌥⌘1', '⌃⇥', '⌃`', '⌥Z'],
+      ['⇧⌘E', '⇧⌘Y', '⌃⌘1', '⌘;', '⌥⌘↑', '⌘3', '⌥⌘1', '⌃⇥', '⌃`', '⌥Z'],
     );
     expect(filesKey.single.meta, isTrue);
     expect(filesKey.single.control, isFalse);
@@ -195,6 +196,7 @@ void main() {
         'Ctrl+Shift+P',
         'Ctrl+Shift+B',
         'Ctrl+Shift+E',
+        'Ctrl+Shift+Y',
         'Ctrl+,',
         'Ctrl+Alt+2',
         'Ctrl+1',

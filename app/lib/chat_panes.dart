@@ -14,6 +14,7 @@ import 'package:nushi/files_pane.dart';
 import 'package:nushi/folder_tree.dart' show filesApi;
 import 'package:nushi/fork_chat.dart';
 import 'package:nushi/preview.dart' show previewApi;
+import 'package:nushi/settings.dart' show filesTree;
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/subagent_pane.dart';
 
@@ -35,8 +36,9 @@ abstract final class ChatPanes {
     wide: true,
   );
 
-  /// The Files pane with its viewer alone (a daemon older than the tree):
-  /// the same width, as the tree's hidden in it, and the viewer's least.
+  /// The Files pane with its viewer alone (its tree hidden, ⇧⌘Y, or a
+  /// daemon older than the tree): the same width, so hiding the tree moves
+  /// no edge, and the viewer's least.
   static const filesNoTree = PaneSpec(
     'filesPane',
     initial: 820,
@@ -80,7 +82,10 @@ List<PaneSpec> openPanes(
     if (chat.side.value != null && !chat.archived && !chat.sideHidden.value)
       ChatPanes.side,
     if ((files || filesOpen(chat)) && api >= previewApi)
-      if (api >= filesApi) ChatPanes.files else ChatPanes.filesNoTree,
+      if (api >= filesApi && filesTree.value)
+        ChatPanes.files
+      else
+        ChatPanes.filesNoTree,
     if (pane && !browser) ChatPanes.subagent,
     if (browser || !pane && chat.browser.shown.value != null) ChatPanes.browser,
   ];

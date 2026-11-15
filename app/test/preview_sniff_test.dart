@@ -9,7 +9,6 @@ import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_marks.dart';
 import 'package:nushi/preview_sniff.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_view.dart';
@@ -272,7 +271,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(d.chats['c']!.shownFile, 'scripts/deploy');
     expect(_inPane(find.byType(SourceView)), findsOneWidget);
-    expect(_inPane(find.byType(WrapButton)), findsOneWidget);
     final plain = _spans(tester);
     await untilReal(tester, () => _spans(tester) > plain + 10);
 
@@ -281,7 +279,6 @@ void main() {
     expect(_inPane(find.text(_note)), findsOneWidget);
     expect(_inPane(find.text('Show in Finder')), findsOneWidget);
     expect(_inPane(find.byType(SourceView)), findsNothing);
-    expect(_inPane(find.byType(WrapButton)), findsNothing);
 
     await tester.tap(_row('.envrc'));
     await tester.pumpAndSettle();
