@@ -107,6 +107,26 @@ void main() {
     d.dispose();
   }, variant: macOS);
 
+  testWidgets('⌃Tab from the box, then ⌃⇧Tab back: the box goes with the '
+      'Chat tab, and the focus stays under the window’s keys', (tester) async {
+    final d = await _app(tester);
+    final b = d.chats['b']!;
+    // A click outside the box first, as anyone does before typing again.
+    await tester.tap(_box);
+    await tester.pumpAndSettle();
+    await tester.tap(_segment('Changes'));
+    await tester.pumpAndSettle();
+    await tester.tap(_segment('Chat'));
+    await tester.pumpAndSettle();
+    await tester.tap(_box);
+    await tester.pumpAndSettle();
+    await _tab(tester);
+    expect(b.shownTab, ChatTab.changes); // the box is gone with Chat
+    await _tab(tester, back: true);
+    expect(b.shownTab, ChatTab.chat);
+    d.dispose();
+  }, variant: macOS);
+
   testWidgets('with the box’s choices showing, ⌃Tab and ⌃⇧Tab step the tabs '
       'and pick none', (tester) async {
     final d = await _app(tester);
