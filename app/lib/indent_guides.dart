@@ -131,9 +131,10 @@ void paintGuides(
   }
 }
 
-/// A line of the read-only source with its indent guides down its whole
-/// height (wrapped, it's several rows high): [level] of them, [step]
-/// apart, from where its child's paragraph (wherever below) starts.
+/// A line of the read-only source with its indent guides down its height
+/// (wrapped, down its first row only: the rows after it start at its
+/// first column): [level] of them, [step] apart, from where its child's
+/// paragraph (wherever below) starts.
 class IndentGuides extends SingleChildRenderObjectWidget {
   const new({
     required this.level,
@@ -197,12 +198,17 @@ class _RenderGuides extends RenderProxyBox {
           p.getTransformTo(this),
           Offset.zero,
         );
+        // Wrapped, its next rows start at its first column, under the
+        // guides: they stop at its first row's foot (VS Code's, wrapping
+        // with no indent).
+        final row = p.getFullHeightForCaret(const TextPosition(offset: 0));
+        final wrapped = p.size.height > row + 0.5;
         paintGuides(
           context.canvas,
           offset + Offset(at.dx, 0),
           _level,
           _step,
-          size.height,
+          wrapped ? at.dy + row : size.height,
           _color,
         );
       }
@@ -326,7 +332,15 @@ class _EditorGuides extends CustomPainter {
     for (final p in laidOut.paragraphs) {
       if (p.index >= levels.length) continue;
       final at = origin + p.offset + Offset(lines.moved, 0);
-      paintGuides(canvas, at, levels[p.index], step, p.height, color);
+      // Down its first row: wrapped, the rows after start at column 0.
+      paintGuides(
+        canvas,
+        at,
+        levels[p.index],
+        step,
+        p.preferredLineHeight,
+        color,
+      );
     }
     canvas.restore();
   }

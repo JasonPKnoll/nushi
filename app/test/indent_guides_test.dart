@@ -248,6 +248,62 @@ void main() {
     await endEditor(tester, d);
   }, variant: onMac);
 
+  testWidgets('a wrapped line’s guides stop at its first row: its next '
+      'rows start under them, in the source and the editor', (tester) async {
+    final long = '${'word ' * 80}end';
+    final text = 'def brew(tea):\n    if tea:\n        $long\n';
+    // The source.
+    viewport(tester, const Size(400, 600));
+    await tester.pumpWidget(
+      themed(SourceView(text, path: 'brew.py', guides: true)),
+    );
+    await tester.pump();
+    final line = _line('end');
+    final box = tester.getSize(line);
+    final drawn = <double>[];
+    expect(
+      tester.renderObject(line),
+      paints..everything((method, args) {
+        if (method == #drawLine) {
+          drawn.add((args[1] as Offset).dy - (args[0] as Offset).dy);
+        }
+        return true;
+      }),
+    );
+    expect(drawn, hasLength(2));
+    final row = tester.getSize(_line('if tea')).height;
+    for (final h in drawn) {
+      expect(h, lessThan(box.height / 2), reason: 'wrapped, ${box.height}');
+      expect(h, closeTo(row, 2));
+    }
+    // The editor.
+    final (d, _) = await openEditor(
+      tester,
+      {'brew.py': utf8.encode(text)},
+      open: const ['brew.py'],
+      width: 900,
+    );
+    final lengths = <double>[];
+    expect(
+      tester.renderObject(
+        find.descendant(
+          of: find.byType(IndentGuideOverlay),
+          matching: find.byType(CustomPaint),
+        ),
+      ),
+      paints..everything((method, args) {
+        if (method == #drawLine) {
+          lengths.add((args[1] as Offset).dy - (args[0] as Offset).dy);
+        }
+        return true;
+      }),
+    );
+    // if 1, the long line 2: each one row high.
+    expect(lengths, hasLength(3));
+    expect(lengths.toSet(), hasLength(1));
+    await endEditor(tester, d);
+  }, variant: onMac);
+
   testWidgets('the editor steps a 2-space file’s own 2 at a tab size of 4', (
     tester,
   ) async {
