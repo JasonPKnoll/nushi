@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/agent_mark.dart';
 import 'package:nushi/background_commands.dart';
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/browser_bar.dart';
@@ -11,6 +12,7 @@ import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_panes.dart';
+import 'package:nushi/controls.dart' show MenuField;
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
@@ -341,7 +343,8 @@ void main() {
   }
 
   testWidgets('a header 360 wide, with a long title and every chip, '
-      'folds and keeps ⋯ at its end', (tester) async {
+      'folds and keeps ⋯ at its end, and the title its least past the '
+      'lights', (tester) async {
     browserFakes();
     // The subagent's pane dragged as wide as it goes beside the
     // transcript, which keeps its least: the header is 360 wide.
@@ -377,16 +380,50 @@ void main() {
       _rect(tester, find.byTooltip('Chat menu')).right,
       header.right - ChatHeader.end,
     );
-    // The Jira key and the GitHub chips folded into ⋯, each a row there.
+    // The sidebar is hidden, so the row starts past the lights: the
+    // agent's mark and the tabs' field fold into ⋯ before the title gets
+    // less than its least. The state's dot stays, and says whose it is.
+    final c = d.chats['c']!;
+    void titleKeepsItsLeast() {
+      final title = find.descendant(
+        of: find.byType(ChatHeader),
+        matching: find.text(c.shownTitle),
+      );
+      expect(title, findsOneWidget);
+      expect(
+        _rect(tester, title).width,
+        greaterThanOrEqualTo(headerTitleLeast),
+      );
+      expect(tester.takeException(), isNull);
+    }
+
+    titleKeepsItsLeast();
+    final inHeader = find.byType(ChatHeader);
+    expect(
+      find.descendant(of: inHeader, matching: find.byType(AgentMark)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: inHeader, matching: find.byType(MenuField)),
+      findsNothing,
+    );
+    expect(find.byTooltip('Claude: idle'), findsOneWidget);
+    // The Jira key and the GitHub chips folded into ⋯, each a row there,
+    // and the tabs too.
     expect(find.text('NUSHI-1234'), findsNothing);
     await tester.tap(find.byTooltip('Chat menu'));
     await tester.pumpAndSettle();
     expect(find.text('Show NUSHI-1234 in Jira'), findsOneWidget);
     expect(find.text('Show #1234 from GitHub'), findsOneWidget);
-    await tester.tap(find.text('Show pull request #1240'));
+    // The pull request's chip's row is the Pull request tab's, so only
+    // that shows.
+    expect(find.text('Changes'), findsOneWidget);
+    expect(find.text('Show pull request #1240'), findsNothing);
+    await tester.tap(find.text('Pull request'));
     await tester.pumpAndSettle();
-    final c = d.chats['c']!;
     expect(c.tab.value, ChatTab.pull);
+    // The widest tab's name changes nothing: the title keeps its least.
+    titleKeepsItsLeast();
     // With the room back, they're chips in the row again, and not in ⋯.
     c
       ..tab.value = ChatTab.chat

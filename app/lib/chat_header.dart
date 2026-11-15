@@ -97,7 +97,9 @@ class ChatHeader extends StatelessWidget {
     // the model, the agent's name (its mark stays), the details button while
     // the panel can't show, the state's word (its dot stays, and its
     // tooltip says it), the tabs into a menu field, then the terminal's,
-    // the files' and the details' buttons into ⋯. Changes counts the review
+    // the files' and the details' buttons into ⋯; last, beside a pane
+    // dragged wide, the Jira and GitHub chips, the agent's mark and the
+    // tabs' field (into ⋯), so the title keeps 80. Changes counts the review
     // comments not sent yet (a small pill more); a hidden side chat's chip,
     // the Jira key and the GitHub chip take their own room. The row's own
     // words were measured in the bundled font: a picked one that sets them
@@ -198,7 +200,7 @@ class ChatHeader extends StatelessWidget {
               folds.more +
               folds.saved -
               (shown ? (folds.roomy ? NushiTheme.barGap : 8) : 0);
-          const least = 80.0;
+          const least = headerTitleLeast;
           // The title takes what the model doesn't (all of it with none),
           // and 60% when both are too long for it.
           final modelWidth = shown ? _textWidth(context, modelName, meta) : 0.0;
@@ -326,11 +328,12 @@ class ChatHeader extends StatelessWidget {
                           ),
                         ],
                         SizedBox(width: group),
-                        tooltip(
-                          context,
-                          folds.name ? chat.agentName : '',
-                          AgentMark(chat.agent, size: 18, ink: t.text),
-                        ),
+                        if (!folds.mark)
+                          tooltip(
+                            context,
+                            folds.name ? chat.agentName : '',
+                            AgentMark(chat.agent, size: 18, ink: t.text),
+                          ),
                         if (!folds.name) ...[
                           const SizedBox(width: 7),
                           Text(
@@ -350,15 +353,19 @@ class ChatHeader extends StatelessWidget {
                             ),
                           ),
                         ],
-                        SizedBox(width: gap),
+                        if (!folds.mark) SizedBox(width: gap),
                         // Its state as a pill, the dot alone once the word
-                        // folds (its tooltip says it).
+                        // folds (its tooltip says it, and whose it is once
+                        // the mark folds too).
                         if (chat.archived)
                           const PhasePill(ChatPhase.archived)
                         else if (folds.word)
                           tooltip(
                             context,
-                            phaseWord(chat.phase, t).$1,
+                            folds.mark
+                                ? '${chat.agentName}: '
+                                      '${phaseWord(chat.phase, t).$1}'
+                                : phaseWord(chat.phase, t).$1,
                             ChatDot(chat: chat),
                           )
                         else
@@ -380,7 +387,9 @@ class ChatHeader extends StatelessWidget {
                         SideChip(chat),
                         SizedBox(width: gap),
                       ],
-                      if (folds.tabs)
+                      if (folds.tabsInMore)
+                        const SizedBox.shrink()
+                      else if (folds.tabs)
                         MenuField(
                           compact: true,
                           tooltip: _stepTabs,
@@ -413,7 +422,8 @@ class ChatHeader extends StatelessWidget {
                           roomy: true,
                           tooltip: (t) => '${keyLabel(tabKey(t))}   $_stepTabs',
                         ),
-                      SizedBox(width: roomy ? NushiTheme.barGap : 6),
+                      if (!folds.tabsInMore)
+                        SizedBox(width: roomy ? NushiTheme.barGap : 6),
                       // In the order of what they show, the terminal under
                       // the chat, then the Files pane, the preview's browser
                       // tab and the details panel beside it, left to right.
@@ -452,8 +462,21 @@ class ChatHeader extends StatelessWidget {
                         padding: IconTap.header,
                         filter: false,
                         entries: [
+                          // The tabs, once their field folds here too.
+                          if (folds.tabsInMore) ...[
+                            for (final (each, label) in _tabs(chat))
+                              MenuEntry(
+                                each == ChatTab.changes && comments > 0
+                                    ? '$label $comments'
+                                    : label,
+                                shortcut: keyLabel(tabKey(each)),
+                                checked: each == tab,
+                                onPick: () => onTab(each),
+                              ),
+                            MenuEntry.divider,
+                          ],
                           if (folds.links) ...[
-                            ..._linkEntries,
+                            ..._linkEntries(tabs: !folds.tabsInMore),
                             MenuEntry.divider,
                           ],
                           if (folds.browser && !folds.buttons) ...[
@@ -533,8 +556,10 @@ class ChatHeader extends StatelessWidget {
   }
 
   /// The browser's button as a row of ⋯, once it folds there.
-  /// The Jira key and the GitHub chips, folded into ⋯.
-  List<MenuEntry> get _linkEntries => [
+  /// The Jira key and the GitHub chips, folded into ⋯; the pull request's
+  /// only while the tabs aren't there too ([tabs]), whose Pull request is
+  /// the same.
+  List<MenuEntry> _linkEntries({required bool tabs}) => [
     if (chat.jiraKey.isNotEmpty)
       MenuEntry(
         'Show ${chat.jiraKey} in Jira',
@@ -545,7 +570,7 @@ class ChatHeader extends StatelessWidget {
         'Show #${link.number} from GitHub',
         onPick: () => showItem(daemon, link.asRef, pull: false),
       ),
-    if (chat.pull case final link?)
+    if (chat.pull case final link? when tabs)
       MenuEntry(
         'Show pull request #${link.number}',
         onPick: () => onTab(ChatTab.pull),
@@ -592,6 +617,27 @@ const githubIssueBadgesRoom = 6.0;
 /// tight gaps.
 const headerRow = 524.0;
 
+/// The least the title keeps: every other part of the row folds first.
+const headerTitleLeast = 80.0;
+
+/// Measured: what the row takes once every part [headerFolds] counts has
+/// folded, with Chat in the tabs' field: its two ends (28), the agent's
+/// mark and the state's dot with their gaps (49), the gap before the rest
+/// (12), the field and its gap (54) and ⋯ (32).
+const headerFolded = 176.0;
+
+/// What folding the agent's mark frees: the mark and its gap to the dot.
+const double _markRoom = 18 + 8;
+
+/// How wide the tabs' names set in their field (measured): what the field
+/// takes past Chat's is the name's width past Chat's.
+const ({double chat, double changes, double counted, double pull}) _tabWords = (
+  chat: 25,
+  changes: 46,
+  counted: 64,
+  pull: 65,
+);
+
 /// What of [headerRow] the longest agent's name takes, with its gap: a
 /// shorter name ([headerFolds]' `name`) leaves the row that much less.
 const headerName = 71.0;
@@ -627,6 +673,8 @@ typedef HeaderFolds = ({
   bool tabs,
   bool buttons,
   bool links,
+  bool mark,
+  bool tabsInMore,
   bool any,
   double saved,
   double more,
@@ -672,7 +720,7 @@ HeaderFolds headerFolds(
       (wider - 1) * (headerWords + (pull ? _pullWords : 0));
   final gaps =
       headerGaps + NushiTheme.iconGap + (files ? NushiTheme.iconGap : 0);
-  final need = headerRow + more + 80 + (model ? 50 : 0);
+  final need = headerRow + more + headerTitleLeast + (model ? 50 : 0);
   var saved = 0.0;
   final folds = <String>{};
   // Each part and about how much folding it frees. The browser's button
@@ -695,6 +743,31 @@ HeaderFolds headerFolds(
     folds.add(part);
     saved += points;
   }
+  // With all of that folded, the title still keeps its least: what's left
+  // of the row is measured ([headerFolded]), with the widest of the tabs'
+  // names in their field, so a switch of tab never folds more or less.
+  // The agent's mark goes first (the state's dot says whose it is), then
+  // the tabs' field, into ⋯ (ADR 0123).
+  if (width + saved < need) {
+    final label =
+        (pull
+            ? _tabWords.pull
+            : comments
+            ? _tabWords.counted
+            : _tabWords.changes) -
+        _tabWords.chat;
+    var left =
+        width -
+        headerFolded -
+        label -
+        (side ? SideChip.width + 8 : 0) -
+        (wider - 1) * (_tabWords.chat + label);
+    if (left < headerTitleLeast) {
+      folds.add('mark');
+      left += _markRoom;
+    }
+    if (left < headerTitleLeast) folds.add('tabsInMore');
+  }
   final roomy = width >= need + gaps;
   return (
     roomy: roomy,
@@ -706,6 +779,8 @@ HeaderFolds headerFolds(
     tabs: folds.contains('tabs'),
     buttons: folds.contains('buttons'),
     links: folds.contains('links'),
+    mark: folds.contains('mark'),
+    tabsInMore: folds.contains('tabsInMore'),
     any: folds.isNotEmpty,
     // The model's points were never in the row's 455.
     saved: saved - (folds.contains('model') ? 50 : 0),
