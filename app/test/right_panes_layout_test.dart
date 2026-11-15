@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/background_commands.dart';
 import 'package:nushi/beside_fit.dart';
@@ -365,6 +366,33 @@ void main() {
       _rect(tester, find.byTooltip('Chat menu')).right,
       header.right - ChatHeader.end,
     );
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets("a header narrowed by a pane folds only what doesn't fit: "
+      "Claude's short name leaves the browser's button and the whole title "
+      'room', (tester) async {
+    // 660 wide: the row with OpenCode's name, the Files and browser
+    // buttons and the title's least would need 668.
+    final (d, _) = await panesApp(
+      tester,
+      width: windowFor(1000, sidebar: true),
+      sidebar: true,
+      details: false,
+      open: _open(subagent: true),
+      widths: {'subagent': 340},
+    );
+    final header = _rect(tester, find.byType(ChatHeader));
+    expect(header.width, 660);
+    expect(find.byType(BrowserButton), findsOneWidget);
+    final title = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byType(ChatHeader),
+        matching: find.text('Fix the login redirect'),
+      ),
+    );
+    expect(title.didExceedMaxLines, isFalse);
+    expect(tester.takeException(), isNull);
     await closeView(tester, d);
   }, variant: _mac);
 }

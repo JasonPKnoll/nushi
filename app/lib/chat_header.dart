@@ -163,8 +163,19 @@ class ChatHeader extends StatelessWidget {
                     theme.code(t.link, size: 12),
                   ),
           };
+          // Its agent's name as wide as it is (it never changes); the
+          // state's word keeps the room of its longest ([headerRow]), so the
+          // row folds nothing more or less as the chat's state changes.
+          final nameStyle = theme.ui(t.text, weight: FontWeight.w500);
+          final name = max(
+            0.0,
+            headerName +
+                _textWidth(context, chat.agentName, nameStyle) -
+                _textWidth(context, _longestName, nameStyle),
+          );
           HeaderFolds foldsWith(double badges) => headerFolds(
             width,
+            name: name,
             pull: chat.pull != null,
             panel: onPanel != null,
             files: _files,
@@ -200,7 +211,9 @@ class ChatHeader extends StatelessWidget {
             modelName,
             folds,
             badges: badges,
-            titleMax: title,
+            // With no model beside it, the title takes all the room the
+            // rest leaves it (a short state's word leaves it more).
+            titleMax: shown ? title : double.infinity,
             modelMax: (room - title).clamp(40.0, 200.0),
           );
         },
@@ -579,6 +592,13 @@ const githubIssueBadgesRoom = 6.0;
 /// tight gaps.
 const headerRow = 524.0;
 
+/// What of [headerRow] the longest agent's name takes, with its gap: a
+/// shorter name ([headerFolds]' `name`) leaves the row that much less.
+const headerName = 71.0;
+
+/// The longest agent's name, which [headerRow] was measured with.
+const _longestName = 'OpenCode';
+
 /// About how much of [headerRow] is its words, set in the app's font (the
 /// agent's name, the state's word, the Chat and Changes segments), and how
 /// much of the Pull request segment is: what a font wider than the bundled
@@ -622,7 +642,8 @@ typedef HeaderFolds = ({
 /// what the chat's Jira key takes, its gap with it; [github]: what its
 /// GitHub chip takes, its gap with it; [wider]: how much wider than the
 /// bundled font the app's sets the row's words (1: as wide), which the row
-/// takes as so much `more`.
+/// takes as so much `more`; [name]: what the agent's name takes with its
+/// gap, the longest's ([headerName]) unless said.
 HeaderFolds headerFolds(
   double width, {
   required bool pull,
@@ -634,6 +655,7 @@ HeaderFolds headerFolds(
   double jira = 0,
   double github = 0,
   double wider = 1,
+  double name = headerName,
 }) {
   // The Pull request segment is 106 more, the comments' count 32, the
   // Files button 32 and the browser's 32.
@@ -646,6 +668,7 @@ HeaderFolds headerFolds(
       button +
       jira +
       github +
+      (name - headerName) +
       (wider - 1) * (headerWords + (pull ? _pullWords : 0));
   final gaps =
       headerGaps + NushiTheme.iconGap + (files ? NushiTheme.iconGap : 0);
@@ -657,9 +680,9 @@ HeaderFolds headerFolds(
   for (final (part, points) in [
     ('browser', button),
     if (model) ('model', 50.0),
-    // What [headerRow] counts for each: the longest name and its gap, the
+    // What the row counts for each: the agent's name and its gap, the
     // longest state's pill less its dot, the segments less a menu field.
-    ('name', 71.0),
+    ('name', name),
     if (!panel) ('panel', button),
     ('word', 106.0),
     ('tabs', (pull ? 160.0 : 72.0) + (comments ? 16 : 0)),

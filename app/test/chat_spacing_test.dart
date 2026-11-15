@@ -346,6 +346,35 @@ void main() {
       }
     });
 
+    test("a shorter agent's name folds the row later, by what it takes "
+        'less', () {
+      // 636 is where the row with the longest name first folds.
+      for (final name in [headerName, 50.0, 30.0]) {
+        HeaderFolds at(double width) => headerFolds(
+          width,
+          pull: false,
+          panel: true,
+          files: false,
+          name: name,
+        );
+        final first = 636 - (headerName - name);
+        expect(at(first).any, isFalse);
+        expect(at(first - 1).any, isTrue);
+        expect(at(first - 1).browser, isTrue);
+      }
+      // Folding the name frees what it takes.
+      final folds = headerFolds(
+        400,
+        pull: false,
+        panel: true,
+        files: false,
+        name: 40,
+      );
+      final longest = headerFolds(400, pull: false, panel: true, files: false);
+      expect(folds.name, isTrue);
+      expect(folds.more - longest.more, 40 - headerName);
+    });
+
     test('a wider app font folds the row sooner, by what its words take '
         'more', () {
       // The row's widths were measured in the bundled font (ADR 0114): a
