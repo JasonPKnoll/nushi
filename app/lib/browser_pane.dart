@@ -295,8 +295,10 @@ class _BrowserPaneState extends State<BrowserPane>
   }
 
   /// The row at least this wide holds the Servers button and the menu
-  /// beside Expand, Close and a chip's start.
-  static const double _fullFrom = 6 + 4 * PaneEndButtons.box + _plusRoom;
+  /// beside Expand, Close, the + and a chip at its least: narrower, they
+  /// go first, so the chip isn't cut.
+  static const double _fullFrom =
+      6 + 4 * PaneEndButtons.box + _plusRoom + previewTabLeast;
 
   /// The top row: the tabs, then (when [full]) Servers and ⋯, Expand and
   /// Close.
@@ -331,26 +333,37 @@ class _BrowserPaneState extends State<BrowserPane>
       );
 
   /// The tabs, chips even when there's one, as Claude's, and the + right
-  /// after them; in a pane squeezed too narrow for the +, the tabs alone
-  /// (its buttons keep their room, ADR 0123).
+  /// after them; in a pane squeezed too narrow for the + beside a chip at
+  /// its least, the tabs alone, a lone chip shrinking to its icon and ✕
+  /// (its buttons keep their room, ADR 0123); narrower than that, cut.
   Widget _tabs() => LayoutBuilder(
     builder: (context, box) => ValueListenableBuilder(
       valueListenable: widget.chat.browser.tabs,
-      builder: (context, open, _) => Row(
-        spacing: 2,
-        children: [
-          Flexible(
-            child: PaneTabs(
-              key: widget.tabsKey,
-              chat: widget.chat,
-              tabs: open.isEmpty ? [_tab] : open,
-              current: _tab,
-              chips: true,
-            ),
-          ),
-          if (box.maxWidth >= _plusRoom) NewBrowserTab(chat: widget.chat),
-        ],
-      ),
+      builder: (context, open, _) {
+        final tabs = PaneTabs(
+          key: widget.tabsKey,
+          chat: widget.chat,
+          tabs: open.isEmpty ? [_tab] : open,
+          current: _tab,
+          chips: true,
+        );
+        if (box.maxWidth < previewChipLeast) {
+          return UnconstrainedBox(
+            constrainedAxis: Axis.vertical,
+            alignment: Alignment.centerLeft,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(width: previewChipLeast, child: tabs),
+          );
+        }
+        return Row(
+          spacing: 2,
+          children: [
+            Flexible(child: tabs),
+            if (box.maxWidth >= _plusRoom + previewTabLeast)
+              NewBrowserTab(chat: widget.chat),
+          ],
+        );
+      },
     ),
   );
 

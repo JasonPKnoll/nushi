@@ -45,7 +45,9 @@ String _label(String file, List<String> files) {
   return '$name · $folder';
 }
 
-/// How narrow a tab gets before the row scrolls instead.
+/// How narrow a tab gets before the row scrolls instead, while the row
+/// is wider (one in a narrower row is as wide as the row: a chip shrinks
+/// to its icon and ✕ rather than being cut).
 const double previewTabLeast = 88;
 
 /// The text's inset in a tab, and the one file's name's in the pane's
@@ -73,6 +75,15 @@ const double _chipCloseRoom = 24;
 const double _chipEnd = 1;
 const double _chipNameMost = 180;
 
+/// A chip with no room for its name: its icon, its ✕ and their room.
+const double previewChipLeast =
+    _chipStart +
+    _chipIcon +
+    _chipIconGap +
+    _chipCloseRoom +
+    _chipEnd +
+    _chipGap;
+
 /// The + after a row of chips, which opens a new browser tab: Claude's is
 /// always there, after a file's chip too.
 class NewBrowserTab extends StatelessWidget {
@@ -92,9 +103,10 @@ class NewBrowserTab extends StatelessWidget {
 }
 
 /// How wide tabs that would like [widths] are in [room]. The widest give way
-/// first, down to [previewTabLeast]; past that they add up to more than
-/// [room], and the row scrolls.
-List<double> fitTabs(List<double> widths, double room) {
+/// first, down to [previewTabLeast] (or the room, when that's less, but
+/// never under [least], a tab's icon and ✕); past that they add up to
+/// more than [room], and the row scrolls.
+List<double> fitTabs(List<double> widths, double room, {double least = 0}) {
   if (widths.fold(0.0, (a, b) => a + b) <= room) return widths;
   final narrowest = [...widths]..sort();
   var left = room;
@@ -107,7 +119,7 @@ List<double> fitTabs(List<double> widths, double room) {
     }
     left -= w;
   }
-  most = max(most, previewTabLeast);
+  most = max(most, max(least, min(previewTabLeast, room)));
   return [for (final w in widths) min(w, most)];
 }
 
@@ -231,10 +243,14 @@ class _PaneTabsState extends State<PaneTabs> {
         : theme
               .code(color, size: chips ? 13 : 12)
               .copyWith(fontStyle: e == provisional ? FontStyle.italic : null);
-    final widths = fitTabs([
-      for (final (i, e) in tabs.indexed)
-        _fullWidth(labels[i], face(e, theme.t.text), chip: chips),
-    ], box.maxWidth);
+    final widths = fitTabs(
+      [
+        for (final (i, e) in tabs.indexed)
+          _fullWidth(labels[i], face(e, theme.t.text), chip: chips),
+      ],
+      box.maxWidth,
+      least: chips ? previewChipLeast : previewTabLeast,
+    );
     final at = tabs.indexOf(widget.current);
     final seen = (widget.current, tabs.length, box.maxWidth);
     if (at >= 0 && seen != _revealed) {

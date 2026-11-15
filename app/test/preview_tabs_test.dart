@@ -318,6 +318,16 @@ void main() {
       // One already narrower stays so.
       expect(fitTabs([50, 200, 200], 100), [50, 88, 88]);
     });
+
+    test('in a row narrower than the least, a tab is as wide as the row, '
+        'down to its own least (a chip’s icon and ✕), so none is cut', () {
+      expect(fitTabs([150], 70, least: previewChipLeast), [70]);
+      expect(fitTabs([150], 40, least: previewChipLeast), [previewChipLeast]);
+      expect(fitTabs([150, 150], 70, least: previewChipLeast), [
+        70,
+        70,
+      ], reason: 'two: the row scrolls, each whole');
+    });
   });
 
   test('a label says the folder only when two share a name', () {
