@@ -137,8 +137,13 @@ class _ResizableState extends State<Resizable> {
     widget.onDrag?.call(width);
   }
 
+  // Saved in whole points, never past its most: a drag let go at a most
+  // that isn't whole (a window of 1209.5) keeps beside what it was beside.
   void _end() {
-    _set(_width().roundToDouble());
+    final width = _width();
+    final most = max(widget.min, widget.max);
+    final whole = width.roundToDouble();
+    _set(whole > most ? most.floorToDouble() : whole);
     setState(() => _asked = _dragged = null);
     if (_told == null) return;
     _told = null;

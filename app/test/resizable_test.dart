@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/beside.dart';
 import 'package:nushi/panes.dart';
+import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 
 void main() {
   Widget beside(double cap) => MaterialApp(
     theme: const NushiTheme(Tokens.dark).toThemeData(),
     home: Beside(
-      main: const SizedBox.expand(),
+      main: const SizedBox.expand(key: Key('main')),
       least: 360,
       panes: [
         SidePane(
@@ -78,6 +79,29 @@ void main() {
     await drag.up();
     await tester.pump();
     expect(width(tester), 1200 - 360);
+    await tester.pump(const Duration(seconds: 2)); // the width's saved
+  });
+
+  testWidgets('let go at its most in a room that is not whole, it stays '
+      'beside the chat', (tester) async {
+    // 1300.5 wide: beside the chat its most is 940.5, and rounded to the
+    // nearest point it would leave the chat 359.5, under its least.
+    tester.view.physicalSize = const Size(2601, 1600);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    paneWidths.value = {};
+    await tester.pumpWidget(beside(double.infinity));
+    final drag = await tester.startGesture(edge(tester));
+    await drag.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    await drag.moveBy(const Offset(-1300, 0));
+    await tester.pump();
+    expect(width(tester), 1300.5 - 360);
+    await drag.up();
+    await tester.pump();
+    expect(paneWidths.value['preview'], 940);
+    expect(width(tester), 940);
+    expect(tester.getSize(find.byKey(const Key('main'))).width, 360.5);
     await tester.pump(const Duration(seconds: 2)); // the width's saved
   });
 
