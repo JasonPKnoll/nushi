@@ -241,10 +241,19 @@ class _BesideState extends State<Beside> {
             ),
           ),
         );
+        // Tab goes the header, [main], the rail, the panes left to right,
+        // then [foot] (a terminal keeps Tab for its shell), whatever their
+        // places: beside [main] the panes run its full height and the
+        // terminal only its width, and reading order would put the
+        // terminal before the rail.
+        final order = {for (final (i, p) in panes.indexed) p.name: 3.0 + i};
+        final last = 3.0 + panes.length;
+        Widget ordered(double at, Widget child) =>
+            FocusTraversalOrder(order: NumericFocusOrder(at), child: child);
         Widget pane(String slot, Widget? child) => LayoutId(
           key: ValueKey((scene, slot)),
           id: slot,
-          child: slide(slot, child),
+          child: ordered(order[slot] ?? last, slide(slot, child)),
         );
         Widget backed(Widget child, {required bool shadow}) => DecoratedBox(
           decoration: BoxDecoration(
@@ -269,14 +278,17 @@ class _BesideState extends State<Beside> {
             LayoutId(
               key: const ValueKey(_Slot.head),
               id: _Slot.head,
-              child: under(
-                _Slot.head,
-                FocusTraversalGroup(
-                  child: _BesideScope(
-                    glide: token,
-                    scene: scene,
-                    held: details != null && !rail,
-                    child: head,
+              child: ordered(
+                0,
+                under(
+                  _Slot.head,
+                  FocusTraversalGroup(
+                    child: _BesideScope(
+                      glide: token,
+                      scene: scene,
+                      held: details != null && !rail,
+                      child: head,
+                    ),
                   ),
                 ),
               ),
@@ -285,21 +297,27 @@ class _BesideState extends State<Beside> {
             LayoutId(
               key: const ValueKey(_Slot.foot),
               id: _Slot.foot,
-              child: under(_Slot.foot, FocusTraversalGroup(child: foot)),
+              child: ordered(
+                last,
+                under(_Slot.foot, FocusTraversalGroup(child: foot)),
+              ),
             ),
           LayoutId(
             key: ValueKey((scene, _Slot.main)),
             id: _Slot.main,
-            child: under(
-              _Slot.main,
-              FocusTraversalGroup(
-                child: Glide(
-                  token: token,
-                  sides: widget.columnSides,
-                  // Its foot is its full width: cut at its left as it
-                  // glides, it doesn't lie over the sidebar.
-                  clip: true,
-                  child: widget.main,
+            child: ordered(
+              1,
+              under(
+                _Slot.main,
+                FocusTraversalGroup(
+                  child: Glide(
+                    token: token,
+                    sides: widget.columnSides,
+                    // Its foot is its full width: cut at its left as it
+                    // glides, it doesn't lie over the sidebar.
+                    clip: true,
+                    child: widget.main,
+                  ),
                 ),
               ),
             ),
@@ -310,25 +328,28 @@ class _BesideState extends State<Beside> {
             LayoutId(
               key: ValueKey((scene, railName)),
               id: railName,
-              child: Focus(
-                focusNode: _railFocus,
-                child: slide(
-                  railName,
-                  shown: rail,
-                  details == null
-                      ? null
-                      : SizedBox(
-                          key: ValueKey(details.name),
-                          width: details.width,
-                          // Over the rail, whose own fill would hide it.
-                          child: DecoratedBox(
-                            position: DecorationPosition.foreground,
-                            decoration: BoxDecoration(
-                              border: Border(left: BorderSide(color: t.line)),
+              child: ordered(
+                2,
+                Focus(
+                  focusNode: _railFocus,
+                  child: slide(
+                    railName,
+                    shown: rail,
+                    details == null
+                        ? null
+                        : SizedBox(
+                            key: ValueKey(details.name),
+                            width: details.width,
+                            // Over the rail, whose own fill would hide it.
+                            child: DecoratedBox(
+                              position: DecorationPosition.foreground,
+                              decoration: BoxDecoration(
+                                border: Border(left: BorderSide(color: t.line)),
+                              ),
+                              child: details.child,
                             ),
-                            child: details.child,
                           ),
-                        ),
+                  ),
                 ),
               ),
             ),
@@ -364,22 +385,25 @@ class _BesideState extends State<Beside> {
           );
           children.add(children.removeAt(top));
         }
-        return CustomMultiChildLayout(
-          delegate: _Beside(
-            panes: [for (final p in panes) p.name],
-            rail: _seen.contains(railName) ? railName : null,
-            railShown: rail,
-            railWidth: details?.width ?? 0,
-            over: over,
-            going: [
-              for (final s in _seen)
-                if (!now.contains(s) && s != railName) s,
-            ],
-            at: _at,
-            widths: _widths,
-            cover: cover,
+        return FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: CustomMultiChildLayout(
+            delegate: _Beside(
+              panes: [for (final p in panes) p.name],
+              rail: _seen.contains(railName) ? railName : null,
+              railShown: rail,
+              railWidth: details?.width ?? 0,
+              over: over,
+              going: [
+                for (final s in _seen)
+                  if (!now.contains(s) && s != railName) s,
+              ],
+              at: _at,
+              widths: _widths,
+              cover: cover,
+            ),
+            children: children,
           ),
-          children: children,
         );
       },
     ),

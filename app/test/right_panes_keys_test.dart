@@ -304,61 +304,73 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('Tab goes header, transcript, rail, then the panes left to '
-      'right, never back from a pane into the header', (tester) async {
-    final (d, _) = await panesApp(
-      tester,
-      width: windowFor(1900, sidebar: false),
-      open: _open(files: true, previews: 1),
-    );
-    final regions = <(String, Finder)>[
-      ('header', find.byType(ChatHeader)),
-      ('rail', _rail),
-      ('files', find.byType(FilesPane)),
-      ('preview', find.byType(PreviewPane)),
-      ('transcript', find.byType(Transcript)),
-    ];
-    String? region(FocusNode n) {
-      final ctx = n.context;
-      if (ctx == null) return null;
-      for (final (name, f) in regions) {
-        for (final e in f.evaluate()) {
-          var hit = false;
-          ctx.visitAncestorElements((a) => !(hit = a == e));
-          if (hit || ctx == e) return name;
+  for (final terminal in [false, true]) {
+    testWidgets('Tab goes header, transcript, rail, then the panes left to '
+        'right, never back from a pane into the header, the terminal last '
+        '(${terminal ? 'open' : 'shut'})', (tester) async {
+      final (d, _) = await panesApp(
+        tester,
+        width: windowFor(1900, sidebar: false),
+        terminal: terminal,
+        open: _open(files: true, previews: 1),
+      );
+      final regions = <(String, Finder)>[
+        ('terminal', find.byType(TerminalPanel)),
+        ('header', find.byType(ChatHeader)),
+        ('rail', _rail),
+        ('files', find.byType(FilesPane)),
+        ('preview', find.byType(PreviewPane)),
+        ('transcript', find.byType(Transcript)),
+      ];
+      String? region(FocusNode n) {
+        final ctx = n.context;
+        if (ctx == null) return null;
+        for (final (name, f) in regions) {
+          for (final e in f.evaluate()) {
+            var hit = false;
+            ctx.visitAncestorElements((a) => !(hit = a == e));
+            if (hit || ctx == e) return name;
+          }
         }
+        return null;
       }
-      return null;
-    }
 
-    tester
-        .widget<EditableText>(
-          find.descendant(
-            of: find.byType(Composer),
-            matching: find.byType(EditableText),
-          ),
-        )
-        .focusNode
-        .unfocus();
-    await tester.pump();
-    final seen = <String>[];
-    for (var i = 0; i < 120; i++) {
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byType(Composer),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .focusNode
+          .unfocus();
       await tester.pump();
-      final n = FocusManager.instance.primaryFocus;
-      final r = n == null ? null : region(n);
-      if (r != null && (seen.isEmpty || seen.last != r)) seen.add(r);
-    }
-    // Once in a pane, never back to the header before the round's end.
-    const order = ['header', 'transcript', 'rail', 'files', 'preview'];
-    for (var i = 1; i < seen.length; i++) {
-      final a = order.indexOf(seen[i - 1]);
-      final b = order.indexOf(seen[i]);
-      expect(b > a || b == 0, isTrue, reason: '${seen[i - 1]} → ${seen[i]}');
-    }
-    expect(seen, containsAll(['header', 'rail', 'files', 'preview']));
-    await closeView(tester, d);
-  }, variant: _mac);
+      final seen = <String>[];
+      for (var i = 0; i < 120; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        final n = FocusManager.instance.primaryFocus;
+        final r = n == null ? null : region(n);
+        if (r != null && (seen.isEmpty || seen.last != r)) seen.add(r);
+      }
+      // Once in a pane, never back to the header before the round's end;
+      // the terminal, which keeps Tab for its shell, after all of them.
+      const order = ['header', 'transcript', 'rail', 'files', 'preview'];
+      for (var i = 1; i < seen.length; i++) {
+        final a = order.indexOf(seen[i - 1]);
+        final b = order.indexOf(seen[i]);
+        final last = seen[i] == 'terminal';
+        expect(
+          last ? a == order.length - 1 : b > a || b == 0,
+          isTrue,
+          reason: '${seen[i - 1]} → ${seen[i]}',
+        );
+      }
+      expect(seen, containsAll(['header', 'rail', 'files', 'preview']));
+      if (terminal) expect(seen.last, 'terminal');
+      await closeView(tester, d);
+    }, variant: _mac);
+  }
 
   group('Expand', () {
     Future<Daemon> expanded(
