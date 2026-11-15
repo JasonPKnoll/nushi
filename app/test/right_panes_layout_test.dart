@@ -8,6 +8,7 @@ import 'package:nushi/background_commands.dart';
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/browser_bar.dart';
 import 'package:nushi/browser_pane.dart';
+import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/chat_panes.dart';
 import 'package:nushi/details_panel.dart';
@@ -366,6 +367,30 @@ void main() {
       _rect(tester, find.byTooltip('Chat menu')).right,
       header.right - ChatHeader.end,
     );
+    // The Jira key and the GitHub chips folded into ⋯, each a row there.
+    expect(find.text('NUSHI-1234'), findsNothing);
+    await tester.tap(find.byTooltip('Chat menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Show NUSHI-1234 in Jira'), findsOneWidget);
+    expect(find.text('Show #1234 from GitHub'), findsOneWidget);
+    await tester.tap(find.text('Show pull request #1240'));
+    await tester.pumpAndSettle();
+    final c = d.chats['c']!;
+    expect(c.tab.value, ChatTab.pull);
+    // With the room back, they're chips in the row again, and not in ⋯.
+    c
+      ..tab.value = ChatTab.chat
+      ..pane.value = null;
+    await tester.pumpAndSettle();
+    expect(find.text('NUSHI-1234'), findsOneWidget);
+    await tester.tap(find.byTooltip('Chat menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rename'), findsOneWidget);
+    expect(find.text('Show NUSHI-1234 in Jira'), findsNothing);
+    expect(find.text('Show #1234 from GitHub'), findsNothing);
+    expect(find.text('Show pull request #1240'), findsNothing);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
     await closeView(tester, d);
   }, variant: _mac);
 
