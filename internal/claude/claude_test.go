@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -91,6 +92,13 @@ func TestSignedIn(t *testing.T) {
 		if got := SignedIn(func(...string) ([]byte, error) { return []byte(out), nil }); got != want {
 			t.Errorf("%s: %q, want %q", out, got, want)
 		}
+	}
+	exit1 := errors.New("exit status 1")
+	if got := SignedIn(func(...string) ([]byte, error) { return []byte(`{"loggedIn": false}`), exit1 }); got != "no" {
+		t.Errorf("signed out, exit 1: %q, want no", got)
+	}
+	if got := SignedIn(func(...string) ([]byte, error) { return nil, errors.New("not found") }); got != "" {
+		t.Errorf("didn't run: %q, want none", got)
 	}
 }
 
