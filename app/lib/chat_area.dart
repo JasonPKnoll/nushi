@@ -71,6 +71,8 @@ class _ChatAreaState extends State<ChatArea> {
     widget.chat.showAsked.addListener(_showAsked);
     _tab.addListener(_showAsked);
     _tab.addListener(_collapse);
+    _terminalOpen = terminalChats.value.contains(widget.chat.id);
+    terminalChats.addListener(_terminalShown);
     // After this frame: the panes beside the transcript aren't built yet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _showAsked();
@@ -90,6 +92,7 @@ class _ChatAreaState extends State<ChatArea> {
     widget.chat.showAsked.removeListener(_showAsked);
     _tab.removeListener(_showAsked);
     _tab.removeListener(_collapse);
+    terminalChats.removeListener(_terminalShown);
     // Gone, it has no room to say; the chat shows nowhere until it's back.
     if (widget.chat.previewFits == _previewFits) {
       widget.chat.previewFits = ChatState.fitsAlways;
@@ -113,6 +116,18 @@ class _ChatAreaState extends State<ChatArea> {
   /// What shows is no longer a browser tab on the Chat tab: it's put back.
   void _collapse() {
     if (!_browsing) _expanded.value = false;
+  }
+
+  /// Whether its chat's terminal was open, as last heard.
+  late bool _terminalOpen;
+
+  /// Its chat's terminal opened, however (⌃`, the palette, a command's
+  /// Open in terminal): over an expanded browser tab, which covers it, the
+  /// tab is put back, or the terminal would open where nothing shows it.
+  void _terminalShown() {
+    final open = terminalChats.value.contains(widget.chat.id);
+    if (open && !_terminalOpen) _expanded.value = false;
+    _terminalOpen = open;
   }
 
   /// ⌃`: the terminal shows or hides. Over an expanded browser tab, which

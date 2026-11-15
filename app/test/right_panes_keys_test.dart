@@ -479,6 +479,25 @@ void main() {
       await closeView(tester, d);
     }, variant: _mac);
 
+    testWidgets("the palette's Show terminal puts it back and shows the "
+        'terminal', (tester) async {
+      final d = await expanded(tester, terminal: false);
+      await _palette(tester, 'show terminal');
+      expect(find.byTooltip('Expand'), findsOneWidget);
+      expect(find.byType(TerminalPanel), findsOneWidget);
+      await closeView(tester, d);
+    }, variant: _mac);
+
+    testWidgets("another chat's terminal opening leaves it expanded", (
+      tester,
+    ) async {
+      final d = await expanded(tester);
+      toggleTerminal('d');
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Collapse'), findsOneWidget);
+      await closeView(tester, d);
+    }, variant: _mac);
+
     testWidgets('Changes puts it back', (tester) async {
       final d = await expanded(tester);
       d.chats['c']!.tab.value = ChatTab.changes;
