@@ -43,6 +43,17 @@ final class ViewToggle {
   void toggle() => pref.value = !pref.value;
 }
 
+/// Preview tabs: a click in the tree opens a provisional tab (ADR 0070).
+final previewTabsOption = ViewToggle(
+  act: Act.previewTabs,
+  pref: previewTabs,
+  label: 'Preview tabs',
+  viewOn: 'Don’t Use Preview Tabs',
+  viewOff: 'Use Preview Tabs',
+  paletteOn: 'Don’t use preview tabs',
+  paletteOff: 'Use preview tabs',
+);
+
 /// Word wrap: a source's long lines wrap, or run on (⌥Z in the viewer).
 final wrapOption = ViewToggle(
   act: Act.wrap,
@@ -66,7 +77,17 @@ final whitespaceOption = ViewToggle(
 );
 
 /// The view options that are on or off, in the ⋯'s order.
-final List<ViewToggle> viewToggles = [wrapOption, whitespaceOption];
+final List<ViewToggle> viewToggles = [
+  previewTabsOption,
+  wrapOption,
+  whitespaceOption,
+];
+
+/// Those of [viewToggles] about how a source shows, a group of the ⋯.
+List<ViewToggle> get sourceToggles => [
+  for (final o in viewToggles)
+    if (o != previewTabsOption) o,
+];
 
 /// A view option of a few values: its [pref], the ⋯'s row ([label], the
 /// value now at its right, a submenu of [values]) and the View menu's

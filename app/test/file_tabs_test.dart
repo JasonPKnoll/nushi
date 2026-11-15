@@ -3,6 +3,7 @@ import 'package:nushi/browser_tabs.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/file_tabs.dart';
 import 'package:nushi/preview_entry.dart';
+import 'package:nushi/settings.dart';
 
 // A chat's file tabs and browser tabs, apart (ADR 0094, 0123).
 
@@ -41,6 +42,80 @@ void main() {
       f.close(const PreviewFile('c'));
       expect(f.shown.value, isNull);
       expect(f.tabs.value, isEmpty);
+    });
+
+    group('preview tabs (ADR 0070)', () {
+      test('an open without keeping is provisional; the next takes its '
+          'place, in its slot', () {
+        final f = FileTabs()
+          ..open('a', folder: folder)
+          ..open('b', folder: folder, keep: false)
+          ..open('c', folder: folder);
+        expect(f.provisional.value, const PreviewFile('b'));
+        f.open('d', folder: folder, keep: false);
+        expect(f.tabs.value, const [
+          PreviewFile('a'),
+          PreviewFile('d'),
+          PreviewFile('c'),
+        ]);
+        expect(f.shown.value, const PreviewFile('d'));
+        expect(f.provisional.value, const PreviewFile('d'));
+      });
+
+      test('at most one; kept by an open that keeps, or keep; then the next '
+          'one is a new tab', () {
+        final f = FileTabs()
+          ..open('a', folder: folder, keep: false)
+          ..open('./a', folder: folder);
+        expect(f.provisional.value, isNull);
+        f
+          ..open('b', folder: folder, keep: false)
+          ..keep(const PreviewFile('b'))
+          ..open('c', folder: folder, keep: false);
+        expect(f.tabs.value, hasLength(3));
+        expect(f.provisional.value, const PreviewFile('c'));
+      });
+
+      test('an open without keeping of a kept tab shows it and leaves it '
+          'kept', () {
+        final f = FileTabs()
+          ..open('a', folder: folder)
+          ..open('b', folder: folder, keep: false)
+          ..open('a', folder: folder, keep: false);
+        expect(f.shown.value, const PreviewFile('a'));
+        expect(f.provisional.value, const PreviewFile('b'));
+        expect(f.tabs.value, hasLength(2));
+      });
+
+      test('closing it, or every tab, leaves none provisional; a replaced '
+          'one forgets its Source', () {
+        final f = FileTabs()
+          ..open('a', folder: folder, keep: false)
+          ..sources.add('a')
+          ..open('b', folder: folder, keep: false);
+        expect(f.sources, isEmpty);
+        f.close(const PreviewFile('b'));
+        expect(f.provisional.value, isNull);
+        f
+          ..open('c', folder: folder, keep: false)
+          ..closeAll();
+        expect(f.provisional.value, isNull);
+      });
+
+      test("a chat's tree click is provisional only with preview tabs on", () {
+        final c = ChatState('c', folder);
+        addTearDown(c.dispose);
+        c.openInFiles('a', keep: false);
+        expect(c.files.provisional.value, const PreviewFile('a'));
+        previewTabs.value = false;
+        c.openInFiles('b', keep: false);
+        expect(c.files.tabs.value, hasLength(2));
+        expect(
+          c.files.provisional.value,
+          const PreviewFile('a'),
+          reason: 'turned off, the one there stays as it was',
+        );
+      });
     });
 
     test('a Source shown is kept while its tab is open', () {

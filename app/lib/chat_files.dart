@@ -194,7 +194,14 @@ void togglePin(ChatState chat, String file) {
   final pins = [...?pinnedFiles.value[chat.id]];
   final had = pins.length;
   pins.removeWhere((p) => relativeIn(chat.folder, p) == file);
-  if (pins.length == had) pins.add(file);
+  if (pins.length == had) {
+    pins.add(file);
+    // Pinned, a provisional tab of it is kept (ADR 0070).
+    if (chat.files.provisional.value case final p?
+        when relativeIn(chat.folder, p.path) == file) {
+      chat.files.keep(p);
+    }
+  }
   pinnedFiles.value = {
     for (final MapEntry(:key, :value) in pinnedFiles.value.entries)
       if (key != chat.id) key: value,

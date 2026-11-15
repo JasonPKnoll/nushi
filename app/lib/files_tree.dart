@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/double_clicks.dart';
 import 'package:nushi/file_filter.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/settings.dart';
@@ -43,6 +44,9 @@ class _FilesTreeState extends State<FilesTree> {
   final _git = GitFiles();
   final _filter = FilterMemo();
 
+  /// A file's row clicked twice keeps its tab (preview tabs, ADR 0070).
+  final _clicks = DoubleClicks();
+
   /// The rows as last built: what the keys move through.
   List<TreeRow> _rows = const [];
 
@@ -59,6 +63,7 @@ class _FilesTreeState extends State<FilesTree> {
   @override
   void dispose() {
     _tree.detach();
+    _clicks.dispose();
     _query.dispose();
     _git.dispose();
     _field.dispose();
@@ -99,13 +104,14 @@ class _FilesTreeState extends State<FilesTree> {
   }
 
   /// A row clicked, or ⏎ on it: a folder opens or closes (in a filter's
-  /// tree they're all open), a file previews.
-  void _activate(TreeRow r) {
+  /// tree they're all open), a file opens in the viewer; a click's file,
+  /// not [keep], in a provisional tab (preview tabs).
+  void _activate(TreeRow r, {bool keep = true}) {
     _select(r.path);
     if (r.kind == TreeRowKind.folder && _q.isEmpty) {
       _tree.toggle(r.path);
     } else if (r.opens) {
-      widget.chat.openInFiles(r.path);
+      widget.chat.openInFiles(r.path, keep: keep);
     }
   }
 
@@ -251,19 +257,28 @@ class _FilesTreeState extends State<FilesTree> {
               itemCount: _rows.length,
               itemBuilder: (context, i) {
                 final r = _rows[i];
-                return TreeRowView(
-                  r,
-                  selected: r.entry && r.path == _at,
-                  showing: r.kind == TreeRowKind.file && r.path == open,
-                  wrote: r.kind == TreeRowKind.folder
-                      ? marks.folders.contains(r.path)
-                      : marks.files.contains(r.path),
-                  onTap: r.entry
-                      ? () {
-                          _list.requestFocus();
-                          _activate(r);
-                        }
-                      : null,
+                // A second click on a file keeps its tab: its first opened
+                // it, and the second's tap shows it again.
+                return Listener(
+                  onPointerDown: (e) {
+                    if (r.opens && _clicks.down(r.path, e.position)) {
+                      widget.chat.openInFiles(r.path);
+                    }
+                  },
+                  child: TreeRowView(
+                    r,
+                    selected: r.entry && r.path == _at,
+                    showing: r.kind == TreeRowKind.file && r.path == open,
+                    wrote: r.kind == TreeRowKind.folder
+                        ? marks.folders.contains(r.path)
+                        : marks.files.contains(r.path),
+                    onTap: r.entry
+                        ? () {
+                            _list.requestFocus();
+                            _activate(r, keep: false);
+                          }
+                        : null,
+                  ),
                 );
               },
             ),

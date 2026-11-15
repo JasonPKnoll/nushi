@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_files.dart';
+import 'package:nushi/double_clicks.dart';
 import 'package:nushi/edit_bars.dart';
 import 'package:nushi/plain_tabs.dart';
 import 'package:nushi/preview.dart';
@@ -142,11 +143,15 @@ class PaneTabs extends StatefulWidget {
 class _PaneTabsState extends State<PaneTabs> {
   final _scroll = ScrollController();
 
+  /// A file's tab clicked twice is kept (preview tabs, ADR 0070).
+  final _clicks = DoubleClicks();
+
   /// What the row last brought into view for: the tab, how many, the room.
   (PreviewEntry, int, double)? _revealed;
 
   @override
   void dispose() {
+    _clicks.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -219,9 +224,13 @@ class _PaneTabsState extends State<PaneTabs> {
         },
     ];
     final chips = widget.chips;
+    // A provisional file's name in italics, measured so too.
+    final provisional = widget.chat.files.provisional.value;
     TextStyle face(PreviewEntry e, Color color) => e is BrowserTab
         ? theme.ui(color, size: chips ? 14 : 12)
-        : theme.code(color, size: chips ? 13 : 12);
+        : theme
+              .code(color, size: chips ? 13 : 12)
+              .copyWith(fontStyle: e == provisional ? FontStyle.italic : null);
     final widths = fitTabs([
       for (final (i, e) in tabs.indexed)
         _fullWidth(labels[i], face(e, theme.t.text), chip: chips),
@@ -269,6 +278,7 @@ class _PaneTabsState extends State<PaneTabs> {
                       face: (color) => face(e, color),
                       showing: e == widget.current,
                       chip: chips,
+                      clicks: _clicks,
                     ),
                   ),
               ],
@@ -293,6 +303,7 @@ class _Tab extends StatelessWidget {
     required this.face,
     required this.showing,
     this.chip = false,
+    this.clicks,
   });
 
   final ChatState chat;
@@ -303,10 +314,14 @@ class _Tab extends StatelessWidget {
   final bool showing;
   final bool chip;
 
+  /// Tells a file's tab clicked twice, which keeps it.
+  final DoubleClicks? clicks;
+
   @override
   Widget build(BuildContext context) {
     final t = NushiTheme.of(context).t;
     if (chip) return _Chip(this);
+    final tab = this.tab;
     return Hover(
       builder: (context, {required hover}) => TabFace(
         showing: showing,
@@ -314,19 +329,27 @@ class _Tab extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Pressable(
-                onTap: () => chat.showTab(tab),
-                tooltip: tooltip,
-                builder: (context, look) => Container(
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.only(left: previewNameInset),
-                  foregroundDecoration: focusRing(t, look),
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    style: face(tabText(t, showing: showing, hover: hover)),
+              child: Listener(
+                onPointerDown: (e) {
+                  if (tab is PreviewFile &&
+                      (clicks?.down(tab, e.position) ?? false)) {
+                    chat.files.keep(tab);
+                  }
+                },
+                child: Pressable(
+                  onTap: () => chat.showTab(tab),
+                  tooltip: tooltip,
+                  builder: (context, look) => Container(
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: previewNameInset),
+                    foregroundDecoration: focusRing(t, look),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: face(tabText(t, showing: showing, hover: hover)),
+                    ),
                   ),
                 ),
               ),

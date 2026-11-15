@@ -353,10 +353,13 @@ void main() {
       '—',
       'Collapse all folders',
       '—',
+      'Preview tabs',
+      '—',
       'Word wrap',
       'Show whitespace',
     ]);
     expect(_checked('Show file tree'), isTrue);
+    expect(_checked('Preview tabs'), isTrue);
     expect(_checked('Word wrap'), isTrue);
     expect(_checked('Show whitespace'), isFalse);
     expect(

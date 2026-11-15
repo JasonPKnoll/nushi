@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/double_clicks.dart';
 import 'package:nushi/edit_bars.dart';
 import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
@@ -67,7 +68,11 @@ class FilesTopRow extends StatelessWidget {
       end: PaneEndButtons.inset,
       child: LayoutBuilder(
         builder: (context, box) => ListenableBuilder(
-          listenable: Listenable.merge([chat.files.tabs, ?shown?.watch]),
+          listenable: Listenable.merge([
+            chat.files.tabs,
+            chat.files.provisional,
+            ?shown?.watch,
+          ]),
           builder: (context, _) {
             final open = chat.files.tabs.value;
             final watch = shown?.watch;
@@ -143,12 +148,14 @@ class FilesTopRow extends StatelessWidget {
   }
 }
 
-/// The one open file's name, plain, its absolute path ([tooltip]) in a
-/// tooltip, and its ✕ (its unsaved edits' dot in its place, ADR 0096): a
-/// click on the name shows the file in the tree ([showInFiles]) when it's
-/// in the chat's folder, and does nothing otherwise. Its text sits where a
-/// tab's would ([PaneTabs]), so a second file opening moves nothing.
-class _Name extends StatelessWidget {
+/// The one open file's name, plain (in italics while its tab is
+/// provisional), its absolute path ([tooltip]) in a tooltip, and its ✕
+/// (its unsaved edits' dot in its place, ADR 0096): a click on the name
+/// shows the file in the tree ([showInFiles]) when it's in the chat's
+/// folder, and does nothing otherwise; a double click keeps its tab. Its
+/// text sits where a tab's would ([PaneTabs]), so a second file opening
+/// moves nothing.
+class _Name extends StatefulWidget {
   const new({
     required this.daemon,
     required this.chat,
@@ -162,34 +169,61 @@ class _Name extends StatelessWidget {
   final String tooltip;
 
   @override
+  State<_Name> createState() => _NameState();
+}
+
+class _NameState extends State<_Name> {
+  final _clicks = DoubleClicks();
+
+  @override
+  void dispose() {
+    _clicks.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
     final t = theme.t;
+    final _Name(:daemon, :chat, :path, :tooltip) = widget;
     final inside = inFiles(daemon, chat, path);
+    final tab = PreviewFile(path);
+    final provisional = chat.files.provisional.value == tab;
     return Hover(
       builder: (context, {required hover}) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Flexible(
-            child: Pressable(
-              onTap: inside == null ? null : () => showInFiles(chat, inside),
-              tooltip: plainPath(tooltip),
-              // Tinted under the pointer and ringed with the keys on it, as
-              // a control is; the text stays where a tab's is.
-              builder: (context, look) => Container(
-                padding: const EdgeInsets.fromLTRB(previewNameInset, 3, 3, 3),
-                decoration: look.hover
-                    ? BoxDecoration(
-                        color: look.pressed ? t.pressed : t.hover,
-                        borderRadius: BorderRadius.circular(NushiTheme.control),
-                      )
-                    : null,
-                foregroundDecoration: focusRing(t, look),
-                child: Text(
-                  plainPath(baseName(path)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.code(t.text, size: 12),
+            child: Listener(
+              onPointerDown: (e) {
+                if (_clicks.down(path, e.position)) chat.files.keep(tab);
+              },
+              child: Pressable(
+                onTap: inside == null ? null : () => showInFiles(chat, inside),
+                tooltip: plainPath(tooltip),
+                // Tinted under the pointer and ringed with the keys on it, as
+                // a control is; the text stays where a tab's is.
+                builder: (context, look) => Container(
+                  padding: const EdgeInsets.fromLTRB(previewNameInset, 3, 3, 3),
+                  decoration: look.hover
+                      ? BoxDecoration(
+                          color: look.pressed ? t.pressed : t.hover,
+                          borderRadius: BorderRadius.circular(
+                            NushiTheme.control,
+                          ),
+                        )
+                      : null,
+                  foregroundDecoration: focusRing(t, look),
+                  child: Text(
+                    plainPath(baseName(path)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme
+                        .code(t.text, size: 12)
+                        .copyWith(
+                          fontStyle: provisional ? FontStyle.italic : null,
+                        ),
+                  ),
                 ),
               ),
             ),

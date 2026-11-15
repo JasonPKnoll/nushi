@@ -47,11 +47,16 @@ List<MenuEntry> filesMenu(
           : null,
     ),
     MenuEntry.divider,
-    for (final o in viewToggles)
-      MenuEntry(o.label, checked: o.pref.value, onPick: o.toggle),
+    _toggle(previewTabsOption),
+    MenuEntry.divider,
+    for (final o in sourceToggles) _toggle(o),
     if (folded.isNotEmpty) ...[MenuEntry.divider, ...folded],
   ];
 }
+
+/// [option]'s row, checked while it's on.
+MenuEntry _toggle(ViewToggle option) =>
+    MenuEntry(option.label, checked: option.pref.value, onPick: option.toggle);
 
 /// [choice]'s row: its value now at the right, its values in a submenu,
 /// the one now checked; unavailable unless [on].

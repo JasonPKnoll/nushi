@@ -14,7 +14,7 @@ You can also open files in these ways:
 
 - **Artifacts**: in the details panel (the panel button in the chat's header), the **Artifacts** list shows the documents, pages and images the chat made. Click one to open it.
 - **Open file** (⌘P): type part of a name to open any file in the chat's folder, code included.
-- **Files** (⇧⌘E, or the folder button in the header): the open files on the left and a tree of the chat's folder on the right, as in Claude's desktop app. With nothing open it says **Open files appear here**. Files the chat wrote have a dot. Opening a file never moves the tree. Type in **Search files…** above the tree to find a file anywhere in the folder. The three buttons at the right of the pane's second row collapse every folder, hide or show the tree (⇧⌘Y; the open file takes its room) and open **⋯**, which has **Go to file or search** (⌘P), **File tree position** (put the tree on the left or the right; Automatic keeps it at the window's edge) and how a file's source shows: **Word wrap** and **Show whitespace**.
+- **Files** (⇧⌘E, or the folder button in the header): the open files on the left and a tree of the chat's folder on the right, as in Claude's desktop app. With nothing open it says **Open files appear here**. Files the chat wrote have a dot. Opening a file never moves the tree. Type in **Search files…** above the tree to find a file anywhere in the folder. The three buttons at the right of the pane's second row collapse every folder, hide or show the tree (⇧⌘Y; the open file takes its room) and open **⋯**, which has **Go to file or search** (⌘P), **File tree position** (put the tree on the left or the right; Automatic keeps it at the window's edge), **Preview tabs** and how a file's source shows: **Word wrap** and **Show whitespace**.
 
 Some agents can also open a file in the Files pane, or a page on your own machine in the browser, themselves.
 
@@ -31,7 +31,7 @@ Above the file, in the pane's second row, is its path. Click the path to copy it
 
 ## Work with several files
 
-Opening a second file adds a tab at the top of the Files pane, after **Files**.
+Opening a second file adds a tab at the top of the Files pane, after **Files**. A click in the tree opens the file in an *italic* tab that the next click's file replaces, so looking through files doesn't fill the row; double-click it, edit it or pin it to keep it. Turn **Preview tabs** off in the pane's **⋯** to keep every file you click.
 
 - Click a name to switch to that file.
 - Click a tab's **✕**, or press ⌘W, to close it. Closing the last one leaves the pane open and blank.

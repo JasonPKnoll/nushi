@@ -93,10 +93,18 @@ class ChatState extends ChangeNotifier {
   /// Says an edit came or went, for the tabs' marks.
   final editsChanged = ValueNotifier<int>(0);
 
-  /// [path]'s edit, made with [make] if it has none.
+  /// [path]'s edit, made with [make] if it has none. Its first unsaved
+  /// change keeps its tab, were it a provisional one ([FileTabs.keep]).
   FileEdit edit(String path, FileEdit Function() make) {
     if (edits[path] case final e?) return e;
     final e = edits[path] = make();
+    void edited() {
+      if (!e.unsaved) return;
+      e.removeListener(edited);
+      files.keep(PreviewFile(path));
+    }
+
+    e.addListener(edited);
     editsChanged.value++;
     return e;
   }
@@ -440,10 +448,11 @@ class ChatState extends ChangeNotifier {
   /// Shows [path] in its Files pane (ADR 0123), the one way a file opens:
   /// the pane opens on the Chat tab if it's closed, on the tab of the same
   /// file if it has one, however each is named ([relativeIn]), or a new one
-  /// last.
-  void openInFiles(String path) {
+  /// last. Without [keep] (a click in the tree) and with [previewTabs] on
+  /// it's a provisional tab, which the next such open takes the place of.
+  void openInFiles(String path, {bool keep = true}) {
     tab.value = ChatTab.chat;
-    files.open(path, folder: folder);
+    files.open(path, folder: folder, keep: keep || !previewTabs.value);
     if (!filesChats.value.contains(id)) {
       filesChats.value = {...filesChats.value, id};
     }

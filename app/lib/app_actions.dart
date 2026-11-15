@@ -136,6 +136,7 @@ enum Act {
   treeLeft,
   treeRight,
   collapseFolders(menu: ActMenu.view, menuLabel: 'Collapse All Folders'),
+  previewTabs(menu: ActMenu.view, menuLabel: 'Use Preview Tabs'),
   // The viewer's own key: elsewhere ⌥Z types a character.
   wrap(shows: wrapKey, menu: ActMenu.view, menuLabel: 'Wrap Lines'),
   whitespace(menu: ActMenu.view, menuLabel: 'Show Whitespace'),

@@ -19,7 +19,8 @@ import 'package:nushi/tile_picture.dart';
 /// side panes' widths (not the details panel's, which is fixed), whether
 /// changed files show flat and diffs unified, which chats show their
 /// terminals and their Files pane, whether it lists ignored files and
-/// shows its tree and on which side, the
+/// shows its tree and on which side, whether its clicks open preview tabs,
+/// the
 /// terminal's font, the app's and code's fonts, whether the chat takes the
 /// whole width,
 /// whether the sidebar is hidden, the Jira task list's groups and assignee
@@ -78,6 +79,12 @@ final Pref<bool> filesIgnored = _plain('filesIgnored', false);
 /// ⇧⌘Y, its second row's button, its ⋯ and View › Show File Tree): one
 /// for every chat, as Claude desktop's.
 final Pref<bool> filesTree = _plain('filesTree', true);
+
+/// Whether a click in the Files pane's tree opens a provisional tab (on at
+/// first), as Claude desktop's and VS Code's Preview tabs: in italics, the
+/// next click's file takes its place until it's kept (a double click, an
+/// edit, a pin). Off, every file opened keeps its tab.
+final Pref<bool> previewTabs = _plain('previewTabs', true);
 
 /// Which side of the Files pane its tree is on, as Claude desktop's File
 /// tree position: Automatic (the side away from the transcript, the
