@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
+import 'package:nushi/chat_header.dart';
+import 'package:nushi/chat_keys.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/palette.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -117,6 +120,88 @@ void main() {
     await _tab(tester, back: true);
     expect(b.shownTab, ChatTab.chat);
     expect(tester.widget<EditableText>(_box).controller.text, '/co');
+    d.dispose();
+  }, variant: macOS);
+
+  testWidgets('a header tab’s tooltip names its own key, the folded tabs’ '
+      'the next tab’s', (tester) async {
+    final d = await _app(tester);
+    for (final (label, key) in [
+      ('Chat', '⌃⌘1'),
+      ('Changes', '⌃⌘2'),
+      ('Pull request', '⌃⌘3'),
+    ]) {
+      expect(find.byTooltip('$label\u2002$key'), findsOneWidget);
+    }
+    expect(find.byTooltip(RegExp('one before')), findsNothing);
+
+    // Folded into a menu field where the header has no room.
+    await tester.pumpWidget(
+      themed(
+        Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 460,
+            child: ChatHeader(
+              d.chats['b']!,
+              d,
+              tab: ChatTab.chat,
+              onTab: (_) {},
+              panel: false,
+              onPanel: null,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.byType(MenuField), findsOneWidget);
+    expect(find.byTooltip('Next tab\u2002⌃⇥'), findsOneWidget);
+    d.dispose();
+  }, variant: macOS);
+
+  testWidgets('View › Previous Tab and Next Tab, and the palette’s rows, '
+      'show the keys and step', (tester) async {
+    final d = await _app(tester);
+    final b = d.chats['b']!;
+    final view = tester
+        .widget<PlatformMenuBar>(find.byType(PlatformMenuBar))
+        .menus
+        .whereType<PlatformMenu>()
+        .firstWhere((m) => m.label == 'View');
+    Iterable<PlatformMenuItem> items(PlatformMenuItem m) => switch (m) {
+      PlatformMenuItemGroup(:final members) => members.expand(items),
+      _ => [m],
+    };
+    PlatformMenuItem item(String label) =>
+        view.menus.expand(items).firstWhere((m) => m.label == label);
+    expect(item('Next Tab').shortcut, nextTabKey);
+    expect(item('Previous Tab').shortcut, previousTabKey);
+    item('Previous Tab').onSelected!();
+    await tester.pumpAndSettle();
+    expect(b.shownTab, ChatTab.pull);
+    item('Next Tab').onSelected!();
+    await tester.pumpAndSettle();
+    expect(b.shownTab, ChatTab.chat);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(Palette),
+        matching: find.byType(TextField),
+      ),
+      'tab',
+    );
+    await tester.pump();
+    Finder inPalette(String text) => find.descendant(
+      of: find.byType(Palette),
+      matching: find.text(text, findRichText: true),
+    );
+    for (final text in ['Next tab', '⌃⇥', 'Previous tab', '⌃⇧⇥']) {
+      expect(inPalette(text), findsOneWidget, reason: text);
+    }
     d.dispose();
   }, variant: macOS);
 }

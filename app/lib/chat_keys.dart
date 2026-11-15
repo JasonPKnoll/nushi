@@ -12,7 +12,8 @@ import 'package:nushi/sidebar_view.dart';
 // Switching chats by keyboard, as Claude Code does: ⌘ held alone numbers
 // the sidebar's chats, ⌘1–⌘9 opens one, ⌥⌘↑ and ⌥⌘↓ go to the one before
 // and after (⌘[ and ⌘] are Back and Forward, ADR 0119). And the chat's
-// tabs: ⌃Tab and ⌃⇧Tab go through them. On Linux, Control in ⌘'s place
+// tabs: ⌃Tab and ⌃⇧Tab go through them, as a browser's (View › Next Tab
+// and Previous Tab, `app_actions.dart`). On Linux, Control in ⌘'s place
 // (`keys.dart`).
 
 /// The chats as the sidebar shows them, top to bottom, Pinned first, then
@@ -97,13 +98,8 @@ const nextChatKey = Cmd(
   linux: SingleActivator(LogicalKeyboardKey.pageDown, control: true),
 );
 
-/// Shows the tab [step] places on (⌃Tab is 1, ⌃⇧Tab -1) in the chat shown.
-class StepTabIntent extends Intent {
-  const new(this.step);
-
-  final int step;
-}
-
+/// ⌃Tab and ⌃⇧Tab: the chat's next tab and the one before, wrapping
+/// ([stepTab]); a Mac's own tabs' keys, which no text field binds.
 const nextTabKey = SingleActivator(LogicalKeyboardKey.tab, control: true);
 const previousTabKey = SingleActivator(
   LogicalKeyboardKey.tab,
@@ -146,15 +142,12 @@ void stepTab(ChatState chat, int step) {
   chat.tab.value = tabs[(tabs.indexOf(chat.shownTab) + step) % tabs.length];
 }
 
-/// ⌘1–⌘9, ⌥⌘↑ and ⌥⌘↓ that switch chats, ⌃Tab and ⌃⇧Tab that switch its
-/// tabs, wherever the focus is (a terminal, which keeps ⌘ and ⌃ keys,
-/// passes them on as these intents).
+/// ⌘1–⌘9, ⌥⌘↑ and ⌥⌘↓ that switch chats, wherever the focus is (a
+/// terminal, which keeps ⌘ and ⌃ keys, passes them on as these intents).
 final Map<ShortcutActivator, Intent> chatKeys = {
   for (var n = 1; n <= 9; n++) chatNumberKey(n): OpenChatIntent(n),
   previousChatKey: const StepChatIntent(-1),
   nextChatKey: const StepChatIntent(1),
-  nextTabKey: const StepTabIntent(1),
-  previousTabKey: const StepTabIntent(-1),
 };
 
 /// How long ⌘ is held alone before the chats show their numbers, so a

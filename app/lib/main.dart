@@ -359,14 +359,6 @@ class _NushiAppState extends State<NushiApp> {
             StepChatIntent: CallbackAction<StepChatIntent>(
               onInvoke: (i) => stepChat(widget.daemon, i.step),
             ),
-            StepTabIntent: CallbackAction<StepTabIntent>(
-              onInvoke: (i) {
-                if (widget.daemon.chatShows) {
-                  stepTab(widget.daemon.selected!, i.step);
-                }
-                return null;
-              },
-            ),
           },
           // The actions' keys, ⌘K, ⌘1–⌘9, ⌥⌘↑ and ⌥⌘↓, ⌃Tab and ⌃⇧Tab:
           // wherever the focus is; and Quit's without a menu bar.
