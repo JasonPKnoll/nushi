@@ -7,6 +7,8 @@ import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
 import 'package:nushi/composer.dart';
+import 'package:nushi/daemon.dart';
+import 'package:nushi/editor_find.dart';
 import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/files_tree.dart';
@@ -262,6 +264,93 @@ void main() {
     c.openBrowserTab('http://localhost:3002');
     await tester.pumpAndSettle();
     expect(_expand, findsOneWidget);
+    await endEditor(tester, d);
+  }, variant: macOnly);
+
+  testWidgets('covering, it stays over a subagent’s pane opening, the tree '
+      'moving sides or hiding, and goes with another chat; each way back '
+      'puts it where it was', (tester) async {
+    final (d, _) = await panesApp(
+      tester,
+      width: 2400,
+      open: (
+        side: false,
+        files: true,
+        subagent: false,
+        command: false,
+        previews: 1,
+        browser: 0,
+      ),
+    );
+    final c = d.chats['c']!;
+    final pane = find.byType(FilesPane);
+    final beside = tester.getRect(pane);
+    final tree = tester.getRect(find.byType(FilesTree));
+    await _tap(tester, _expand);
+    final all = tester.getRect(find.byType(Pane));
+    expect(tester.getRect(pane), all);
+    // A subagent's pane takes only the browser's place: Files still covers.
+    c.pane.value = 'a';
+    await tester.pumpAndSettle();
+    expect(_collapse, findsOneWidget);
+    expect(tester.getRect(pane), all);
+    c.pane.value = null;
+    await tester.pumpAndSettle();
+    expect(tester.getRect(pane), all);
+    // The tree to the left, and hidden: still covering.
+    filesTreeSide.value = TreeSide.left;
+    await tester.pumpAndSettle();
+    expect(_collapse, findsOneWidget);
+    expect(tester.getRect(find.byType(FilesTree)).left, all.left);
+    filesTree.value = false;
+    await tester.pumpAndSettle();
+    expect(_collapse, findsOneWidget);
+    expect(find.byType(FilesTree), findsNothing);
+    filesTree.value = true;
+    filesTreeSide.value = TreeSide.automatic;
+    await tester.pumpAndSettle();
+    await _tap(tester, _collapse);
+    expect(tester.getRect(pane), beside);
+    expect(tester.getRect(find.byType(FilesTree)), tree);
+    // Another chat and back: beside, where it was.
+    await _tap(tester, _expand);
+    d.select('d');
+    await tester.pumpAndSettle();
+    d.select('c');
+    await tester.pumpAndSettle();
+    expect(_expand, findsOneWidget);
+    expect(tester.getRect(pane), beside);
+    expect(tester.getRect(find.byType(FilesTree)), tree);
+    await closeView(tester, d);
+  }, variant: macOnly);
+
+  testWidgets('Esc in the editor’s find bar closes the bar, not the cover; '
+      'the next collapses it', (tester) async {
+    final (d, _) = await openEditor(tester, {
+      'main.go': utf8.encode('package main\n'),
+    });
+    final beside = tester.getRect(find.byType(FilesPane));
+    await _tap(tester, _expand);
+    await _tap(tester, find.byType(SourceEditor));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorFindBar), findsOneWidget);
+    final bar = find.descendant(
+      of: find.byType(EditorFindBar),
+      matching: find.byType(EditableText),
+    );
+    expect(bar, findsOneWidget);
+    await _esc(tester);
+    expect(_collapse, findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(EditorFindBar), matching: bar),
+      findsNothing,
+    );
+    await _esc(tester);
+    expect(_expand, findsOneWidget);
+    expect(tester.getRect(find.byType(FilesPane)), beside);
     await endEditor(tester, d);
   }, variant: macOnly);
 }
