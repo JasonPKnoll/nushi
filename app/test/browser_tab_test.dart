@@ -35,79 +35,83 @@ void main() {
   group('the tabs', () {
     ChatState state() => ChatState('c', '/Users/me/nushi');
 
-    test('each new browser tab is a tab of its own, last', () {
+    test('each new browser tab is a tab of its own, last, apart from the '
+        'files', () {
       final c = state()..openPreview('docs/a.md');
       final one = c.openBrowserTab();
       final two = c.openBrowserTab();
-      expect(c.previewTabs.value, [const PreviewFile('docs/a.md'), one, two]);
-      expect(c.preview.value, two);
-      expect(c.previewFile, isNull);
-      // A file still opens once, beside them.
+      expect(c.browser.tabs.value, [one, two]);
+      expect(c.browser.shown.value, two);
+      // The file's tab stays and shows, beside them.
+      expect(c.fileNames, ['docs/a.md']);
+      expect(c.shownFile, 'docs/a.md');
       c.openPreview('/Users/me/nushi/docs/a.md');
-      expect(c.previewTabs.value, hasLength(3));
-      expect(c.previewFile, 'docs/a.md');
+      expect(c.fileNames, ['docs/a.md']);
+      expect(c.browser.shown.value, two);
     });
 
-    test('closing one shows the next; Close takes them all', () {
+    test('closing one shows the next; Close takes them all and leaves the '
+        'files', () {
       final c = state()..openPreview('a.md');
       final one = c.openBrowserTab('http://localhost:3000');
+      final two = c.openBrowserTab('http://localhost:5173');
       c
-        ..openPreview('b.md')
-        ..showPreviewTab(one)
-        ..closePreview(one);
-      expect(c.previewFile, 'b.md');
-      expect(c.previewNames, ['a.md', 'b.md']);
-      c.preview.value = null;
-      expect(c.previewTabs.value, isEmpty);
+        ..showBrowserTab(one)
+        ..browser.close(one);
+      expect(c.browser.shown.value, two);
+      expect(c.browserNames, ['http://localhost:5173']);
+      c.browser.shown.value = null;
+      expect(c.browser.tabs.value, isEmpty);
+      expect(c.fileNames, ['a.md']);
+      expect(c.shownFile, 'a.md');
     });
 
     test('Browser shows the last browser tab, or a new one', () {
-      final c = state()..showBrowser();
-      final first = c.preview.value! as BrowserTab;
+      final c = state()..showOrHideBrowser();
+      final first = c.browser.shown.value!;
       expect(first.address.value, '');
       final second = c.openBrowserTab();
-      c
-        ..openPreview('a.md')
-        ..showBrowser();
-      expect(c.preview.value, same(second));
-      c.showBrowser();
-      expect(c.previewTabs.value, hasLength(3));
+      c.openPreview('a.md');
+      expect(c.browser.shown.value, same(second));
+      c.showOrHideBrowser();
+      expect(c.browser.shown.value, isNull);
+      c.showOrHideBrowser();
+      expect(c.browser.shown.value, same(second));
+      expect(c.browser.tabs.value, [first, second]);
     });
 
     test('the globe hides the browser tabs and brings the same ones back', () {
       final c = state()..openPreview('a.md');
       final one = c.openBrowserTab('http://localhost:3000');
       final two = c.openBrowserTab('http://localhost:5173');
-      c.showPreviewTab(one);
+      c.showBrowserTab(one);
       expect(c.browserShown, isTrue);
       c.showOrHideBrowser();
-      // The file's tab stays and shows.
+      // The file's tab stays.
       expect(c.browserShown, isFalse);
-      expect(c.previewFile, 'a.md');
-      expect(c.previewTabs.value, hasLength(1));
+      expect(c.shownFile, 'a.md');
+      expect(c.browser.tabs.value, isEmpty);
       c.showOrHideBrowser();
-      expect(c.preview.value, same(one));
-      expect(c.previewTabs.value, hasLength(3));
-      expect(c.previewTabs.value.whereType<BrowserTab>(), [one, two]);
+      expect(c.browser.shown.value, same(one));
+      expect(c.browser.tabs.value, [one, two]);
       expect(one.address.value, 'http://localhost:3000');
     });
 
-    test('with only browser tabs the globe closes the preview, and a new '
-        'tab brings the hidden ones back with it', () {
+    test('a hidden browser comes back with a new tab after its own', () {
       final c = state();
       final one = c.openBrowserTab('http://localhost:3000');
       c.showOrHideBrowser();
-      expect(c.preview.value, isNull);
-      expect(c.previewTabs.value, isEmpty);
+      expect(c.browser.shown.value, isNull);
+      expect(c.browser.tabs.value, isEmpty);
       final fresh = c.openBrowserTab();
-      expect(c.previewTabs.value, [one, fresh]);
-      expect(c.preview.value, same(fresh));
+      expect(c.browser.tabs.value, [one, fresh]);
+      expect(c.browser.shown.value, same(fresh));
       // Nothing left put away: hiding and showing again keeps the two.
       c
         ..showOrHideBrowser()
         ..showOrHideBrowser();
-      expect(c.previewTabs.value, [one, fresh]);
-      expect(c.preview.value, same(fresh));
+      expect(c.browser.tabs.value, [one, fresh]);
+      expect(c.browser.shown.value, same(fresh));
     });
 
     test('a browser tab says its title, else its address, else New tab', () {
@@ -147,8 +151,9 @@ void main() {
       await closeView(tester, d);
     }, variant: macOnly);
 
-    testWidgets('+ shows after chips, on a file’s too, never with files '
-        'alone', (tester) async {
+    testWidgets('+ shows after the chips, and the browser holds no file', (
+      tester,
+    ) async {
       browserFakes();
       final d = await browserApp(tester);
       final c = d.chats['c']!..openPreview('docs/a.md');
@@ -156,26 +161,29 @@ void main() {
       expect(find.byTooltip('New browser tab'), findsNothing);
       c.openBrowserTab('http://localhost:3000');
       await tester.pumpAndSettle();
-      expect(find.byType(PaneTabs), findsOneWidget);
+      final row = find.descendant(
+        of: find.byType(BrowserPane),
+        matching: find.byType(PaneTabs),
+      );
+      expect(row, findsOneWidget);
       final plus = find.byTooltip('New browser tab');
       expect(plus, findsOneWidget);
       // Right after the last tab.
-      final tabs = tester.getRect(find.byType(PaneTabs));
-      expect(tester.getRect(plus).left, closeTo(tabs.right + 2, 0.5));
-      await tester.tap(plus);
-      await tester.pumpAndSettle();
-      expect(c.previewTabs.value, hasLength(3));
-      expect(find.text(browserHint), findsOneWidget);
-      // Back on the file's chip: the row keeps its +, as Claude's.
-      await tester.tap(
-        find.descendant(of: find.byType(PaneTabs), matching: find.text('a.md')),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(FileView), findsOneWidget);
       expect(
         tester.getRect(plus).left,
-        closeTo(tester.getRect(find.byType(PaneTabs)).right + 2, 0.5),
+        closeTo(tester.getRect(row).right + 2, 0.5),
       );
+      expect(
+        find.descendant(of: row, matching: find.text('a.md')),
+        findsNothing,
+      );
+      await tester.tap(plus);
+      await tester.pumpAndSettle();
+      expect(c.browser.tabs.value, hasLength(2));
+      expect(find.text(browserHint), findsOneWidget);
+      // The file's view stays beside the browser.
+      expect(find.byType(FileView), findsOneWidget);
+      expect(c.shownFile, 'docs/a.md');
       await closeView(tester, d);
     }, variant: macOnly);
 
@@ -194,11 +202,11 @@ void main() {
       await tester.tap(globe);
       await tester.pumpAndSettle();
       final c = d.chats['c']!;
-      expect(c.preview.value, isA<BrowserTab>());
+      expect(c.browser.shown.value, isA<BrowserTab>());
       expect(find.byType(BrowserPane), findsOneWidget);
       expect(lit(), isTrue);
       // Pressed again it hides the browser, unlit; again, the same tab.
-      final shown = c.preview.value;
+      final shown = c.browser.shown.value;
       await tester.tap(globe);
       await tester.pumpAndSettle();
       expect(find.byType(BrowserPane), findsNothing);
@@ -206,12 +214,12 @@ void main() {
       expect(find.byTooltip('Show browser'), findsOneWidget);
       await tester.tap(globe);
       await tester.pumpAndSettle();
-      expect(c.preview.value, same(shown));
-      expect(c.previewTabs.value, hasLength(1));
+      expect(c.browser.shown.value, same(shown));
+      expect(c.browser.tabs.value, hasLength(1));
       expect(find.byTooltip('Hide browser'), findsOneWidget);
       runAct(tester.element(globe), d, Act.newBrowserTab);
       await tester.pumpAndSettle();
-      expect(c.previewTabs.value, hasLength(2));
+      expect(c.browser.tabs.value, hasLength(2));
       await closeView(tester, d);
     }, variant: macOnly);
 
@@ -248,12 +256,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(c.shownTab, ChatTab.chat);
       expect(find.byType(BrowserPane), findsOneWidget);
-      expect(c.previewTabs.value, hasLength(1));
+      expect(c.browser.tabs.value, hasLength(1));
       await toChanges();
       runAct(tester.element(globe), d, Act.newBrowserTab);
       await tester.pumpAndSettle();
       expect(c.shownTab, ChatTab.chat);
-      expect(c.previewTabs.value, hasLength(2));
+      expect(c.browser.tabs.value, hasLength(2));
       expect(find.text(browserHint), findsOneWidget);
       await closeView(tester, d);
     }, variant: macOnly);
@@ -279,7 +287,7 @@ void main() {
         ),
       );
       await pressMeta(tester, LogicalKeyboardKey.keyW);
-      expect(c.preview.value, isNull);
+      expect(c.browser.shown.value, isNull);
       // With no browser tab they do nothing.
       final acts = appActions(tester.element(find.byType(Scaffold).first), d);
       for (final a in [Act.address, Act.reloadPage]) {
@@ -433,8 +441,8 @@ void main() {
                 child: SizedBox.fromSize(
                   size: size,
                   child: ValueListenableBuilder(
-                    valueListenable: c.preview,
-                    builder: (context, tab, _) => tab is BrowserTab
+                    valueListenable: c.browser.shown,
+                    builder: (context, tab, _) => tab != null
                         ? BrowserPane(
                             key: ObjectKey(tab),
                             chat: c,
@@ -465,13 +473,10 @@ void main() {
         );
       }, variant: macOnly);
 
-      testWidgets('tabs, a file’s among them, with +; the bar on a page', (
-        tester,
-      ) async {
+      testWidgets('tabs, with +; the bar on a page', (tester) async {
         final fakes = browserFakes();
         final c = await pane(tester, const Size(560, 160));
         c
-          ..openPreview('docs/plan.md')
           ..openBrowserTab('http://localhost:5173')
           ..openBrowserTab('http://localhost:3000');
         await tester.pumpAndSettle();

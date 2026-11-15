@@ -248,7 +248,7 @@ void main() {
     final (fake, d) = await _app(tester);
     fake.emit(EventsResponse(chatId: 'c', showUrl: 'http://localhost:5173'));
     await tester.pumpAndSettle();
-    expect(d.chats['c']!.preview.value, isA<BrowserTab>());
+    expect(d.chats['c']!.browser.shown.value, isA<BrowserTab>());
     expect(opened, isEmpty);
     expect(_in<BrowserPane>(find.text('localhost:5173')), findsWidgets);
     for (final tip in ['Back', 'Forward', 'More']) {
@@ -297,11 +297,11 @@ void main() {
     // The app that opens https, as every page here (not url_launcher's).
     expect(opened, [Uri.parse('https://tea.example/guide')]);
     expect(outside, isEmpty);
-    expect(d.chats['c']!.preview.value, isNull);
+    expect(d.chats['c']!.browser.shown.value, isNull);
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
     expect(opened.last, Uri.parse('http://localhost:5173/menu'));
-    expect(d.chats['c']!.preview.value, isNull);
+    expect(d.chats['c']!.browser.shown.value, isNull);
     d.openSettings(section: SettingsSection.general);
     await tester.pumpAndSettle();
     expect(find.text('Notifications'), findsWidgets); // the page shows

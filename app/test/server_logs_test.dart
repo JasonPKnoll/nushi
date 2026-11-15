@@ -115,7 +115,7 @@ Future<(FakeDaemon, Daemon, ChatState)> _pane(
       ),
       home: Scaffold(
         body: ValueListenableBuilder(
-          valueListenable: c.preview,
+          valueListenable: c.browser.shown,
           builder: (context, tab, _) => tab is BrowserTab
               ? BrowserPane(
                   key: ObjectKey(tab),

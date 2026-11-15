@@ -8,7 +8,6 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/chat_panes.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/details_panel.dart';
-import 'package:nushi/preview_entry.dart';
 import 'package:nushi/settings.dart';
 
 import 'fake_daemon.dart';
@@ -33,7 +32,7 @@ void main() {
 
   test('the panes dragged as wide as wanted say so on their spec', () {
     expect(ChatPanes.subagent.wide, isTrue);
-    expect(ChatPanes.preview.wide, isTrue);
+    expect(ChatPanes.fileView.wide, isTrue);
     expect(ChatPanes.side.wide, isFalse);
     expect(ChatPanes.files.wide, isFalse);
     // A SidePane made of a spec carries it, which the chat area reads.
@@ -135,9 +134,24 @@ void main() {
   // Widths saved as dragged: each pane at its most, its least, and between.
   final savedSets = <String, Map<String, double>>{
     'default': const {},
-    'wide': const {'side': 600, 'files': 460, 'subagent': 900, 'preview': 1000},
-    'least': const {'side': 300, 'files': 200, 'subagent': 220, 'preview': 300},
-    'mixed': const {'side': 320, 'files': 480, 'subagent': 240, 'preview': 700},
+    'wide': const {
+      'side': 600,
+      'files': 460,
+      'subagent': 900,
+      'fileView': 1000,
+    },
+    'least': const {
+      'side': 300,
+      'files': 200,
+      'subagent': 220,
+      'fileView': 300,
+    },
+    'mixed': const {
+      'side': 320,
+      'files': 480,
+      'subagent': 240,
+      'fileView': 700,
+    },
   };
 
   test("stepped a point at a time across every line, the panes' left edge "
@@ -180,13 +194,13 @@ void main() {
   test('the widest gives first, down to its least, then the next, the '
       'transcript keeping its least', () {
     const files = ChatPanes.files;
-    const preview = ChatPanes.preview;
+    const preview = ChatPanes.fileView;
     // Files 260 and the preview 560 want 1180 with the transcript's 360.
-    expect(fit(1180, [files, preview]).widths, {'files': 260, 'preview': 560});
-    expect(fit(1120, [files, preview]).widths, {'files': 260, 'preview': 500});
-    expect(fit(920, [files, preview]).widths, {'files': 260, 'preview': 300});
-    expect(fit(880, [files, preview]).widths, {'files': 220, 'preview': 300});
-    expect(fit(860, [files, preview]).widths, {'files': 200, 'preview': 300});
+    expect(fit(1180, [files, preview]).widths, {'files': 260, 'fileView': 560});
+    expect(fit(1120, [files, preview]).widths, {'files': 260, 'fileView': 500});
+    expect(fit(920, [files, preview]).widths, {'files': 260, 'fileView': 300});
+    expect(fit(880, [files, preview]).widths, {'files': 220, 'fileView': 300});
+    expect(fit(860, [files, preview]).widths, {'files': 200, 'fileView': 300});
     for (final room in [1120.0, 920.0, 880.0, 860.0]) {
       expect(fit(room, [files, preview]).left, 360);
       expect(fit(room, [files, preview]).over, false);
@@ -196,9 +210,9 @@ void main() {
     final dragged = fit(
       1000,
       [files, preview],
-      saved: {'files': 480, 'preview': 320},
+      saved: {'files': 480, 'fileView': 320},
     );
-    expect(dragged.widths, {'files': 320, 'preview': 320});
+    expect(dragged.widths, {'files': 320, 'fileView': 320});
     // Three: the subagent's pane, the widest, then the side chat, then
     // Files.
     const side = ChatPanes.side;
@@ -225,9 +239,9 @@ void main() {
 
   test('narrowing never touches the saved widths, and they come back as '
       'soon as there is room', () {
-    final saved = {'files': 400.0, 'preview': 800.0};
+    final saved = {'files': 400.0, 'fileView': 800.0};
     final before = {...saved};
-    const panes = [ChatPanes.files, ChatPanes.preview];
+    const panes = [ChatPanes.files, ChatPanes.fileView];
     for (var room = 2200.0; room >= 700; room -= 10) {
       fit(room, panes, saved: saved);
     }
@@ -237,7 +251,7 @@ void main() {
     expect(fit(1900, panes, saved: saved).widths, saved);
     expect(fit(1559, panes, saved: saved).widths, {
       'files': 400,
-      'preview': 799,
+      'fileView': 799,
     });
   });
 
@@ -286,12 +300,12 @@ void main() {
 
   test('narrowed, a pane dragged narrower gives the rest their width back, '
       'and goes no wider than it is', () {
-    const panes = [ChatPanes.files, ChatPanes.preview];
+    const panes = [ChatPanes.files, ChatPanes.fileView];
     // 920: Files 260, the preview narrowed to 300.
     final rest = fit(920, panes);
-    expect(rest.most, {'files': 260, 'preview': 300});
+    expect(rest.most, {'files': 260, 'fileView': 300});
     final f = fit(920, panes, live: {'files': 220});
-    expect(f.widths, {'files': 220, 'preview': 340});
+    expect(f.widths, {'files': 220, 'fileView': 340});
     expect(f.left, 360);
     expect(fit(920, panes, live: {'files': 300}).widths['files'], 260);
   });
@@ -318,19 +332,19 @@ void main() {
     expect(fit(2000, [side], saved: {'side': 900}).widths['side'], 640);
     expect(fit(2000, [side], saved: {'side': 10}).widths['side'], 300);
     // A relaunch in a smaller window than the width saved.
-    final small = fit(700, [ChatPanes.preview], saved: {'preview': 1200});
+    final small = fit(700, [ChatPanes.fileView], saved: {'fileView': 1200});
     expect(small.over, false);
-    expect(small.widths['preview'], 700 - 360);
+    expect(small.widths['fileView'], 700 - 360);
     // No room even for its least: it keeps its least, over the view, its
     // edge stopping there.
-    final none = fit(320, [ChatPanes.preview]);
+    final none = fit(320, [ChatPanes.fileView]);
     expect(none.over, true);
-    expect(none.most['preview'], 300);
-    expect(none.widths['preview'], 300);
+    expect(none.most['fileView'], 300);
+    expect(none.widths['fileView'], 300);
     expect(none.left, 320);
-    final tiny = fit(200, [ChatPanes.files, ChatPanes.preview]);
+    final tiny = fit(200, [ChatPanes.files, ChatPanes.fileView]);
     expect(tiny.over, true);
-    expect(tiny.widths, {'files': 200, 'preview': 300});
+    expect(tiny.widths, {'files': 200, 'fileView': 300});
   });
 
   test("it gives the same answer whatever was asked before, in the panes' "
@@ -353,34 +367,43 @@ void main() {
     }
   });
 
-  testWidgets('a hidden or archived side chat takes no room, and a '
-      "subagent's pane takes the preview's place", (tester) async {
+  testWidgets('a hidden or archived side chat takes no room, a '
+      "subagent's pane sits beside the files' view and takes the browser's "
+      'place', (tester) async {
     final d = await FakeDaemon([chat('c', 'claude', 'Fix it')]).connect(tester);
     final c = d.chats['c']!;
-    List<String> names({bool? preview}) => [
-      for (final p in openPanes(c, d, preview: preview)) p.name,
+    List<String> names({bool fileView = false, bool browser = false}) => [
+      for (final p in openPanes(c, d, fileView: fileView, browser: browser))
+        p.name,
     ];
     expect(names(), isEmpty);
     c.side.value = ChatState('s', '/Users/me');
     filesChats.value = {'c'};
-    c.preview.value = const PreviewFile('/Users/me/a.md');
-    expect(names(), ['side', 'files', 'preview']);
+    c.openPreview('/Users/me/a.md');
+    expect(names(), ['side', 'files', 'fileView']);
     c.sideHidden.value = true;
-    expect(names(), ['files', 'preview']);
+    expect(names(), ['files', 'fileView']);
     c
       ..sideHidden.value = false
       ..archived = true;
-    expect(names(), ['files', 'preview']);
+    expect(names(), ['files', 'fileView']);
     c.archived = false;
     c.pane.value = 'a';
-    expect(names(), ['side', 'files', 'subagent']);
-    // The room a preview the agent asks for would take: the subagent's
-    // pane gives it its place.
-    expect(names(preview: true), ['side', 'files', 'preview']);
-    c.pane.value = null;
-    c.preview.value = null;
+    expect(names(), ['side', 'files', 'fileView', 'subagent']);
+    c.openBrowserTab('http://localhost:3000');
+    // The browser took the subagent's place.
+    expect(c.pane.value, isNull);
+    expect(names(), ['side', 'files', 'fileView', 'browser']);
+    c.pane.value = 'a';
+    expect(c.browser.shown.value, isNull);
+    // The room a page the agent asks for would take: the subagent's pane
+    // gives it its place.
+    expect(names(browser: true), ['side', 'files', 'fileView', 'browser']);
+    c
+      ..pane.value = null
+      ..files.closeAll();
     expect(names(), ['side', 'files']);
-    expect(names(preview: true), ['side', 'files', 'preview']);
+    expect(names(fileView: true), ['side', 'files', 'fileView']);
     await closeView(tester, d);
   });
 

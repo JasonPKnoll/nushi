@@ -174,7 +174,7 @@ void main() {
     expect(_inRows(find.text('Show more')), findsNothing);
     await tester.tap(_inRows(find.text('chart.png')));
     await tester.pumpAndSettle();
-    expect(d.chats['c']!.previewFile, 'docs/img/chart.png');
+    expect(d.chats['c']!.shownFile, 'docs/img/chart.png');
     expect(
       find.descendant(
         of: find.byType(FileView),
@@ -225,7 +225,7 @@ void main() {
     fake.emit(EventsResponse(chatId: 'c', show: page));
     await tester.pumpAndSettle();
     final c = d.chats['c']!;
-    expect(c.previewFile, page);
+    expect(c.shownFile, page);
     expect(
       tester
           .widget<Tap>(
@@ -353,7 +353,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_names(tester).take(3), ['chart.png', 'report.md', 'flows.md']);
     // Closed, it stays recent for the hour.
-    c.preview.value = null;
+    c.files.closeAll();
     clock = () => start.add(const Duration(minutes: 59));
     await tester.pump(const Duration(minutes: 1)); // the widget's tick
     expect(_names(tester).take(3), ['chart.png', 'report.md', 'flows.md']);

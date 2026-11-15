@@ -220,15 +220,53 @@ Future<void> closeTabSaving(
   ChatState chat,
   PreviewEntry tab,
 ) async {
-  if (await saveBeforeClosing(context, chat, [tab])) chat.closePreview(tab);
-}
-
-/// Closes the preview and its tabs, their edits saved first.
-Future<void> closePreviewSaving(BuildContext context, ChatState chat) async {
-  if (await saveBeforeClosing(context, chat, chat.previewTabs.value)) {
-    chat.preview.value = null;
+  if (!await saveBeforeClosing(context, chat, [tab])) return;
+  switch (tab) {
+    case final PreviewFile file:
+      chat.files.close(file);
+    case final BrowserTab page:
+      chat.browser.close(page);
   }
 }
+
+/// Closes the file view and its tabs, their edits saved first.
+Future<void> closeFilesSaving(BuildContext context, ChatState chat) async {
+  if (await saveBeforeClosing(context, chat, chat.files.tabs.value)) {
+    chat.files.closeAll();
+  }
+}
+
+/// Closes the browser pane and its tabs (they hold no edits).
+void closeBrowser(ChatState chat) => chat.browser.shown.value = null;
+
+/// What ⌘W closes in [chat]: the tab showing in the pane that has the focus
+/// (a file's view or the browser), else in the one whose tab showed last,
+/// else in the other; null with no tab showing.
+PreviewEntry? tabToClose(ChatState chat) {
+  final file = chat.files.shown.value;
+  final page = chat.browser.shown.value;
+  final at = FocusManager.instance.primaryFocus?.context;
+  final focused = switch (at) {
+    final at? when at.findAncestorStateOfType<FileTabsFocus>() != null =>
+      TabKind.file,
+    final at? when at.findAncestorStateOfType<BrowserTabsFocus>() != null =>
+      TabKind.browser,
+    _ => null,
+  };
+  final first = focused ?? chat.lastTabbed ?? TabKind.file;
+  return switch (first) {
+    TabKind.file => file ?? page,
+    TabKind.browser => page ?? file,
+  };
+}
+
+/// A pane's state that holds file tabs: ⌘W with the focus in it closes
+/// its file (`tabToClose`).
+mixin FileTabsFocus<T extends StatefulWidget> on State<T>;
+
+/// A pane's state that holds browser tabs: ⌘W with the focus in it
+/// closes its tab (`tabToClose`).
+mixin BrowserTabsFocus<T extends StatefulWidget> on State<T>;
 
 /// A file tab's ✕, or, while its file has unsaved edits and the pointer
 /// isn't on the tab ([hover]), a dot in its place (amber in a conflict or

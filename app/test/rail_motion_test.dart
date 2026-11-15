@@ -78,7 +78,7 @@ void main() {
     expect(find.byType(DetailsPanel, skipOffstage: false), findsOneWidget);
 
     // Closed: it slides back in from the right, to where it was.
-    c.preview.value = null;
+    c.files.closeAll();
     await tester.pump();
     final first = tester.getRect(_rail).left;
     expect(first, greaterThan(at.left + 100));
@@ -111,7 +111,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(_rail, findsNothing);
-      c.preview.value = null;
+      c.files.closeAll();
       await tester.pump();
       // From past its place on the right, never from the left of it.
       expect(tester.getRect(_rail).left, greaterThan(at.left + 200));
@@ -138,12 +138,12 @@ void main() {
     );
     final c = d.chats['c']!;
     final panel = tester.state(find.byType(DetailsPanel, skipOffstage: false));
-    final preview = c.preview.value;
-    c.preview.value = null;
+    final shown = c.shownFile!;
+    c.files.closeAll();
     await tester.pump();
     await tester.pump(Motion.enter ~/ 3);
     final mid = tester.getRect(_rail).left;
-    c.preview.value = preview;
+    c.openPreview(shown);
     await tester.pump();
     expect(tester.getRect(_rail).left, closeTo(mid, 2));
     await tester.pumpAndSettle();
@@ -309,7 +309,7 @@ void main() {
     expect(tester.getRect(_menu).right, preview.left - ChatHeader.end);
     await tester.pumpAndSettle();
     expect(tester.getRect(find.byType(FileView)), preview);
-    c.preview.value = null;
+    c.files.closeAll();
     await tester.pump();
     expect(_rail, findsOneWidget);
     final rail = tester.getRect(_rail);

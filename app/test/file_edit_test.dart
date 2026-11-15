@@ -315,14 +315,14 @@ void main() {
     expect(find.text('Discard your changes to main.go?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(chatC(d).previewNames, ['main.go', 'b.go']);
+    expect(chatC(d).fileNames, ['main.go', 'b.go']);
     expect(chatC(d).edits['main.go'], same(e));
     // ⌘W asks too; Discard closes the tab.
     await cmd(tester, LogicalKeyboardKey.keyW);
     expect(find.text('Discard your changes to main.go?'), findsOneWidget);
     await tester.tap(find.text('Discard'));
     await tester.pumpAndSettle();
-    expect(chatC(d).previewNames, ['b.go']);
+    expect(chatC(d).fileNames, ['b.go']);
     expect(chatC(d).edits.containsKey('main.go'), isFalse);
     await endEditor(tester, d);
   }, variant: onMac);
@@ -362,7 +362,7 @@ void main() {
       await tester.pumpAndSettle();
       fake.down = false;
       await tester.pumpAndSettle();
-      expect(chatC(d).previewNames, ['b.go']);
+      expect(chatC(d).fileNames, ['b.go']);
       expect(fake.writes, isEmpty);
       expect(utf8.decode(fake.files['main.go']!), goSource);
       await endEditor(tester, d);
@@ -395,8 +395,8 @@ void main() {
     await typeIn(tester, editOf(d), 'x');
     chatC(d).pane.value = 'task';
     await tester.pumpAndSettle();
-    expect(chatC(d).previewNames, ['main.go']);
-    expect(chatC(d).preview.value, isNotNull);
+    expect(chatC(d).fileNames, ['main.go']);
+    expect(chatC(d).files.shown.value, isNotNull);
     chatC(d).pane.value = null;
     await endEditor(tester, d);
   }, variant: onMac);

@@ -248,7 +248,7 @@ void main() {
     expect(_view(tester, 'build.zip').row.opens, isFalse);
     await tester.tap(_row('build.zip'));
     await tester.pumpAndSettle();
-    expect(d.chats['c']!.preview.value, isNull);
+    expect(d.chats['c']!.files.shown.value, isNull);
     await closeView(tester, d);
   }, variant: _mac);
 
@@ -271,7 +271,7 @@ void main() {
     expect(_view(tester, 'img').wrote, isFalse);
     await tester.tap(_row('report.md'));
     await tester.pumpAndSettle();
-    expect(d.chats['c']!.previewFile, 'docs/report.md');
+    expect(d.chats['c']!.shownFile, 'docs/report.md');
     expect(find.byType(FileView), findsOneWidget);
     expect(_view(tester, 'report.md').showing, isTrue);
     // Closed, its listing ends; the tree keeps that it was open.
@@ -303,10 +303,10 @@ void main() {
     expect(_names(tester).take(4), ['app', 'lib', 'main.dart', 'pubspec.yaml']);
     expect(_view(tester, 'main.dart').selected, isTrue);
     expect(_view(tester, 'main.dart').showing, isTrue);
-    expect(c.previewFile, 'app/lib/main.dart', reason: 'the preview stays');
+    expect(c.shownFile, 'app/lib/main.dart', reason: 'the preview stays');
     // Open already, it goes to another file the same way.
     c
-      ..closePreview(const PreviewFile('app/lib/main.dart'))
+      ..files.close(const PreviewFile('app/lib/main.dart'))
       ..openPreview('docs/report.md');
     await tester.pumpAndSettle();
     await tester.tap(
@@ -348,7 +348,7 @@ void main() {
     filesIgnored.value = false;
     folder.tree['node_modules/left-pad'] = [_file('index.md', ignored: true)];
     c
-      ..closePreview(const PreviewFile('docs/draft.md'))
+      ..files.close(const PreviewFile('docs/draft.md'))
       ..openPreview('node_modules/left-pad/index.md');
     await tester.pumpAndSettle();
     await tester.tap(
@@ -394,7 +394,7 @@ void main() {
     expect(folderTreeOf(d.chats['c']!).selected, 'app/lib/main.dart');
     expect(_view(tester, 'main.dart').selected, isTrue);
     await _key(tester, LogicalKeyboardKey.enter);
-    expect(d.chats['c']!.previewFile, 'app/lib/main.dart');
+    expect(d.chats['c']!.shownFile, 'app/lib/main.dart');
     await _key(tester, LogicalKeyboardKey.arrowLeft); // up to lib
     expect(folderTreeOf(d.chats['c']!).selected, 'app/lib');
     await _key(tester, LogicalKeyboardKey.arrowLeft); // closes it
@@ -430,7 +430,7 @@ void main() {
     expect(_names(tester).last, 'tree_view.dart');
     expect(_view(tester, 'tree_view.dart').selected, isTrue);
     await _key(tester, LogicalKeyboardKey.enter);
-    expect(d.chats['c']!.previewFile, 'app/lib/widgets/tree_view.dart');
+    expect(d.chats['c']!.shownFile, 'app/lib/widgets/tree_view.dart');
     await _key(tester, LogicalKeyboardKey.escape);
     expect(_names(tester).first, 'app');
     expect(_names(tester), isNot(contains('widgets')));

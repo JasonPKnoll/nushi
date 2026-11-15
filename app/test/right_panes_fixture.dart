@@ -23,7 +23,7 @@ typedef ThresholdRow = ({
 const PaneSpec _side = ChatPanes.side;
 const PaneSpec _files = ChatPanes.files;
 const PaneSpec _sub = ChatPanes.subagent;
-const PaneSpec _preview = ChatPanes.preview;
+const PaneSpec _preview = ChatPanes.fileView;
 
 /// Every set of panes a chat can have open, left to right.
 const List<ThresholdRow> thresholdRows = [

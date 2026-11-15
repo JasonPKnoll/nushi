@@ -29,3 +29,5 @@ The owner, looking at a file in the preview: "If I clicked the file in the view 
 - Conflict on any outside change: the agent editing other lines is the common case, and both exits of a two-way choice lose someone's work.
 - The app writing the file itself: the daemon already decides what the preview may read, and the phone mustn't write.
 - Backups of unsaved text on disk, saying who changed a file, approval-card lines: left for if it's used enough.
+
+**Amendment (2026-11-15): a subagent's pane no longer takes the files' place** (ADR 0123). Files' tabs and the browser's are apart, and a subagent's pane takes only the browser's, so the rule that kept files with unsaved edits beside it is gone: a file's tabs and its edits always stay.

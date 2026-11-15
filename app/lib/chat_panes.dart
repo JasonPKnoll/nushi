@@ -14,18 +14,24 @@ import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/folder_tree.dart' show filesApi;
 import 'package:nushi/fork_chat.dart';
-import 'package:nushi/preview_entry.dart';
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/subagent_pane.dart';
 
 /// The panes that open beside a chat's transcript, left to right, each at
 /// the width it opens at until dragged and its least and most: the side
-/// chat, the Files pane, a subagent's or a background command's pane
-/// (named as the old Wider one was, so a width dragged then stays), and
-/// the preview, a file or a browser tab, in that one's place.
+/// chat, the Files pane, the open files' view, a subagent's or a
+/// background command's pane (named as the old Wider one was, so a width
+/// dragged then stays), and the browser, in that one's place.
 abstract final class ChatPanes {
   static const side = PaneSpec('side', initial: 380, min: 300, cap: 640);
   static const files = PaneSpec('files', initial: 260, min: 200, cap: 480);
+  static const fileView = PaneSpec(
+    'fileView',
+    initial: 560,
+    min: 300,
+    cap: double.infinity,
+    wide: true,
+  );
 
   /// It opens at the details panel's width before that took its own (ADR
   /// 0092).
@@ -36,8 +42,8 @@ abstract final class ChatPanes {
     cap: double.infinity,
     wide: true,
   );
-  static const preview = PaneSpec(
-    'preview',
+  static const browser = PaneSpec(
+    'browser',
     initial: 560,
     min: 300,
     cap: double.infinity,
@@ -47,17 +53,23 @@ abstract final class ChatPanes {
 
 /// The panes open beside [chat]'s transcript, left to right, as the chat
 /// view lays them out: a hidden side chat, or an archived chat's, isn't
-/// placed, and a subagent's or a command's pane takes the preview's place.
-/// [preview] counts the preview as open whatever it shows (the room it
-/// would take, when the agent asks for one).
-List<PaneSpec> openPanes(ChatState chat, Daemon daemon, {bool? preview}) {
+/// placed, and a subagent's or a command's pane takes the browser's place.
+/// [fileView] and [browser] count that pane as open whatever it shows (the
+/// room it would take, when the agent asks for one).
+List<PaneSpec> openPanes(
+  ChatState chat,
+  Daemon daemon, {
+  bool fileView = false,
+  bool browser = false,
+}) {
   final pane = chat.pane.value != null;
   return [
     if (chat.side.value != null && !chat.archived && !chat.sideHidden.value)
       ChatPanes.side,
     if (filesOpen(chat) && daemon.daemonApi >= filesApi) ChatPanes.files,
-    if (pane && preview == null) ChatPanes.subagent,
-    if (preview ?? (!pane && chat.preview.value != null)) ChatPanes.preview,
+    if (fileView || chat.files.shown.value != null) ChatPanes.fileView,
+    if (pane && !browser) ChatPanes.subagent,
+    if (browser || !pane && chat.browser.shown.value != null) ChatPanes.browser,
   ];
 }
 
@@ -87,15 +99,17 @@ BesideFit chatFit({
 
 /// The panes open beside [chat]'s transcript, left to right ([openPanes]),
 /// each at its own remembered width and closed on its own: the side chat,
-/// the Files pane, a subagent's or background command's pane (or a file's
-/// preview or a browser tab in its place). The preview's tabs row is
-/// [tabsKey]'s, so it outlives each file's view; a browser tab is
-/// [expanded] over all of it (ADR 0094) and [onExpand] toggles that.
+/// the Files pane, the open files' view, a subagent's or background
+/// command's pane (or the browser in its place). The file view's tab row
+/// is [fileTabsKey]'s and the browser's [browserTabsKey]'s, so each
+/// outlives each tab's view; the browser is [expanded] over all of it (ADR
+/// 0094) and [onExpand] toggles that.
 List<SidePane> chatPanes(
   BuildContext context,
   ChatState chat,
   Daemon daemon, {
-  required GlobalKey tabsKey,
+  required GlobalKey fileTabsKey,
+  required GlobalKey browserTabsKey,
   required bool expanded,
   required VoidCallback onExpand,
 }) {
@@ -119,27 +133,25 @@ List<SidePane> chatPanes(
             daemon: daemon,
             onClose: () => toggleFiles(chat),
           ),
+          'fileView' => FileView(
+            key: ValueKey(chat.shownFile),
+            chat: chat,
+            daemon: daemon,
+            path: chat.shownFile!,
+            tabsKey: fileTabsKey,
+            onClose: () => unawaited(closeFilesSaving(context, chat)),
+          ),
           'subagent' => _taskPane(chat, daemon, id!),
-          _ => switch (chat.preview.value!) {
-            PreviewFile(:final path) => FileView(
-              key: ValueKey(path),
-              chat: chat,
-              daemon: daemon,
-              path: path,
-              tabsKey: tabsKey,
-              onClose: () => unawaited(closePreviewSaving(context, chat)),
-            ),
-            final BrowserTab tab => BrowserPane(
-              key: ObjectKey(tab),
-              chat: chat,
-              tab: tab,
-              daemon: daemon,
-              tabsKey: tabsKey,
-              onClose: () => unawaited(closePreviewSaving(context, chat)),
-              expanded: expanded,
-              onExpand: onExpand,
-            ),
-          },
+          _ => BrowserPane(
+            key: ObjectKey(chat.browser.shown.value),
+            chat: chat,
+            tab: chat.browser.shown.value!,
+            daemon: daemon,
+            tabsKey: browserTabsKey,
+            onClose: () => closeBrowser(chat),
+            expanded: expanded,
+            onExpand: onExpand,
+          ),
         },
       ),
   ];

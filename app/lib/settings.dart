@@ -337,12 +337,23 @@ final Pref<Set<String>> cleanUpLater = _set('cleanUpLater', chats: true);
 
 /// The widths panes were dragged to, by pane (see `Resizable`). Not the
 /// details panel's, which is fixed (ADR 0092): an older `details` width is
-/// ignored, and dropped by the next save.
+/// ignored, and dropped by the next save. The preview's, from when files
+/// and browser tabs shared it, is the browser's (ADR 0094).
 final paneWidths = Pref<Map<String, double>>(
   'panes',
-  (v) => _entries(v, (w) => w is num ? w.toDouble() : null)..remove('details'),
+  readPaneWidths,
   rewrite: true,
 );
+
+/// [paneWidths] as read from `app.json`'s [v].
+@visibleForTesting
+Map<String, double> readPaneWidths(Object? v) {
+  final widths = _entries(v, (w) => w is num ? w.toDouble() : null)
+    ..remove('details');
+  final preview = widths.remove('preview');
+  if (preview != null) widths.putIfAbsent('browser', () => preview);
+  return widths;
+}
 
 /// Whether the chat takes the pane's whole width rather than a column in
 /// its middle (ADR 0074).

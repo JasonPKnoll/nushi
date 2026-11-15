@@ -10,6 +10,7 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/edit_bars.dart' show BrowserTabsFocus;
 import 'package:nushi/native.dart';
 import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/panes.dart';
@@ -35,7 +36,7 @@ class BrowserButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([chat.preview, chat.tab]),
+    listenable: Listenable.merge([chat.browser.shown, chat.tab]),
     builder: (context, _) {
       return IconTap.line(
         LineIcon.globe,
@@ -92,7 +93,9 @@ class BrowserPane extends StatefulWidget {
   State<BrowserPane> createState() => _BrowserPaneState();
 }
 
-class _BrowserPaneState extends State<BrowserPane> implements BrowserControls {
+class _BrowserPaneState extends State<BrowserPane>
+    with BrowserTabsFocus
+    implements BrowserControls {
   BrowserHost? _host;
   late final _address = TextEditingController(text: widget.tab.address.value);
   final _field = FocusNode(debugLabel: 'address');
@@ -334,7 +337,7 @@ class _BrowserPaneState extends State<BrowserPane> implements BrowserControls {
   /// The tabs, chips even when there's one, as Claude's, and the + right
   /// after them.
   Widget _tabs() => ValueListenableBuilder(
-    valueListenable: widget.chat.previewTabs,
+    valueListenable: widget.chat.browser.tabs,
     builder: (context, open, _) => Row(
       spacing: 2,
       children: [
@@ -344,6 +347,7 @@ class _BrowserPaneState extends State<BrowserPane> implements BrowserControls {
             chat: widget.chat,
             tabs: open.isEmpty ? [_tab] : open,
             current: _tab,
+            chips: true,
           ),
         ),
         NewBrowserTab(chat: widget.chat),

@@ -130,7 +130,9 @@ void main() {
     expect(showDetails.value, isFalse);
     expect(terminalChats.value, {'x', 'y'});
     // The details panel's width is fixed now (ADR 0092): an older one goes.
-    expect(paneWidths.value, {'preview': 600});
+    // The preview's, from when files and browser tabs shared it, is the
+    // browser's (ADR 0094).
+    expect(paneWidths.value, {'browser': 600});
     expect(terminalFontSize.value, 14);
     expect(githubDays.value, 30);
     expect(dismissedUpdate.value, '0.1.17');
@@ -145,9 +147,19 @@ void main() {
         ..remove('worktrees')
         ..remove('subagentWide')),
       'details': true,
-      'panes': {'preview': 600.0},
+      'panes': {'browser': 600.0},
     });
     expect(_appJson.statSync().mode & 0x1ff, 0x180);
+  });
+
+  test("the preview's width is the browser's unless it has its own; the "
+      "Changes list's stays", () {
+    expect(readPaneWidths({'preview': 640}), {'browser': 640});
+    expect(readPaneWidths({'preview': 640, 'browser': 500, 'files': 333}), {
+      'browser': 500,
+      'files': 333,
+    });
+    expect(readPaneWidths('x'), isEmpty);
   });
 
   test('a chat forgotten from every pref kept by chat, in one go', () {

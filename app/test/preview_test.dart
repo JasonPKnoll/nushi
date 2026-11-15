@@ -335,13 +335,13 @@ void main() {
     d.dispose();
   }, variant: _mac);
 
-  test('a preview and a subagent take one place', () {
+  test('a file and a subagent sit side by side', () {
     final c = ChatState('c', '/Users/me/nushi')..openPreview('a.md');
-    expect(c.previewFile, 'a.md');
+    expect(c.shownFile, 'a.md');
     c.pane.value = 'agent';
-    expect(c.preview.value, isNull);
+    expect(c.shownFile, 'a.md');
     c.openPreview('b.md');
-    expect((c.pane.value, c.previewFile), (null, 'b.md'));
+    expect((c.pane.value, c.shownFile), ('agent', 'b.md'));
   });
 
   testWidgets('the pane with a Markdown file, dark, wide', (tester) async {

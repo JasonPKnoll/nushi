@@ -213,7 +213,7 @@ void main() {
     tester,
   ) async {
     final d = await _app(tester);
-    paneWidths.value = {'preview': 300};
+    paneWidths.value = {'fileView': 300};
     await tester.pumpAndSettle();
     expect(_wrapButton, findsNothing);
     await tester.tap(_inPane(find.byTooltip('More')));

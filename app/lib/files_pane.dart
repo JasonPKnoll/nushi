@@ -258,7 +258,7 @@ class _FilesPaneState extends State<FilesPane> {
                 _tree,
                 _git,
                 widget.chat,
-                widget.chat.preview,
+                widget.chat.files.shown,
               ]),
               builder: (context, _) => _body(theme),
             ),
@@ -291,7 +291,7 @@ class _FilesPaneState extends State<FilesPane> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(path));
       }
     }
-    final open = widget.chat.previewFile;
+    final open = widget.chat.shownFile;
     return MacScrollbar(
       controller: _scroll,
       child: ListView.builder(

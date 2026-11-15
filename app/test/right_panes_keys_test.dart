@@ -218,9 +218,9 @@ void main() {
     // the last, and the rail has the pane's edge again.
     await _palette(tester, 'new browser tab');
     final c = d.chats['c']!;
-    expect(c.previewTabs.value, hasLength(2));
+    expect(c.browser.tabs.value, hasLength(2));
     await _cmd(tester, LogicalKeyboardKey.keyW);
-    expect(c.previewTabs.value, hasLength(1));
+    expect(c.browser.tabs.value, hasLength(1));
     expect(_r(tester, find.byType(BrowserPane)), browser);
     await _cmd(tester, LogicalKeyboardKey.keyW);
     expect(find.byType(BrowserPane), findsNothing);
@@ -281,7 +281,7 @@ void main() {
     expect(_r(tester, find.byType(ChatHeader)), header);
     // ⌘W on its only tab: closed, the rail back.
     await _cmd(tester, LogicalKeyboardKey.keyW);
-    expect(c.preview.value, isNull);
+    expect(c.browser.shown.value, isNull);
     expect(find.byType(BrowserPane), findsNothing);
     expect(_rail, findsOneWidget);
     expect(_r(tester, _rail).right, _r(tester, find.byType(Pane)).right);

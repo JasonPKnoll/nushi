@@ -45,17 +45,17 @@ final _firsts = <(String, Type, PanesOpen, List<PaneSpec>)>[
     'side chat',
     SideChat,
     _open(side: true, files: true, previews: 1),
-    [ChatPanes.side, ChatPanes.files, ChatPanes.preview],
+    [ChatPanes.side, ChatPanes.files, ChatPanes.fileView],
   ),
   (
     'Files',
     FilesPane,
     _open(files: true, previews: 1),
-    [ChatPanes.files, ChatPanes.preview],
+    [ChatPanes.files, ChatPanes.fileView],
   ),
   ('subagent', SubagentPane, _open(subagent: true), [ChatPanes.subagent]),
-  ('preview', FileView, _open(previews: 1), [ChatPanes.preview]),
-  ('browser', BrowserPane, _open(browser: 1), [ChatPanes.preview]),
+  ('file view', FileView, _open(previews: 1), [ChatPanes.fileView]),
+  ('browser', BrowserPane, _open(browser: 1), [ChatPanes.browser]),
 ];
 
 void main() {

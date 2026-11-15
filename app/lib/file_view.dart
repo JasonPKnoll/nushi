@@ -53,7 +53,7 @@ class FileView extends StatefulWidget {
   State<FileView> createState() => _FileViewState();
 }
 
-class _FileViewState extends State<FileView> {
+class _FileViewState extends State<FileView> with FileTabsFocus {
   late final _watch = FileWatch(widget.daemon, widget.chat.id, widget.path);
   late final PreviewKind _kind = previewKind(widget.path) ?? PreviewKind.code;
   late final PageHost? _page = _kind.page && _kind != PreviewKind.mermaid
@@ -62,7 +62,7 @@ class _FileViewState extends State<FileView> {
   late final DiagramHost? _diagram = _kind == PreviewKind.mermaid
       ? native.web.diagram()
       : null;
-  late bool _source = widget.chat.previewSources.contains(widget.path);
+  late bool _source = widget.chat.files.sources.contains(widget.path);
   final _focus = FocusNode(debugLabel: 'preview');
 
   @override
@@ -163,7 +163,7 @@ class _FileViewState extends State<FileView> {
 
   void _showSource(bool source) {
     setState(() => _source = source);
-    final sources = widget.chat.previewSources;
+    final sources = widget.chat.files.sources;
     if (source) {
       sources.add(widget.path);
     } else {
@@ -211,17 +211,14 @@ class _FileViewState extends State<FileView> {
             onClose: widget.onClose,
           ),
           LayoutBuilder(
-            builder: (context, pane) => ValueListenableBuilder(
-              valueListenable: widget.chat.previewTabs,
-              builder: (context, open, _) => PathLine(
-                folder: widget.chat.folder,
-                path: widget.path,
-                // The source button under Close.
-                end: previewHeaderEnd(pane.maxWidth, open, page: page != null),
-                trailing: _switches
-                    ? SourceButton(source: _source, onChanged: _showSource)
-                    : null,
-              ),
+            builder: (context, pane) => PathLine(
+              folder: widget.chat.folder,
+              path: widget.path,
+              // The source button under Close.
+              end: previewHeaderEnd(pane.maxWidth, page: page != null),
+              trailing: _switches
+                  ? SourceButton(source: _source, onChanged: _showSource)
+                  : null,
             ),
           ),
           ListenableBuilder(

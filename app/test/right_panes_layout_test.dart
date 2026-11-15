@@ -107,19 +107,19 @@ final List<_Kind> _kinds = [
   (
     name: '3 files',
     open: _open(previews: 3),
-    specs: [ChatPanes.preview],
+    specs: [ChatPanes.fileView],
     types: [FileView],
   ),
   (
     name: '2 browser tabs',
     open: _open(browser: 2),
-    specs: [ChatPanes.preview],
+    specs: [ChatPanes.browser],
     types: [BrowserPane],
   ),
   (
     name: 'files + browser',
     open: _open(files: true, browser: 1),
-    specs: [ChatPanes.files, ChatPanes.preview],
+    specs: [ChatPanes.files, ChatPanes.browser],
     types: [FilesPane, BrowserPane],
   ),
 ];

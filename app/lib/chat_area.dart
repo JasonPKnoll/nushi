@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nushi/beside.dart';
+import 'package:nushi/beside_fit.dart' show PaneSpec;
 import 'package:nushi/changes_view.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_column.dart';
@@ -10,7 +11,6 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/panes.dart' show Pane;
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_entry.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_tab.dart';
 import 'package:nushi/settings.dart';
@@ -41,17 +41,19 @@ class _ChatAreaState extends State<ChatArea> {
   /// Its pull request, looked for while the chat shows (for the tab).
   late final ChatPull _pull;
 
-  /// The area's width, as last built: what the preview's and the
-  /// details' room is worked out from when asked.
+  /// The area's width, as last built: what the panes' and the details'
+  /// room is worked out from when asked.
   double _width = double.infinity;
 
-  /// The preview's tabs: each file's view is made again as it shows, and
-  /// the row moves to the new one with its place kept.
-  final GlobalKey<State> _previewTabs = GlobalKey();
+  /// The file view's and the browser's tab rows: each tab's view is made
+  /// again as it shows, and its row moves to the new one with its place
+  /// kept.
+  final GlobalKey<State> _fileTabs = GlobalKey();
+  final GlobalKey<State> _browserTabs = GlobalKey();
 
   /// Whether the browser tab showing takes the whole area, over the
   /// transcript (its Expand, ADR 0094). It lasts while a browser tab shows
-  /// on the Chat tab: a file's tab, the browser hidden, a subagent's pane,
+  /// on the Chat tab: a file shown, the browser hidden, a subagent's pane,
   /// another chat (another area) or another tab put it back.
   final _expanded = ValueNotifier<bool>(false);
 
@@ -65,8 +67,8 @@ class _ChatAreaState extends State<ChatArea> {
     // transcript when it needs you: what it asks is there.
     if (widget.chat.phase == ChatPhase.waiting) _tab.value = ChatTab.chat;
     widget.chat.addListener(_showFile);
-    widget.chat.preview.addListener(_showPreview);
-    widget.chat.preview.addListener(_collapse);
+    widget.chat.files.shown.addListener(_showFileTab);
+    widget.chat.browser.shown.addListener(_collapse);
     widget.chat.pane.addListener(_collapse);
     widget.chat.showAsked.addListener(_showAsked);
     _tab.addListener(_showAsked);
@@ -86,16 +88,19 @@ class _ChatAreaState extends State<ChatArea> {
   @override
   void dispose() {
     widget.chat.removeListener(_showFile);
-    widget.chat.preview.removeListener(_showPreview);
-    widget.chat.preview.removeListener(_collapse);
+    widget.chat.files.shown.removeListener(_showFileTab);
+    widget.chat.browser.shown.removeListener(_collapse);
     widget.chat.pane.removeListener(_collapse);
     widget.chat.showAsked.removeListener(_showAsked);
     _tab.removeListener(_showAsked);
     _tab.removeListener(_collapse);
     terminalChats.removeListener(_terminalShown);
     // Gone, it has no room to say; the chat shows nowhere until it's back.
-    if (widget.chat.previewFits == _previewFits) {
-      widget.chat.previewFits = ChatState.fitsAlways;
+    if (widget.chat.filesFit == _filesFit) {
+      widget.chat.filesFit = ChatState.fitsAlways;
+    }
+    if (widget.chat.browserFits == _browserFits) {
+      widget.chat.browserFits = ChatState.fitsAlways;
     }
     if (widget.chat.panelFits == _panelFits) {
       widget.chat.panelFits = ChatState.fitsAlways;
@@ -111,7 +116,7 @@ class _ChatAreaState extends State<ChatArea> {
   bool get _browsing =>
       widget.chat.shownTab == ChatTab.chat &&
       widget.chat.pane.value == null &&
-      widget.chat.preview.value is BrowserTab;
+      widget.chat.browser.shown.value != null;
 
   /// What shows is no longer a browser tab on the Chat tab: it's put back.
   void _collapse() {
@@ -142,9 +147,12 @@ class _ChatAreaState extends State<ChatArea> {
     toggleTerminalOf(widget.chat, _keys);
   }
 
-  /// A file's preview opened (from Artifacts, or ⌘P) shows beside the chat.
-  void _showPreview() {
-    if (widget.chat.preview.value != null) _tab.value = ChatTab.chat;
+  /// A file opened (from Artifacts, or ⌘P) shows beside the chat, and an
+  /// expanded browser tab is put back for it (ADR 0094).
+  void _showFileTab() {
+    if (widget.chat.files.shown.value == null) return;
+    _tab.value = ChatTab.chat;
+    _expanded.value = false;
   }
 
   /// A file or page its agent asked to show opens while the transcript
@@ -159,24 +167,31 @@ class _ChatAreaState extends State<ChatArea> {
     final asked = chat.showAsked.value;
     if (asked == null || chat.shownTab != ChatTab.chat) return;
     chat.showAsked.value = null;
-    if (!_previewFits()) return;
     switch (asked) {
-      case ShowFile(:final path):
+      case ShowFile(:final path) when _filesFit():
         chat.openPreview(path);
-      case ShowPage(:final url):
+      case ShowPage(:final url) when _browserFits():
         chat.showPage(url);
+      case _:
     }
   }
 
-  /// Whether the preview opens beside the transcript and leaves it
+  /// Whether a file's view opens beside the transcript and leaves it
   /// [ChatView.leastBesideWide], as [Beside] works it out ([chatFit]): the
   /// details rail tucks itself away for it and the panes narrow, each to
-  /// its least at most (a subagent's pane takes no room: the preview takes
-  /// its place). It is read when asked, since a side chat or the
+  /// its least at most. It is read when asked, since a side chat or the
   /// Files pane opens without building this area again.
-  bool _previewFits() => !chatFit(
+  bool _filesFit() =>
+      _fits(openPanes(widget.chat, widget.daemon, fileView: true));
+
+  /// Whether the browser opens beside the transcript, as [_filesFit] (a
+  /// subagent's pane takes no room: the browser takes its place).
+  bool _browserFits() =>
+      _fits(openPanes(widget.chat, widget.daemon, browser: true));
+
+  bool _fits(List<PaneSpec> panes) => !chatFit(
     room: _width,
-    panes: openPanes(widget.chat, widget.daemon, preview: true),
+    panes: panes,
     saved: paneWidths.value,
     wantRail: false,
   ).over;
@@ -222,7 +237,8 @@ class _ChatAreaState extends State<ChatArea> {
               final fits = box.maxWidth >= _railFrom;
               chat
                 ..panelFits = _panelFits
-                ..previewFits = _previewFits;
+                ..filesFit = _filesFit
+                ..browserFits = _browserFits;
               // The pull request's tab goes with its link.
               final tab = chat.shownTab;
               final onChat = tab == ChatTab.chat;
@@ -282,13 +298,14 @@ class _ChatAreaState extends State<ChatArea> {
                 // Only the transcript's rows open a preview or a tab.
                 open: onChat ? chat.openPreview : null,
                 browse: onChat ? (url) => chat.openBrowserTab('$url') : null,
-                browseFits: () => chat.previewFits(),
-                current: chat.preview,
+                browseFits: () => chat.browserFits(),
+                current: chat.files.shown,
                 name: (path) => relativeIn(chat.folder, path),
                 child: ListenableBuilder(
                   listenable: Listenable.merge([
                     chat.pane,
-                    chat.preview,
+                    chat.files.shown,
+                    chat.browser.shown,
                     chat.side,
                     chat.sideHidden,
                     filesChats,
@@ -328,7 +345,8 @@ class _ChatAreaState extends State<ChatArea> {
             context,
             chat,
             widget.daemon,
-            tabsKey: _previewTabs,
+            fileTabsKey: _fileTabs,
+            browserTabsKey: _browserTabs,
             expanded: _expanded.value && _browsing,
             onExpand: () => _expanded.value = !_expanded.value,
           )
@@ -348,7 +366,7 @@ class _ChatAreaState extends State<ChatArea> {
       // narrower than that the panes lie over it ([chatFit]).
       least: wide ? ChatView.leastBesideWide : ChatView.minWidth,
       railLeast: wide ? ChatView.leastBesideWide : ChatView.leastBesideDetails,
-      cover: _expanded.value && _browsing ? 'preview' : null,
+      cover: _expanded.value && _browsing ? ChatPanes.browser.name : null,
       panes: panes,
       details: details,
     );

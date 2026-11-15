@@ -47,7 +47,7 @@ PanesOpen _openOf(List<PaneSpec> panes) => (
   files: panes.contains(ChatPanes.files),
   subagent: panes.contains(ChatPanes.subagent),
   command: false,
-  previews: panes.contains(ChatPanes.preview) ? 1 : 0,
+  previews: panes.contains(ChatPanes.fileView) ? 1 : 0,
   browser: 0,
 );
 
@@ -186,7 +186,11 @@ void main() {
     showDetails.addListener(count);
     addTearDown(() => showDetails.removeListener(count));
     viewport(tester, Size(width, 900));
-    await openPanesIn(tester, d, _openOf([ChatPanes.files, ChatPanes.preview]));
+    await openPanesIn(
+      tester,
+      d,
+      _openOf([ChatPanes.files, ChatPanes.fileView]),
+    );
     expect(_rail(), false);
     expect(told, 0);
     await tester.pump(const Duration(seconds: 2)); // a save would be done
@@ -228,7 +232,7 @@ void main() {
     viewport(tester, Size(width, 900));
     await tester.pumpAndSettle();
     final c = d.chats['c']!;
-    c.closePreview(c.preview.value!);
+    c.files.close(c.files.shown.value!);
     await tester.pumpAndSettle();
     expect(find.byType(FileView), findsNothing);
     expect(_rail(), false);
@@ -495,7 +499,7 @@ void main() {
     final (d, fake) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.preview]),
+      open: _openOf([ChatPanes.fileView]),
     );
     final c = d.chats['c']!
       // A turn under way: the status the chat list sends.
@@ -524,7 +528,7 @@ void main() {
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.preview]),
+      open: _openOf([ChatPanes.fileView]),
     );
     final c = d.chats['c']!;
     expect(c.panelFits(), isFalse);
@@ -536,7 +540,7 @@ void main() {
     expect(showDetails.value, isFalse);
     Navigator.of(tester.element(find.byType(Palette))).pop();
     await tester.pumpAndSettle();
-    c.preview.value = null;
+    c.files.closeAll();
     await tester.pumpAndSettle();
     expect(c.panelFits(), isTrue);
     revealArtifacts(tester.element(find.byType(ChatHeader)), c);
@@ -554,7 +558,7 @@ void main() {
       tester,
       width: windowFor(1240, sidebar: false),
       archived: true,
-      open: _openOf([ChatPanes.side, ChatPanes.preview]),
+      open: _openOf([ChatPanes.side, ChatPanes.fileView]),
     );
     expect(find.byType(SideChat, skipOffstage: false), findsNothing);
     expect(find.byType(FileView), findsOneWidget);
@@ -568,7 +572,7 @@ void main() {
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1240, sidebar: false),
-      open: _openOf([ChatPanes.side, ChatPanes.preview]),
+      open: _openOf([ChatPanes.side, ChatPanes.fileView]),
     );
     final c = d.chats['c']!..listed(ChatStatus(sessionGone: true));
     await tester.pumpAndSettle();
@@ -597,7 +601,7 @@ void main() {
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.preview]),
+      open: _openOf([ChatPanes.fileView]),
     );
     final c = d.chats['c']!;
     final preview = tester.getRect(find.byType(FileView));
@@ -629,7 +633,7 @@ void main() {
     final (d, _) = await panesApp(
       tester,
       width: windowFor(1100, sidebar: false),
-      open: _openOf([ChatPanes.preview]),
+      open: _openOf([ChatPanes.fileView]),
     );
     final preview = tester.getRect(find.byType(FileView));
     d.select('d');

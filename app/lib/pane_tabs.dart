@@ -14,11 +14,11 @@ import 'package:nushi/theme/theme.dart';
 import 'package:nushi/tool_parts.dart' show plainPath;
 import 'package:nushi/widgets.dart';
 
-// The preview pane's tabs (ADR 0070), in its title row in place of the file
-// name when more than one tab is open: what each says, how wide it is, and
-// the row. A browser tab (ADR 0094) is a tab like a file's, named for its
-// page; with one in the row every tab is a chip, as Claude desktop's
-// browser draws its tabs ([previewChips]).
+// A pane's tabs (ADR 0070): a file view's, in its title row in place of the
+// file name when more than one file is open, as plain names (ADR 0071); the
+// browser pane's (ADR 0094), named for their pages, as chips, as Claude
+// desktop's browser draws its tabs. What each says, how wide it is, and the
+// row.
 
 /// What the tab of [file] says: its name, with as much of its folder as
 /// tells it from the others of that name in [files] ("plan.md · docs"),
@@ -53,12 +53,6 @@ const double previewNameInset = 5;
 
 /// The room a tab keeps for its ✕, shown or not, so its name doesn't move.
 const double _closeRoom = 18;
-
-/// Whether [tabs] are drawn as chips: with a browser tab among them, as
-/// Claude desktop's browser draws its tabs (a rounded fill, an icon, the
-/// name, a ✕), a file's tab beside one a chip too so the row reads as one
-/// (ADR 0094); files alone keep plain tabs (ADR 0071).
-bool previewChips(List<PreviewEntry> tabs) => tabs.any((e) => e is BrowserTab);
 
 /// The room at the ends of a title row of chips, the browser's (as
 /// Claude's, a little in from the pane's edges).
@@ -118,21 +112,28 @@ List<double> fitTabs(List<double> widths, double room) {
 
 /// The tabs of [tabs], [current] the one showing: plain names that fill the
 /// slot the file name had, so the title row keeps its height and its
-/// controls. Past the room they shrink, then scroll, the showing one brought
-/// into view. Its state outlives the file's view (`FileView.tabsKey`), so
-/// picking a tab doesn't lose the row's place. A file's tab says its name
-/// in the code face, a browser tab its page's title in the interface's.
+/// controls, or the browser's [chips]. Past the room they shrink, then
+/// scroll, the showing one brought into view. Its state outlives each tab's
+/// view (`FileView.tabsKey`), so picking a tab doesn't lose the row's
+/// place. A file's tab says its name in the code face, a browser tab its
+/// page's title in the interface's.
 class PaneTabs extends StatefulWidget {
   const new({
     required this.chat,
     required this.tabs,
     required this.current,
+    required this.chips,
     super.key,
   });
 
   final ChatState chat;
   final List<PreviewEntry> tabs;
   final PreviewEntry current;
+
+  /// Drawn as Claude desktop's browser draws its tabs (a rounded fill, an
+  /// icon, the name, a ✕): the browser's (ADR 0094); a file's are plain
+  /// names (ADR 0071).
+  final bool chips;
 
   @override
   State<PaneTabs> createState() => _PaneTabsState();
@@ -217,7 +218,7 @@ class _PaneTabsState extends State<PaneTabs> {
           final BrowserTab b => b.label,
         },
     ];
-    final chips = previewChips(tabs);
+    final chips = widget.chips;
     TextStyle face(PreviewEntry e, Color color) => e is BrowserTab
         ? theme.ui(color, size: chips ? 14 : 12)
         : theme.code(color, size: chips ? 13 : 12);
@@ -314,7 +315,7 @@ class _Tab extends StatelessWidget {
           children: [
             Expanded(
               child: Pressable(
-                onTap: () => chat.showPreviewTab(tab),
+                onTap: () => chat.showTab(tab),
                 tooltip: tooltip,
                 builder: (context, look) => Container(
                   alignment: Alignment.centerLeft,
@@ -387,7 +388,7 @@ class _Chip extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Pressable(
-                      onTap: () => tab.chat.showPreviewTab(tab.tab),
+                      onTap: () => tab.chat.showTab(tab.tab),
                       tooltip: tab.tooltip,
                       builder: (context, look) => Container(
                         padding: const EdgeInsets.only(left: _chipStart),

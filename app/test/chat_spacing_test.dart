@@ -120,7 +120,7 @@ Future<Daemon> _app(
 }) async {
   viewport(tester, Size(width, height), brightness: brightness);
   showDetails.value = false;
-  paneWidths.value = {'preview': ?pane};
+  paneWidths.value = {'fileView': ?pane};
   final c = chat('c', 'claude', 'Fix the login redirect after it expires');
   final fake = FakeDaemon([c])
     ..answer = ((input) => input is GetChatRequest

@@ -54,7 +54,7 @@ void main() {
     expect(fakes.hosts, hasLength(1));
     expect(fakes.hosts.single.opened, hasLength(1));
     // Its width as dragged is kept.
-    expect(paneWidths.value, isNot(contains('preview')));
+    expect(paneWidths.value, isNot(contains('browser')));
     await closeView(tester, d);
   }, variant: macOnly);
 
@@ -128,7 +128,7 @@ void main() {
     c.openPreview('docs/plan.md');
     await tester.pumpAndSettle();
     expect(find.byType(Composer), findsOneWidget);
-    c.showPreviewTab(c.previewTabs.value.first);
+    c.showBrowserTab(c.browser.tabs.value.first);
     await tester.pumpAndSettle();
     expect(_expand, findsOneWidget);
 
@@ -198,7 +198,7 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
         final c = d.chats['c']!;
-        c.showPreviewTab(c.previewTabs.value.first);
+        c.showBrowserTab(c.browser.tabs.value.first);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await render(

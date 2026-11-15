@@ -25,7 +25,6 @@ import 'package:nushi/native.dart';
 import 'package:nushi/new_chat.dart';
 import 'package:nushi/open_file.dart';
 import 'package:nushi/palette.dart';
-import 'package:nushi/preview_entry.dart';
 import 'package:nushi/preview_marks.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_link_dialog.dart';
@@ -242,21 +241,22 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
   final details = showDetails.value;
   final terminal = shown != null && terminalChats.value.contains(shown.id);
   // The browser tab in sight, under no dialog.
-  final browser = switch (shown?.preview.value) {
-    final BrowserTab tab
+  final browser = switch (shown?.browser.shown.value) {
+    final tab?
         when shown?.shownTab == ChatTab.chat &&
             !(Navigator.maybeOf(context)?.canPop() ?? false) =>
       tab.view,
     _ => null,
   };
   // The file the preview shows, being edited, in sight under no dialog.
-  final edited = switch (shown?.previewFile) {
+  final edited = switch (shown?.shownFile) {
     final path?
         when shown?.shownTab == ChatTab.chat &&
             !(Navigator.maybeOf(context)?.canPop() ?? false) =>
       shown!.edits[path],
     _ => null,
   };
+  final closing = shown == null ? null : tabToClose(shown);
   return [
     AppAction(.newChat, 'New chat', run: () => newChat(context, d, '')),
     AppAction(
@@ -268,14 +268,13 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
     AppAction(
       .closeTab,
       'Close tab',
-      // Only a preview in sight, and never under a dialog: its ⌘W, which
+      // Only a tab in sight, and never under a dialog: its ⌘W, which
       // Flutter's keys don't reach, comes here from the menu bar.
       enabled:
-          shown?.preview.value != null &&
+          closing != null &&
           shown?.shownTab == ChatTab.chat &&
           !(Navigator.maybeOf(context)?.canPop() ?? false),
-      run: () =>
-          unawaited(closeTabSaving(context, shown!, shown.preview.value!)),
+      run: () => unawaited(closeTabSaving(context, shown!, closing!)),
     ),
     AppAction(
       .save,

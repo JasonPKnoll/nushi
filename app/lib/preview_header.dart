@@ -97,31 +97,14 @@ class PreviewHeader extends StatelessWidget {
             : roomy
             ? NushiTheme.barGap - 8
             : 0.0;
-        return ValueListenableBuilder(
-          valueListenable: chat.previewTabs,
-          // Beside a browser tab its row's ends are the browser's, so
-          // going from one tab to the other moves no chip (ADR 0094).
-          builder: (context, open, row) {
-            final chips = open.length > 1 && previewChips(open);
-            return PaneHeader(
-              inset: chips
-                  ? previewChipInset
-                  : roomy
-                  ? NushiTheme.gutter
-                  : 12,
-              end: previewHeaderEnd(pane.maxWidth, open, page: page),
-              child: row!,
-            );
-          },
+        return PaneHeader(
+          inset: roomy ? NushiTheme.gutter : 12,
+          end: previewHeaderEnd(pane.maxWidth, page: page),
           child: LayoutBuilder(
             builder: (context, box) => ListenableBuilder(
-              listenable: Listenable.merge([
-                watch,
-                chat.previewTabs,
-                wrapLines,
-              ]),
+              listenable: Listenable.merge([watch, chat.files.tabs, wrapLines]),
               builder: (context, _) {
-                final open = chat.previewTabs.value;
+                final open = chat.files.tabs.value;
                 final tabs = open.length > 1;
                 // A tab's file on its way keeps Live's room: a pick
                 // would otherwise widen the tabs' row for a moment,
@@ -139,9 +122,7 @@ class PreviewHeader extends StatelessWidget {
                         child: Row(
                           spacing: roomy ? 6 : 8,
                           children: [
-                            // A chip has its own icon.
-                            if (!tabs || !previewChips(open))
-                              Icon(kind.icon, size: 14, color: t.textSecondary),
+                            Icon(kind.icon, size: 14, color: t.textSecondary),
                             // The name shows the file in the Files
                             // pane; several open, their tabs take its
                             // place.
@@ -233,36 +214,19 @@ class PreviewHeader extends StatelessWidget {
     );
   }
 
-  /// The tabs of [open], this file's showing; as chips, the + after them,
-  /// as a browser tab's title row has it, so the row keeps its shape as
-  /// you move between the two.
-  Widget _tabs(List<PreviewEntry> open) {
-    final tabs = PaneTabs(
-      key: tabsKey,
-      chat: chat,
-      tabs: open,
-      current: PreviewFile(path),
-    );
-    if (!previewChips(open)) return tabs;
-    return Row(
-      spacing: 2,
-      children: [
-        Flexible(child: tabs),
-        NewBrowserTab(chat: chat),
-      ],
-    );
-  }
+  /// The tabs of [open], this file's showing.
+  Widget _tabs(List<PreviewFile> open) => PaneTabs(
+    key: tabsKey,
+    chat: chat,
+    tabs: open,
+    current: PreviewFile(path),
+    chips: false,
+  );
 }
 
 /// The room right of a preview header's last button (Close) in a pane
-/// [width] wide with [open]'s tabs, a [page]'s or not: the path line's ends
-/// there too.
-double previewHeaderEnd(
-  double width,
-  List<PreviewEntry> open, {
-  required bool page,
-}) {
-  if (open.length > 1 && previewChips(open)) return previewChipInset;
+/// [width] wide, a [page]'s or not: the path line's ends there too.
+double previewHeaderEnd(double width, {required bool page}) {
   final roomy = width >= (page ? _roomyWithPageFrom : _roomyFrom);
   return roomy ? NushiTheme.gutter : 4;
 }

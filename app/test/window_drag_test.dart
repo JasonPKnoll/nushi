@@ -382,6 +382,7 @@ void main() {
                       PreviewFile('docs/b.md'),
                     ],
                     current: const PreviewFile('docs/a.md'),
+                    chips: false,
                   ),
                 ),
                 IconTap(Icons.close, tooltip: 'Close', onTap: () {}),

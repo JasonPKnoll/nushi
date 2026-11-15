@@ -269,7 +269,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(_over(tester), isFalse);
-    expect(paneWidths.value['preview'], area.width - ChatView.leastBesideWide);
+    expect(paneWidths.value['fileView'], area.width - ChatView.leastBesideWide);
     await closeView(tester, d);
   }, variant: _mac);
 

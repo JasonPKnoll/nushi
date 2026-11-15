@@ -172,15 +172,15 @@ Artifacts chatArtifacts(ChatState chat, {bool pins = true}) {
   );
 }
 
-/// The file [chat]'s preview shows, by its artifact's name ([relativeIn]).
-String? openArtifact(ChatState chat) => switch (chat.previewFile) {
+/// The file [chat]'s file tabs show, by its artifact's name ([relativeIn]).
+String? openArtifact(ChatState chat) => switch (chat.shownFile) {
   final p? => relativeIn(chat.folder, p),
   null => null,
 };
 
 /// What [chatArtifacts] reads, to build again when it changes.
 Listenable artifactsOf(ChatState chat) =>
-    Listenable.merge([chat, chat.preview, chat.opened, pinnedFiles]);
+    Listenable.merge([chat, chat.files.shown, chat.opened, pinnedFiles]);
 
 /// Whether [file] is pinned in [chat], by whatever name it was.
 bool pinned(ChatState chat, String file) =>

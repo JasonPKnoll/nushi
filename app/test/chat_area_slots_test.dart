@@ -95,7 +95,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tucked(), isTrue);
     expect(tester.widget(transcript), same(first));
-    c.preview.value = null;
+    c.files.closeAll();
     await tester.pumpAndSettle();
     expect(tucked(), isFalse);
     // A subagent's pane (264) leaves the rail its room, until its edge is
