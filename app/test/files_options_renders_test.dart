@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/files_bar.dart';
+import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_editor.dart';
@@ -129,6 +130,7 @@ void main() {
           {'main.go': utf8.encode(_go)},
           width: width,
           brightness: brightness,
+          folder: [FolderEntry(name: 'main.go', kind: 'file')],
         );
         await tester.pump(const Duration(seconds: 1));
         await tester.pumpAndSettle();
