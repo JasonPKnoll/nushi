@@ -133,7 +133,7 @@ Future<(FakeDaemon, Daemon)> _view(
       _ => null,
     };
   final d = await fake.connect(tester);
-  await tester.binding.setSurfaceSize(const Size(1000, 860));
+  viewport(tester, const Size(1000, 860), ratio: 3);
   await tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -195,7 +195,7 @@ void main() {
         _ => null,
       };
     final d = await fake.connect(tester);
-    await tester.binding.setSurfaceSize(const Size(1000, 860));
+    viewport(tester, const Size(1000, 860), ratio: 3);
     await tester.pumpWidget(
       themed(SkillsView(daemon: d, folder: '/Users/me/lost')),
     );
@@ -249,7 +249,7 @@ void main() {
       ..answer = (input) => input is ListSkillsRequest ? _opencode() : null;
     final d = await fake.connect(tester);
     d.skillsAgent = 'opencode';
-    await tester.binding.setSurfaceSize(const Size(1000, 860));
+    viewport(tester, const Size(1000, 860), ratio: 3);
     await tester.pumpWidget(
       themed(SkillsView(daemon: d, folder: '$_home/opencode')),
     );
@@ -321,7 +321,7 @@ void main() {
           : null;
     final d = await fake.connect(tester);
     d.skillsAgent = 'codex';
-    await tester.binding.setSurfaceSize(const Size(1000, 860));
+    viewport(tester, const Size(1000, 860), ratio: 3);
     await tester.pumpWidget(
       themed(SkillsView(daemon: d, folder: '$_home/named')),
     );

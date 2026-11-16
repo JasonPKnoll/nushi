@@ -101,7 +101,7 @@ Future<(FakeDaemon, Daemon)> _view(
     };
   final d = await fake.connect(tester);
   d.skillsAgent = agent;
-  await tester.binding.setSurfaceSize(size);
+  viewport(tester, size, ratio: 3);
   await tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -300,7 +300,7 @@ void main() {
           : null;
     final d = await fake.connect(tester);
     d.skillsAgent = 'claude';
-    await tester.binding.setSurfaceSize(const Size(1000, 700));
+    viewport(tester, const Size(1000, 700), ratio: 3);
     await tester.pumpWidget(
       themed(SkillsView(daemon: d, folder: '$_home/grouped')),
     );

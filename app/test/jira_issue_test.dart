@@ -155,7 +155,7 @@ Future<(FakeDaemon, Daemon, List<String>)> _open(
               _ => null,
             };
   final d = await fake.connect(tester);
-  await tester.binding.setSurfaceSize(const Size(700, 1100));
+  viewport(tester, const Size(700, 1100), ratio: 3);
   clock = () => _now;
   await tester.pumpWidget(
     MaterialApp(

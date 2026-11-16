@@ -99,7 +99,7 @@ void main() {
   testWidgets('the page lists Ante’s servers under Ante, without a switch, '
       'and says it has yours only', (tester) async {
     final (fake, d) = await _daemon(tester);
-    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    viewport(tester, const Size(1000, 900), ratio: 3);
     await tester.pumpWidget(
       themed(McpView(daemon: d, folder: '/Users/me/ante')),
     );
@@ -126,7 +126,7 @@ void main() {
   testWidgets('an Ante server that asks for a sign-in has Log in, and shows '
       'its real state once that is done', (tester) async {
     final (fake, d) = await _signIn(tester);
-    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    viewport(tester, const Size(1000, 900), ratio: 3);
     await tester.pumpWidget(
       themed(McpView(daemon: d, folder: '/Users/me/sign-in')),
     );
@@ -146,7 +146,7 @@ void main() {
   testWidgets('a daemon too old to say still has Ante’s as yours only, by '
       'its name', (tester) async {
     final (_, d) = await _daemon(tester, api: agentFactsApi - 1);
-    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    viewport(tester, const Size(1000, 900), ratio: 3);
     await tester.pumpWidget(
       themed(McpView(daemon: d, folder: '/Users/me/old')),
     );
@@ -159,7 +159,7 @@ void main() {
   testWidgets('an Ante chat’s widget shows its servers', (tester) async {
     final (fake, d) = await _daemon(tester);
     final chat = ChatState('c1', '/Users/me/ante-card')..agent = 'ante';
-    await tester.binding.setSurfaceSize(const Size(340, 500));
+    viewport(tester, const Size(340, 500), ratio: 3);
     await tester.pumpWidget(themed(PanelWidgets([mcpWidget(chat, d)])));
     await tester.pumpAndSettle();
     expect(find.textContaining('its own config'), findsNothing);
@@ -177,7 +177,7 @@ void main() {
 
   testWidgets('the form adds Ante’s for you only, without SSE', (tester) async {
     final (fake, d) = await _daemon(tester);
-    await tester.binding.setSurfaceSize(const Size(720, 900));
+    viewport(tester, const Size(720, 900), ratio: 3);
     await tester.pumpWidget(
       MaterialApp(
         theme: const NushiTheme(Tokens.dark).toThemeData(),
@@ -218,7 +218,7 @@ void main() {
   ]) {
     testWidgets('golden, Claude’s and Ante’s, $name', (tester) async {
       final (_, d) = await _daemon(tester);
-      await tester.binding.setSurfaceSize(Size(width, 960));
+      viewport(tester, Size(width, 960), ratio: 3);
       await tester.pumpWidget(
         MaterialApp(
           debugShowCheckedModeBanner: false,

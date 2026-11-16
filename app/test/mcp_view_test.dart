@@ -71,7 +71,7 @@ Future<(FakeDaemon, Daemon)> _view(
   Tokens tokens = Tokens.dark,
 }) async {
   final (fake, d) = await _daemon(tester);
-  await tester.binding.setSurfaceSize(const Size(1000, 640));
+  viewport(tester, const Size(1000, 640), ratio: 3);
   await tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -110,7 +110,7 @@ void main() {
     final chat = ChatState('c1', '/Users/me/card')
       ..agent = 'claude'
       ..mcpChanged = true;
-    await tester.binding.setSurfaceSize(const Size(340, 500));
+    viewport(tester, const Size(340, 500), ratio: 3);
     await tester.pumpWidget(themed(PanelWidgets([mcpWidget(chat, d)])));
     await tester.pumpAndSettle();
     expect(find.byType(Switch), findsNWidgets(4));
@@ -146,7 +146,7 @@ void main() {
     fake.agents.first.mcp = true;
     final d = await fake.connect(tester);
     final chat = ChatState('c1', '/Users/me/lost')..agent = 'claude';
-    await tester.binding.setSurfaceSize(const Size(340, 500));
+    viewport(tester, const Size(340, 500), ratio: 3);
     await tester.pumpWidget(themed(PanelWidgets([mcpWidget(chat, d)])));
     await tester.pumpAndSettle();
     expect(find.text('daemon unavailable: connection lost'), findsOneWidget);
