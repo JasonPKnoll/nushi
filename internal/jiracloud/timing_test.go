@@ -2,25 +2,20 @@ package jiracloud
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
 
 // slowFake is issueFake with each route taking what it took a real site
-// to answer (scaled by NUSHI_JIRA_TIMING, 0.1 when unset), and a search
-// of 100 issues a page.
-func slowFake(t *testing.T) (*fake, time.Duration, *inflight) {
+// to answer, scaled by scale, and a search of 100 issues a page.
+func slowFake(t *testing.T, scale float64) (*fake, time.Duration) {
 	t.Helper()
-	scale := 0.1
-	if v := os.Getenv("NUSHI_JIRA_TIMING"); v != "" {
-		_, _ = fmt.Sscan(v, &scale)
-	}
 	ms := func(n int) time.Duration { return time.Duration(float64(n)*scale) * time.Millisecond }
 	f := issueFake(t)
 	f.file("GET /rest/agile/1.0/board/7/sprint", "sprints.json")
@@ -55,64 +50,30 @@ func slowFake(t *testing.T) (*fake, time.Duration, *inflight) {
 		"GET /rest/agile/1.0/board/7/sprint":        350,
 		"POST /rest/api/3/search/jql":               600,
 	}
-	in := &inflight{}
 	for route, d := range slow {
 		h := f.routes[route]
 		f.routes[route] = func(w http.ResponseWriter, r *http.Request) {
-			in.add(1)
-			defer in.add(-1)
 			time.Sleep(ms(d))
 			h(w, r)
 		}
 	}
-	return f, ms(1000), in
+	return f, ms(1000)
 }
 
-// inflight counts the requests being answered, and the most at once.
-// With a gate set, a request waits (up to 2 s) for that many to be in,
-// so calls made together are counted together on a slow runner too.
-type inflight struct {
-	mu             sync.Mutex
-	now, max, gate int
-}
-
-func (n *inflight) add(d int) {
-	n.mu.Lock()
-	n.now += d
-	n.max = max(n.max, n.now)
-	gate := n.gate
-	n.mu.Unlock()
-	if d < 0 || gate == 0 {
-		return
-	}
-	for end := time.Now().Add(2 * time.Second); time.Now().Before(end); time.Sleep(time.Millisecond) {
-		n.mu.Lock()
-		in := n.now >= gate
-		n.mu.Unlock()
-		if in {
-			return
-		}
-	}
-}
-
-func (n *inflight) setGate(g int) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.gate = g
-}
-
-func (n *inflight) reset() int {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	m := n.max
-	n.max = 0
-	return m
-}
-
-// TestTiming times what the Jira view asks for, against slowFake; with
-// NUSHI_JIRA_TIMING=1 the times are the real site's (go test -v).
+// TestTiming times what the Jira view asks for, against slowFake, only
+// with NUSHI_JIRA_TIMING set: its scale of the real site's times (1 for
+// them as they were, 0.1 for a tenth; go test -v to see them). It measures
+// and logs; TestIssueCallsTogether checks what it once found.
 func TestTiming(t *testing.T) {
-	f, second, in := slowFake(t)
+	v := os.Getenv("NUSHI_JIRA_TIMING")
+	if v == "" {
+		t.Skip("set NUSHI_JIRA_TIMING to time the Jira view's calls")
+	}
+	var scale float64
+	if _, err := fmt.Sscan(v, &scale); err != nil {
+		t.Fatalf("NUSHI_JIRA_TIMING: %v", err)
+	}
+	f, second := slowFake(t, scale)
 	c := f.client()
 	ctx := t.Context()
 	timed := func(name string, run func() error) {
@@ -145,14 +106,49 @@ func TestTiming(t *testing.T) {
 		return cmp.Or(err, err2)
 	})
 	timed("issue, first", func() error { _, err := c.Issue(ctx, "SCRUM-5"); return err })
-	// The issue's three calls go together: its fields, comments and
-	// remote links.
-	in.reset()
-	in.setGate(3)
 	timed("issue, again", func() error { _, err := c.Issue(ctx, "SCRUM-5"); return err })
-	in.setGate(0)
-	if n := in.reset(); n != 3 {
-		t.Errorf("%d of the issue's calls at once, want 3", n)
-	}
 	timed("transitions", func() error { _, err := c.Transitions(ctx, "SCRUM-5"); return err })
+}
+
+// An issue's three calls go together: its fields, comments and remote
+// links. Each is answered only once all three are in, so calls made one
+// after another never get past the first.
+func TestIssueCallsTogether(t *testing.T) {
+	f := issueFake(t)
+	c := f.client()
+	if _, err := c.Issue(t.Context(), "SCRUM-5"); err != nil { // the field list, asked for once
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	in, all := make(chan string, 3), make(chan struct{})
+	f.mu.Lock()
+	for _, route := range []string{"GET /rest/api/3/issue/SCRUM-5", "GET /rest/api/3/issue/SCRUM-5/comment", "GET /rest/api/3/issue/SCRUM-5/remotelink"} {
+		h := f.routes[route]
+		f.routes[route] = func(w http.ResponseWriter, r *http.Request) {
+			in <- route
+			select {
+			case <-all:
+				h(w, r)
+			case <-r.Context().Done():
+			}
+		}
+	}
+	f.mu.Unlock()
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.Issue(ctx, "SCRUM-5")
+		done <- err
+	}()
+	for n := range 3 {
+		select {
+		case <-in:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%d of the issue's calls at once, want 3", n)
+		}
+	}
+	close(all)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
 }
