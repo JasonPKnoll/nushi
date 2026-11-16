@@ -108,7 +108,7 @@ func setup(t *testing.T, configurations ...string) (*Service, *fakeChats, string
 func freePort(t *testing.T) int {
 	t.Helper()
 	for range 50 {
-		p := 20000 + rand.IntN(10000)
+		p := 20000 + rand.IntN(10000) //nolint:gosec // a port to try, not a secret
 		if free(t, p) && free(t, p+1) && free(t, p+2) && free(t, p+3) {
 			return p
 		}
