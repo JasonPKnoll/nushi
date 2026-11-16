@@ -113,8 +113,10 @@ Finder get _tab => find.descendant(
   matching: find.text('Pull request'),
 );
 
-/// The time the app sees ([clock]), moved by hand ([_later]).
-var _now = DateTime(2026, 10, 29, 12);
+/// The time the app sees ([clock]), moved by hand ([_later]); each test
+/// starts at [_start].
+final _start = DateTime(2026, 10, 29, 12);
+DateTime _now = _start;
 
 /// [d] later, on the clock and the timers.
 Future<void> _later(WidgetTester tester, Duration d) async {
@@ -125,7 +127,10 @@ Future<void> _later(WidgetTester tester, Duration d) async {
 
 void main() {
   setUpAll(loadFonts);
-  setUp(() => clock = () => _now);
+  setUp(() {
+    _now = _start;
+    clock = () => _now;
+  });
 
   // The owner's report: a chat whose widget said "No pull request for x"
   // didn't link the one opened since; only the details panel's widget
