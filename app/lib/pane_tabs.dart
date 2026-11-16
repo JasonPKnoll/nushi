@@ -16,7 +16,8 @@ import 'package:nushi/tool_parts.dart' show plainPath;
 import 'package:nushi/widgets.dart';
 
 // A pane's tabs (ADR 0070): a file view's, in its title row in place of the
-// file name when more than one file is open, as plain names (ADR 0071); the
+// file name when more than one file is open, as plain names (ADR 0071), each
+// led by its kind's icon; the
 // browser pane's (ADR 0094), named for their pages, as chips, as Claude
 // desktop's browser draws its tabs. What each says, how wide it is, and the
 // row.
@@ -56,6 +57,17 @@ const double previewNameInset = 5;
 
 /// The room a tab keeps for its ✕, shown or not, so its name doesn't move.
 const double _closeRoom = 18;
+
+/// A file's kind's icon before its name, in a plain tab and before the one
+/// file's name alike, and the gap after it: so a tab's icon and name are
+/// where the one file's were.
+const double previewKindIcon = 14;
+const double previewKindGap = 6;
+
+/// How narrow a file's plain tab gets: [previewTabLeast] past its kind's
+/// icon, so its name keeps the room it had without one.
+const double previewFileTabLeast =
+    previewTabLeast + previewKindIcon + previewKindGap;
 
 /// A chip's height, the room between chips, its icon's size, the room
 /// before it and after it, the room a chip keeps for its ✕ and after it,
@@ -100,7 +112,8 @@ class NewBrowserTab extends StatelessWidget {
 
 /// How wide tabs that would like [widths] are in [room]. The widest give way
 /// first, down to [previewTabLeast] (or the room, when that's less, but
-/// never under [least], a tab's icon and ✕); past that they add up to
+/// never under [least]: a chip's icon and ✕, a file tab's
+/// [previewFileTabLeast]); past that they add up to
 /// more than [room], and the row scrolls.
 List<double> fitTabs(List<double> widths, double room, {double least = 0}) {
   if (widths.fold(0.0, (a, b) => a + b) <= room) return widths;
@@ -141,7 +154,7 @@ class PaneTabs extends StatefulWidget {
 
   /// Drawn as Claude desktop's browser draws its tabs (a rounded fill, an
   /// icon, the name, a ✕): the browser's (ADR 0094); a file's are plain
-  /// names (ADR 0071).
+  /// names (ADR 0071), each after its kind's icon.
   final bool chips;
 
   @override
@@ -167,8 +180,13 @@ class _PaneTabsState extends State<PaneTabs> {
   /// A tab's width with all its name showing: measured as a [Text] draws it,
   /// over the [DefaultTextStyle] (its letter spacing widens a name). A
   /// [chip]'s takes its icon and the gap after it too, its name at most
-  /// [_chipNameMost].
-  double _fullWidth(String label, TextStyle face, {required bool chip}) {
+  /// [_chipNameMost]; a plain one with an [icon] (a file's) its kind's.
+  double _fullWidth(
+    String label,
+    TextStyle face, {
+    required bool chip,
+    required bool icon,
+  }) {
     final style = DefaultTextStyle.of(context).style.merge(face);
     final text = TextPainter(
       text: TextSpan(text: label, style: style),
@@ -177,7 +195,12 @@ class _PaneTabsState extends State<PaneTabs> {
     )..layout();
     final width = text.width.ceilToDouble();
     text.dispose();
-    if (!chip) return width + previewNameInset + _closeRoom;
+    if (!chip) {
+      return (icon ? previewKindIcon + previewKindGap : 0) +
+          width +
+          previewNameInset +
+          _closeRoom;
+    }
     return _chipStart +
         _chipIcon +
         _chipIconGap +
@@ -242,10 +265,15 @@ class _PaneTabsState extends State<PaneTabs> {
     final widths = fitTabs(
       [
         for (final (i, e) in tabs.indexed)
-          _fullWidth(labels[i], face(e, theme.t.text), chip: chips),
+          _fullWidth(
+            labels[i],
+            face(e, theme.t.text),
+            chip: chips,
+            icon: e is PreviewFile,
+          ),
       ],
       box.maxWidth,
-      least: chips ? previewChipLeast : previewTabLeast,
+      least: chips ? previewChipLeast : previewFileTabLeast,
     );
     final at = tabs.indexOf(widget.current);
     final seen = (widget.current, tabs.length, box.maxWidth);
@@ -302,9 +330,10 @@ class _PaneTabsState extends State<PaneTabs> {
   }
 }
 
-/// A tab: its name, which shows it, and a ✕ always on the one showing, on the
-/// others under the pointer. Neither a box nor a tint: the one showing is the
-/// primary text with a line under it, the rest muted. A [chip] is Claude
+/// A tab: a file's kind's icon, its name, which shows it, and a ✕ always on
+/// the one showing, on the others under the pointer. Neither a box nor a
+/// tint: the one showing is the primary text with a line under it (its icon
+/// secondary, as the one file's is), the rest muted. A [chip] is Claude
 /// desktop's browser's tab instead ([_Chip]).
 class _Tab extends StatelessWidget {
   const new({
@@ -351,18 +380,39 @@ class _Tab extends StatelessWidget {
                 child: Pressable(
                   onTap: () => chat.showTab(tab),
                   tooltip: tooltip,
-                  builder: (context, look) => Container(
-                    alignment: Alignment.centerLeft,
-                    padding: const EdgeInsets.only(left: previewNameInset),
-                    foregroundDecoration: focusRing(t, look),
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      style: face(tabText(t, showing: showing, hover: hover)),
-                    ),
-                  ),
+                  builder: (context, look) {
+                    final ink = tabText(t, showing: showing, hover: hover);
+                    return Container(
+                      alignment: Alignment.centerLeft,
+                      foregroundDecoration: focusRing(t, look),
+                      child: Row(
+                        children: [
+                          if (tab case PreviewFile(:final path)) ...[
+                            Icon(
+                              (previewKind(path) ?? PreviewKind.code).icon,
+                              size: previewKindIcon,
+                              color: showing ? t.textSecondary : ink,
+                            ),
+                            const SizedBox(width: previewKindGap),
+                          ],
+                          Flexible(
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                left: previewNameInset,
+                              ),
+                              child: Text(
+                                label,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                                style: face(ink),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

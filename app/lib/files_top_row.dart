@@ -19,13 +19,15 @@ import 'package:nushi/tool_parts.dart' show plainPath;
 import 'package:nushi/widgets.dart' show Hover;
 
 /// The Files pane's top row (ADR 0123), level with the chat's header: Files
-/// at its left, as Claude desktop's; after it the open file's name and its
-/// ✕, or with two or more open their tabs ([PaneTabs], ADR 0070); Live
+/// at its left, as Claude desktop's; after it the open file's kind's icon,
+/// its name and its ✕, or with two or more open their tabs, each led by its
+/// own kind's icon ([PaneTabs], ADR 0070); Live
 /// while the daemon keeps the file current; at its right end Expand (while
 /// [onExpand] is given) and ×, which hides the pane and keeps its tabs
 /// ([PaneEndButtons]). With no file open, Files alone. Squeezed, the row
-/// folds from what stays ([_Fold]): Files goes first, then the kind's icon
-/// and Live, then the name, then Expand, so × always fits.
+/// folds from what stays ([_Fold]): Files goes first, then the one file's
+/// kind's icon and Live, then the name, then Expand, so × always fits (the
+/// tabs keep their icons, and scroll).
 class FilesTopRow extends StatelessWidget {
   const new({
     required this.chat,
@@ -54,8 +56,8 @@ class FilesTopRow extends StatelessWidget {
   /// The room between Files and the file's name or tabs.
   static const _titleGap = 16.0;
 
-  /// The kind's icon and the gap after it.
-  static const double _kindRoom = 14 + 6;
+  /// The one file's kind's icon and the gap after it.
+  static const double _kindRoom = previewKindIcon + previewKindGap;
 
   /// The least the one file's name keeps: a few letters and its ✕'s box
   /// (narrower, a ✕ alone would read as a stray).
@@ -108,18 +110,20 @@ class FilesTopRow extends StatelessWidget {
                 watch.file == null &&
                 watch.error.isEmpty;
             final live = watch?.live ?? false;
+            // One file's kind leads its name; tabs each lead with their own.
+            final one = shown != null && open.length < 2;
             final fold = _Fold(
               room: box.maxWidth,
               words: _width(context, 'Files', theme.ui(t.text)) + _titleGap,
               marks:
-                  (shown == null ? 0 : _kindRoom) +
+                  (one ? _kindRoom : 0) +
                   (live || coming
                       ? 8 +
                             LiveMark.dot +
                             LiveMark.gap +
                             _width(context, 'Live', theme.ui(t.done, size: 12))
                       : 0),
-              name: shown != null && open.length < 2 ? _nameLeast : 0,
+              name: one ? _nameLeast : 0,
               ends: _endGap + (onExpand == null ? 1 : 2) * PaneEndButtons.box,
             );
             return Row(
@@ -136,11 +140,15 @@ class FilesTopRow extends StatelessWidget {
                   ),
                   const SizedBox(width: _titleGap),
                 ],
-                if (shown != null && fold.marks) ...[
-                  // The shown file's kind, before its name or the tabs, so
-                  // the first name stays put as a second file opens.
-                  Icon(shown.kind.icon, size: 14, color: t.textSecondary),
-                  const SizedBox(width: 6),
+                if (one && fold.marks) ...[
+                  // The file's kind, where the first tab's is, so its name
+                  // stays put as a second file opens.
+                  Icon(
+                    shown.kind.icon,
+                    size: previewKindIcon,
+                    color: t.textSecondary,
+                  ),
+                  const SizedBox(width: previewKindGap),
                 ],
                 Expanded(
                   child: switch (shown) {
@@ -188,7 +196,7 @@ class FilesTopRow extends StatelessWidget {
 }
 
 /// What a [FilesTopRow] of a room keeps, from what its parts need: Files'
-/// words, the kind's icon and Live (marks), the one file's name's
+/// words, the one file's kind's icon and Live (marks), the one file's name's
 /// least and the ends' buttons. Each folds in that order as the room
 /// goes, so the row never needs more than its × ([PaneEndButtons.box]).
 final class _Fold {

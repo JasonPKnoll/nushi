@@ -454,6 +454,42 @@ void main() {
       }, variant: _mac);
     }
 
+    testWidgets('each tab leads with its own file’s kind, not the shown '
+        'one’s', (tester) async {
+      final d = await _app(
+        tester,
+        files: const ['docs/a.md', 'cmd/b.go', 'site/c.md'],
+      );
+      d.chats['c']!.openInFiles('cmd/b.go');
+      await tester.pumpAndSettle();
+      final icons = find.descendant(
+        of: find.byType(FilesTopRow),
+        matching: find.byType(Icon),
+      );
+      // The icon nearest the label on its left, in the row.
+      IconData? before(String label) {
+        final text = tester.getRect(_inPane(find.text(label)));
+        Rect? best;
+        IconData? kind;
+        for (final e in icons.evaluate()) {
+          final r = tester.getRect(find.byWidget(e.widget));
+          if (r.right > text.left || (r.center.dy - text.center.dy).abs() > 2) {
+            continue;
+          }
+          if (best == null || r.right > best.right) {
+            best = r;
+            kind = (e.widget as Icon).icon;
+          }
+        }
+        return kind;
+      }
+
+      expect(before('a.md'), PreviewKind.markdown.icon);
+      expect(before('b.go'), PreviewKind.code.icon);
+      expect(before('c.md'), PreviewKind.markdown.icon);
+      d.dispose();
+    }, variant: _mac);
+
     // The pane lies beside the chat header, its top row level with it (ADR
     // 0123): the two rows share a height and a line, and each row's lines
     // stop on its own border.
@@ -760,10 +796,10 @@ void main() {
       expect(row.maxScrollExtent, greaterThan(0));
       // A long name stops at the least; a short one keeps its own width.
       double width(String label) => tester.getSize(_tab(label)).width;
-      expect(width('one.md'), lessThan(previewTabLeast));
+      expect(width('one.md'), lessThan(previewFileTabLeast));
       expect(
         width('five-is-a-rather-longer-name-than-four.md'),
-        previewTabLeast,
+        previewFileTabLeast,
       );
       final rect = tester.getRect(find.byType(PaneTabs));
       final shown = tester.getRect(_tab('eight.md'));
