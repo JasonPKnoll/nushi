@@ -36,8 +36,9 @@ func TestSleepAndWakeOnSend(t *testing.T) {
 		t.Fatal(err)
 	}
 	launches, _, _ := agent.count()
-	_, _ = svc.Get(c.id) // what it does to the agent is what's tested
-	time.Sleep(10 * time.Millisecond)
+	// What Get does to the agent is what's tested: a reopen it began
+	// would show at once, as busy, set before Get returns.
+	_, _ = svc.Get(c.id)
 	if again, _, _ := agent.count(); again != launches || c.agent != nil || !svc.Status(c.record).Asleep || len(c.items) != 2 {
 		t.Fatalf("after Sleep and Get: %d launches (was %d), status %+v, %d items", again, launches, svc.Status(c.record), len(c.items))
 	}
