@@ -139,6 +139,11 @@ class IconTap extends StatelessWidget {
   /// details' and the chat's menu.
   static const header = 8.0;
 
+  /// How far a header button's fill (lit, under the pointer) sits inside
+  /// its 32 points, so two lit side by side keep a gap (4) between them,
+  /// as Claude desktop's do; the whole 32 still takes the click.
+  static const headerInset = 2.0;
+
   @override
   Widget build(BuildContext context) {
     final t = NushiTheme.of(context).t;
@@ -160,8 +165,10 @@ class IconTap extends StatelessWidget {
             : look.hover && color == null
             ? t.text
             : color ?? t.textSecondary;
-        final button = Container(
-          padding: EdgeInsets.all(padding),
+        final inset = padding == header ? headerInset : 0.0;
+        final Widget button = Container(
+          margin: EdgeInsets.all(inset),
+          padding: EdgeInsets.all(padding - inset),
           decoration: BoxDecoration(
             color: danger
                 ? (look.hover
