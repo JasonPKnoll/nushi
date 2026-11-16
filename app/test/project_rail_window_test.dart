@@ -285,6 +285,9 @@ void main() {
 
         final sidebar = tester.getRect(find.byType(Sidebar));
         final rail = find.byType(ProjectRail);
+        // The narrow window's sidebar is too narrow for it; the wide one's
+        // has it, and the rest of the test is that one's.
+        expect(sidebar.width < ProjectRail.minSidebar, width < 1000);
         if (sidebar.width < ProjectRail.minSidebar) {
           // Too narrow for it: the chats keep the sidebar's width.
           expect(rail, findsNothing);
