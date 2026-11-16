@@ -18,7 +18,8 @@ import "time"
 // first reached (or the agent's own list, at the end), 32 at most. Agents
 // counts the run's agents, Done and Failed those that ended so; Running
 // holds the labels of up to 8 that run now, RunningCount how many do.
-// Summary is the agent's own line for the run, at most 2 KB. Stalled says
+// Summary is how a failed run ended, in the agent's words (its error's
+// first line), at most 2 KB. Stalled says
 // no file of the run changed for so long (an hour) that it no longer
 // counts as working, though nothing says it ended; any change clears it.
 type Workflow struct {

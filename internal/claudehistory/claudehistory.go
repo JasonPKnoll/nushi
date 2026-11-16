@@ -25,6 +25,9 @@ import (
 type Local struct {
 	claude.Harness
 	Projects string
+	// Workflows keeps what was read of the workflows being followed; nil
+	// reads each whole every time.
+	Workflows *Runs
 }
 
 // Projects returns Claude's projects folder, in its config folder
