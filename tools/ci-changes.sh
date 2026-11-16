@@ -1,5 +1,5 @@
 #!/bin/sh
-# What a change can affect, for CI's jobs to skip what it can't (ADR 0128):
+# What a change can affect, for CI's jobs to skip what it can't (ADR 0129):
 # go=true when Go's jobs must run, app=true when the app's must, code=true
 # when either, one per line for $GITHUB_OUTPUT.
 #
@@ -61,7 +61,7 @@ self_test() {
 			failed=1
 		fi
 	}
-	check "false false" "docs/adr/0128-x.md"
+	check "false false" "docs/adr/0129-x.md"
 	check "false false" "README.md"
 	check "false false" "AGENTS.md
 CLAUDE.md

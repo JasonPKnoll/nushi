@@ -53,7 +53,7 @@ jobs:
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
       # CI has usually checked this commit already; only a commit without a passing CI run of every job (one
-      # cancelled by a newer push, or one whose change let CI skip jobs, ADR 0128) is checked here, by the ci job,
+      # cancelled by a newer push, or one whose change let CI skip jobs, ADR 0129) is checked here, by the ci job,
       # which runs them all. Only a push's run counts: a pull request's run is listed under its head commit but tested
       # the merge of it into the base.
       - id: ci

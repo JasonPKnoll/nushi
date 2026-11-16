@@ -206,7 +206,7 @@ $(GOVULNCHECK): tools/lint/go.mod tools/lint/go.sum
 # (govulncheck asks vuln.go.dev, so this needs the network). CI runs the
 # parts as jobs of their own (.github/workflows/ci.yml); make check runs
 # everything they do, and tools/ci-changes.sh's self-test (what CI's jobs
-# skip for a change, ADR 0128).
+# skip for a change, ADR 0129).
 lint: lint-go lint-dart lint-linux lint-windows
 	tools/ci-changes.sh --self-test
 
@@ -284,7 +284,7 @@ test-packages:
 	cd packages/svg_path && flutter test
 
 # The app's widget tests and goldens, the files tools/test-shards gives
-# (ADR 0128): SET=macos the files that need a Mac (goldens), SET=linux the
+# (ADR 0129): SET=macos the files that need a Mac (goldens), SET=linux the
 # rest, all of them by default; SHARD=i/n the ith of n shards split by
 # app/test/timings.tsv, as CI's jobs run them. Each shard's files go
 # slowest first, so none is left running at the end. NUSHI_TEST_SET

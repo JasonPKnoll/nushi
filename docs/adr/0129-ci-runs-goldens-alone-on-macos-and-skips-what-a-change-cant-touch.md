@@ -1,4 +1,4 @@
-# 0128. CI runs goldens alone on macOS and skips what a change can't touch
+# 0129. CI runs goldens alone on macOS and skips what a change can't touch
 
 Status: proposed in pull request 41 (the owner, 2026-11-16: "Is there any way we can improve CI? It seems to have grown and takes a long time now").
 

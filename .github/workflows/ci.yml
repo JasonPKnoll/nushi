@@ -9,7 +9,7 @@
 # architecture as the release builds it (tools/release.sh's linux part, on the oldest Ubuntu it supports, for the glibc
 # it needs), installed and started on a virtual display (tools/linux-smoke.sh), with the runner's channels tested for
 # real on amd64 (tools/linux-channels.sh). tools/test-shards says which app test files are whose and splits each set by
-# app/test/timings.tsv, slowest first (ADR 0128); a shard's count is its matrix's, nowhere else. The ACP library,
+# app/test/timings.tsv, slowest first (ADR 0129); a shard's count is its matrix's, nowhere else. The ACP library,
 # github.com/afrase/acp-go, has its own CI. Actions are pinned by commit.
 #
 # A push or a pull request runs only the jobs its change can affect (the changes job, tools/ci-changes.sh): a docs-only
@@ -39,7 +39,7 @@ permissions:
   contents: read
 
 # A pull request's newer push cancels its older run: each run tests the whole branch. Main's pushes don't cancel
-# each other: each run tests only what its own push changed (ADR 0128), so a docs-only push cancelling a run would
+# each other: each run tests only what its own push changed (ADR 0129), so a docs-only push cancelling a run would
 # leave the code before it untested.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -50,7 +50,7 @@ env:
   NUSHI_FLUTTER_VERSION: 3.47.7
 
 jobs:
-  # What the change can affect (tools/ci-changes.sh, ADR 0128): the other jobs run only for it. A pull request's whole
+  # What the change can affect (tools/ci-changes.sh, ADR 0129): the other jobs run only for it. A pull request's whole
   # branch, a push's own commits; any other event (the release's call) runs everything.
   changes:
     name: Changes

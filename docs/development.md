@@ -82,7 +82,7 @@ The same goes for Claude's library, `github.com/afrase/claude-acp-go` (`go work 
 
 ## CI
 
-CI (`.github/workflows/ci.yml`) runs the same parts as `make check`, as parallel jobs, in about 5–6 minutes when it runs them all (ADR 0128):
+CI (`.github/workflows/ci.yml`) runs the same parts as `make check`, as parallel jobs, in about 5–6 minutes when it runs them all (ADR 0129):
 
 - on macOS: Go's tests, Go's lint with the window's placement maths, and the app's test files that need a Mac (those with goldens, and the Mac's fonts) in two shards (`make test-app SET=macos SHARD=1/2`);
 - on Linux: the protos' and Dart's lint (with `tools/native-edge`), the Dart packages' tests, the web app's end-to-end test in Chrome (`make test-web`), every Go package's tests (`make test-go`, with bubblewrap from apt for npm's sandbox and AppArmor's rule on unprivileged user namespaces off) and `go mod tidy -diff`, and beside them `make lint-linux` and `make lint-windows` (ADR 0101, 0124);

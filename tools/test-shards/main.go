@@ -1,7 +1,7 @@
 // Command test-shards says which of the app's test files a test run takes:
 // the files of a host's set (-set), split into shards by their time
 // (-shard i/n), each shard's files slowest first. CI's jobs and make
-// test-app run what it prints (ADR 0128).
+// test-app run what it prints (ADR 0129).
 //
 // The macOS set is every file that needs a Mac: one that compares goldens
 // (drawn with macOS's text rendering) or reads the Mac itself
