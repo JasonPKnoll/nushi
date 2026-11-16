@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nushi: your coding agents as chats</title>
+<meta name="description" content="A Mac and Linux app that runs your coding agents as chats, beside a diff viewer, your pull requests and your phone.">
+<meta property="og:title" content="Nushi">
+<meta property="og:description" content="Your coding agents as chats, beside a diff viewer, your pull requests and your phone.">
+<meta property="og:image" content="images/hero.png">
+<meta name="theme-color" content="#0F1A20">
+<link rel="icon" href="brand/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="#top"><img src="brand/mark-dark.svg" alt="" width="28" height="28"> Nushi</a>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/afrase/nushi/wiki">Guide</a>
+    <a href="https://github.com/afrase/nushi">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <svg class="orbits" viewBox="0 0 1000 1000" aria-hidden="true">
+      <g class="ring outer">
+        <path d="M500 60a440 440 0 0 1 413 288"/><path d="M940 500a440 440 0 0 1-288 413"/>
+        <path d="M500 940a440 440 0 0 1-413-288"/><path d="M60 500a440 440 0 0 1 288-413"/>
+        <circle cx="940" cy="500" r="9"/><circle cx="189" cy="811" r="9"/>
+      </g>
+      <g class="ring inner">
+        <path d="M772 657a315 315 0 0 1-288 157"/><path d="M343 772a315 315 0 0 1-157-288"/>
+        <path d="M228 343a315 315 0 0 1 288-157"/><path d="M657 228a315 315 0 0 1 157 288"/>
+        <circle cx="500" cy="185" r="7"/><circle cx="773" cy="657" r="7"/>
+      </g>
+    </svg>
+    <div class="hero-text">
+      <h1>Run your coding agents as chats.</h1>
+      <p class="lede">Nushi is a Mac and Linux app for Claude, Codex and the other agents you already use. Each runs as your own CLI, with your login and history, beside a diff viewer, your pull requests and your phone.</p>
+      <div class="cta">
+        <button class="brew" type="button" data-copy="brew install --cask afrase/tap/nushi" aria-label="Copy the Homebrew install command">
+          <code>brew install --cask afrase/tap/nushi</code><span class="copied" aria-live="polite">Copy</span>
+        </button>
+        <a class="button" href="https://github.com/afrase/nushi/releases/latest">Download</a>
+      </div>
+      <p class="fine">Free and open source (MIT). macOS 13+ on Apple silicon, or Linux.</p>
+    </div>
+    <figure class="shot hero-shot">
+      <img src="images/hero.png" width="1600" height="1000" alt="Nushi: a Claude chat mid-turn, with tool rows and a plan, an Explore subagent in a pane beside it, and the details panel's context, pull request and background task widgets">
+    </figure>
+  </section>
+
+  <section class="agents" aria-label="Supported agents">
+    <p>Works with</p>
+    <ul>
+      <li>Claude</li><li>Codex</li><li>Ante</li><li>OpenCode</li><li>Pi</li><li>PiG</li><li>oh-my-pi</li>
+    </ul>
+    <p class="over">over the <a href="https://agentclientprotocol.com">Agent Client Protocol</a></p>
+  </section>
+
+  <section id="features" class="features">
+    <article>
+      <div class="copy">
+        <h2>The agent you already use</h2>
+        <p>Nushi doesn't bring its own model or its own permissions. It starts the CLI you've logged in to, so a chat started here resumes in your terminal, and the other way round.</p>
+      </div>
+      <figure class="shot"><img loading="lazy" src="images/agents.png" width="1280" height="800" alt="The New chat dialog listing the agents"></figure>
+    </article>
+    <article>
+      <div class="copy">
+        <h2>Review the work like a pull request</h2>
+        <p>A side-by-side or unified diff of what the chat changed. Leave comments on its lines and they go to the agent as one message.</p>
+      </div>
+      <figure class="shot"><img loading="lazy" src="images/changes.png" width="1280" height="800" alt="The Changes tab: a file tree and a side-by-side diff with two review comments"></figure>
+    </article>
+    <article>
+      <div class="copy">
+        <h2>See what it writes, as it writes it</h2>
+        <p>Markdown, HTML, images, PDFs, CSVs and Mermaid diagrams preview beside the chat and update live. Click into a file's source to edit it yourself.</p>
+      </div>
+      <figure class="shot"><img loading="lazy" src="images/preview.png" width="1280" height="800" alt="A Markdown design note previewed beside the chat that wrote it"></figure>
+    </article>
+    <article>
+      <div class="copy">
+        <h2>Pull requests, blockers first</h2>
+        <p>Checks, reviews and threads in one tab, with what blocks the merge at the top. Send a failing check to the agent in one click, and merge from the same tab.</p>
+      </div>
+      <figure class="shot"><img loading="lazy" src="images/pull-request.png" width="1280" height="800" alt="The Pull request tab: status lights and the To do list of a failing check and review threads"></figure>
+    </article>
+    <article>
+      <div class="copy">
+        <h2>Start from a Jira issue</h2>
+        <p>Your issues and sprints as a task list. Start work opens a chat in a worktree named after the issue.</p>
+      </div>
+      <figure class="shot"><img loading="lazy" src="images/jira.png" width="1280" height="800" alt="The Jira view: a sprint's issues by status, with their assignees"></figure>
+    </article>
+    <article>
+      <div class="copy">
+        <h2>Terminals that outlive the app</h2>
+        <p>Shells under each chat are kept by a small background daemon, so quitting Nushi doesn't stop a test run.</p>
+      </div>
+      <figure class="shot"><img loading="lazy" src="images/terminal.png" width="1280" height="800" alt="A terminal under a chat, showing a test run"></figure>
+    </article>
+  </section>
+
+  <section class="phone">
+    <figure class="shot phone-shot"><img loading="lazy" src="images/phone.png" width="780" height="1520" alt="The phone's web app: an agent's question, answered with a tap"></figure>
+    <div class="copy">
+      <h2>Keep it going from your phone</h2>
+      <p>Follow your chats and answer an agent's questions while you're away from your desk. The link is end-to-end encrypted, through a relay you run yourself.</p>
+      <a class="link" href="https://github.com/afrase/nushi/blob/main/docs/remote.md">How the phone link works</a>
+    </div>
+  </section>
+
+  <section id="install" class="install">
+    <h2>Install</h2>
+    <div class="ways">
+      <div>
+        <h3>macOS</h3>
+        <pre><code>brew install --cask afrase/tap/nushi</code></pre>
+        <p>Or download the zip from <a href="https://github.com/afrase/nushi/releases/latest">Releases</a>. Nushi updates itself from inside the app.</p>
+      </div>
+      <div>
+        <h3>Linux</h3>
+        <pre><code>tar -xzf nushi-*-linux-amd64.tar.gz</code></pre>
+        <p>x86_64 or arm64, glibc 2.34 or later. Steps in <a href="https://github.com/afrase/nushi/blob/main/docs/install.md#on-linux">Installing Nushi</a>.</p>
+      </div>
+    </div>
+    <p class="then">Then open Nushi and set up an agent in Settings › Agents. The <a href="https://github.com/afrase/nushi/wiki">guide</a> walks through it.</p>
+  </section>
+</main>
+
+<footer>
+  <img src="brand/mark-dark.svg" alt="" width="20" height="20">
+  <span>Nushi is MIT licensed.</span>
+  <a href="https://github.com/afrase/nushi">Source</a>
+  <a href="https://github.com/afrase/nushi/releases">Releases</a>
+  <a href="https://github.com/afrase/nushi/wiki">Guide</a>
+</footer>
+
+<script>
+for (const b of document.querySelectorAll('[data-copy]')) {
+  b.addEventListener('click', async () => {
+    const label = b.querySelector('.copied');
+    try {
+      await navigator.clipboard.writeText(b.dataset.copy);
+      label.textContent = 'Copied';
+    } catch {
+      label.textContent = 'Select and copy';
+    }
+    setTimeout(() => { label.textContent = 'Copy'; }, 1600);
+  });
+}
+</script>
+</body>
+</html>
