@@ -5,8 +5,10 @@
 // kern.proc.all and a command line is kern.procargs2, readable for the
 // user's own processes (proctree_darwin.go); on Linux both come from
 // /proc, each process's stat and cmdline (proctree_linux.go, through
-// procfs). Another OS reads no processes (proctree_other.go, ADR 0097),
-// and Windows signals none (signal_windows.go).
+// procfs); on Windows a Toolhelp snapshot and NtQueryInformationProcess,
+// with no process groups, and a process ended only outright
+// (proctree_windows.go, signal_windows.go, ADR 0130). Another OS reads no
+// processes (proctree_other.go, ADR 0097).
 package proctree
 
 import (
