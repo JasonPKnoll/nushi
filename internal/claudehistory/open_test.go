@@ -75,7 +75,8 @@ func TestOpen(t *testing.T) {
 // A record as Claude Code writes it on Windows: no procStart, the
 // process's creation time as a FILETIME in procStartFt, and the host's
 // lowercased name in pidDomain (docs/facts/claude.md). It counts on that
-// host while the start matches to the 100 ns.
+// host while the start matches to the 100 ns, past this platform's
+// stepSlack (none on Windows and the Mac, minutes on Linux).
 func TestOpenWindowsRecord(t *testing.T) {
 	dir := t.TempDir()
 	me := os.Getpid()
@@ -95,7 +96,7 @@ func TestOpenWindowsRecord(t *testing.T) {
 		counts           bool
 	}{
 		{"its process", "134079678123456789", "darwin:jason-pc", at, now, true},
-		{"another process on the pid", "134079678123456789", "darwin:jason-pc", at.Add(100 * time.Nanosecond), now, false},
+		{"another process on the pid", "134079678123456789", "darwin:jason-pc", at.Add(stepSlack + 100*time.Nanosecond), now, false},
 		{"another host's", "134079678123456789", "darwin:other-pc", at, now, false},
 		{"a token in another unit, fresh", "1763494212345678900", "darwin:jason-pc", at, now, true},
 		{"a token in another unit, a day old", "1763494212345678900", "darwin:jason-pc", at, now.Add(-25 * time.Hour), false},
