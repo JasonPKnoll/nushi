@@ -26,15 +26,15 @@ type Piped struct {
 	Out io.Reader
 	Pid int
 
-	proc   *os.Process
+	group  *procgroup.Group
 	said   lastLine
 	exited chan struct{}
 	err    error // how it exited; set before exited closes
 }
 
 // Pipe starts bin with args in dir and env (nil: this process's), in a
-// group of its own (procgroup.Own), so what it starts goes with it on
-// Kill. Its stderr goes to stderr (nil: dropped), its last line kept for
+// group of its own (procgroup.Start: a process group on Unix, a job
+// object on Windows), so what it starts goes with it on Kill. Its stderr goes to stderr (nil: dropped), its last line kept for
 // Said.
 func Pipe(bin string, args []string, dir string, env []string, stderr io.Writer) (*Piped, error) {
 	cmd := exec.Command(bin, args...) //nolint:gosec,noctx // lives until Kill, not a context; the program its caller chose
@@ -44,7 +44,6 @@ func Pipe(bin string, args []string, dir string, env []string, stderr io.Writer)
 	if stderr != nil {
 		cmd.Stderr = io.MultiWriter(stderr, &p.said)
 	}
-	procgroup.Own(cmd)
 	cmd.WaitDelay = waitDelay
 	var err error
 	if p.In, err = cmd.StdinPipe(); err != nil {
@@ -57,14 +56,14 @@ func Pipe(bin string, args []string, dir string, env []string, stderr io.Writer)
 		return nil, err
 	}
 	cmd.Stdout = w
-	err = cmd.Start()
+	p.group, err = procgroup.Start(cmd)
 	_ = w.Close() // the program has its own copy
 	if err != nil {
 		_ = r.Close()
 		return nil, err
 	}
 	out := &stdout{f: r, ended: make(chan struct{})}
-	p.Out, p.Pid, p.proc = out, cmd.Process.Pid, cmd.Process
+	p.Out, p.Pid = out, cmd.Process.Pid
 	go func() {
 		p.err = cmd.Wait()
 		close(p.exited)
@@ -93,11 +92,12 @@ func (s *stdout) Read(b []byte) (int, error) {
 	return n, err
 }
 
-// Kill kills its group (procgroup.Kill) and waits for it to exit. Pi and
-// Ante call it on every stop, often after the program has exited: on
-// Windows the kill then does nothing, as the pid may be another's by now.
+// Kill kills its group (procgroup.Group's Kill) and waits for it to
+// exit. Pi and Ante call it on every stop, often after the program has
+// exited: what it left in its group goes then, and on Windows nothing is
+// killed by a pid that may be another's by now.
 func (p *Piped) Kill() {
-	_ = procgroup.Kill(p.proc) // the group may be gone already
+	_ = p.group.Kill() // the group may be gone already
 	<-p.exited
 }
 

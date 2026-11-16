@@ -5,7 +5,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 
@@ -43,6 +45,63 @@ func killTree(h windows.Handle, pid int) error {
 		return windows.TerminateProcess(h, 1) // taskkill missing or refused: at least the process itself
 	}
 	return nil
+}
+
+// Group is a command Start started, in a job object, which the processes
+// it starts join, so Kill ends them all, one whose parent ended first
+// included, as a Unix process group's kill does; the job also kills them
+// if this process dies. One the command starts before it joins the job (a
+// moment after it starts) is left. Without a job (the system refused
+// one), Kill is the package's Kill.
+type Group struct {
+	p   *os.Process
+	mu  sync.Mutex
+	job windows.Handle // 0 when there is none, or once Kill closed it
+}
+
+func hold(p *os.Process) *Group {
+	g := &Group{p: p}
+	job, err := killJob()
+	if err != nil {
+		return g
+	}
+	if p.WithHandle(func(h uintptr) { err = windows.AssignProcessToJobObject(job, windows.Handle(h)) }) != nil || err != nil {
+		_ = windows.CloseHandle(job) // it exited already, or the system refused
+		return g
+	}
+	g.job = job
+	return g
+}
+
+// Kill ends the job, what is left of it once the command has exited too,
+// and lets go of it; with no job, the command's tree (Kill).
+func (g *Group) Kill() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.job == 0 {
+		return Kill(g.p)
+	}
+	err := windows.TerminateJobObject(g.job, 1)
+	_ = windows.CloseHandle(g.job) // kills anything that joined since
+	g.job = 0
+	return err
+}
+
+// killJob is a job object whose processes are killed when it is closed.
+func killJob() (windows.Handle, error) {
+	job, err := windows.CreateJobObject(nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	info := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
+		BasicLimitInformation: windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE},
+	}
+	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info))); err != nil {
+		_ = windows.CloseHandle(job)
+		return 0, err
+	}
+	return job, nil
 }
 
 // taskkill is the system's taskkill, by its full path so PATH can't name
