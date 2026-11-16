@@ -50,6 +50,7 @@ import (
 )
 
 func main() {
+	noCurrentDirPrograms()
 	if len(os.Args) > 1 && os.Args[1] == ante.Command { // the bridge Nushi runs Ante through
 		ante.Main()
 		return
