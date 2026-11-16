@@ -1,14 +1,18 @@
-// Command check-app checks the app the way a change to it needs: make
-// lint-dart, then make test-app, then flutter build macos (on Linux,
-// flutter build linux), which it never runs. It stops at the first failure. Each step's whole output goes to a log
-// file, so what's printed is short enough to need no pipe: a line per step
-// and, on a failure, the failing tests' names and reasons, then a last line
-// with the failed step, its exit code and its log. The last line is the
-// verdict, so even a tail shows it. Run it from the repository root: make
-// check-app.
+// Command check is make check: the lint, every test (the app's suite once)
+// and the desktop app's build (flutter build macos, or linux on Linux,
+// which it never runs), before a push. Two lanes run side by side: the
+// app's suite, then the web app's tests (both flutter test in app/); and
+// the lints, then the other tests. The build comes after both. A failed
+// step doesn't stop the others, so one run shows every failure. Each
+// step's whole output goes to a log file, so what's printed is short
+// enough to need no pipe: a line per step as it ends, then each failed
+// step's failing tests and reasons, or its log's key lines, and its log's
+// path, and a last line with the verdict, so even a tail shows it. Run it
+// from the repository root: make check.
 //
-// It exits with the failing step's code. make check-app reports any failing
-// recipe as 2, whatever the code was; the last line has the real one.
+// It exits with the first failed step's code (in the lanes' order). make
+// check reports any failing recipe as 2, whatever the code was; the last
+// line has the real one.
 package main
 
 import (
@@ -24,11 +28,13 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
-// logs is where each step's output goes, under bin/ so git ignores it.
-const logs = "bin/check-app-logs"
+// logs is where each step's output goes, under bin/ so git ignores it;
+// make test-timings reads the app's test times from it.
+const logs = "bin/check-logs"
 
 const (
 	maxTests  = 20 // failing tests named, the rest counted
@@ -45,7 +51,8 @@ func main() {
 	if err := os.MkdirAll(folder, 0o700); err != nil {
 		log.Fatal(err)
 	}
-	os.Exit(run(log.New(os.Stdout, "", 0), folder, steps(folder)))
+	lanes, after := steps(folder)
+	os.Exit(run(log.New(os.Stdout, "", 0), folder, lanes, after))
 }
 
 // step is a command to run, from the repository root unless dir says.
@@ -56,20 +63,53 @@ type step struct {
 	results string // the JSON reporter's file, for a step that runs tests
 }
 
-// steps are the checks in order. FLUTTER_TEST_FLAGS and SHARD work as for
-// make test-app; the flag's path is from app/, where flutter test runs,
-// because make splits it at any space in an absolute one.
-func steps(folder string) []step {
-	flags := os.Getenv("FLUTTER_TEST_FLAGS") + " --file-reporter json:../" + logs + "/test-app.json"
-	return []step{
-		{name: "lint-dart", cmd: []string{"make", "lint-dart"}},
-		{
-			name:    "test-app",
-			cmd:     []string{"make", "test-app", "FLUTTER_TEST_FLAGS=" + strings.TrimSpace(flags)},
-			results: filepath.Join(folder, "test-app.json"),
-		},
-		{name: "flutter build " + buildTarget(), dir: "app", cmd: []string{"flutter", "build", buildTarget()}},
+// steps are the lanes, each run in order beside the other, and the steps
+// after them. FLUTTER_TEST_FLAGS works as for make test-app (three files
+// at once unless it says: more was no faster on a 12-core Mac); the
+// report's path is from app/, where flutter test runs, because make
+// splits it at any space in an absolute one. The web app's tests run
+// after the suite, not beside it: both are flutter test in app/.
+func steps(folder string) (lanes [][]step, after []step) {
+	flags := os.Getenv("FLUTTER_TEST_FLAGS")
+	if flags == "" {
+		flags = "--concurrency 3"
 	}
+	flags += " --file-reporter json:../" + logs + "/test-app.json"
+	app := []step{{
+		name:    "test-app",
+		cmd:     []string{"make", "test-app", "FLUTTER_TEST_FLAGS=" + flags},
+		results: filepath.Join(folder, "test-app.json"),
+	}}
+	if hasChrome() {
+		app = append(app, makeStep("test-web"))
+	}
+	rest := []step{
+		makeStep("lint-dart"), makeStep("lint-go"), makeStep("lint-linux"), makeStep("lint-windows"),
+		{name: "ci-changes self-test", cmd: []string{"tools/ci-changes.sh", "--self-test"}},
+		makeStep("test-go"), makeStep("test-packages"),
+	}
+	if runtime.GOOS == "darwin" {
+		rest = append(rest, makeStep("test-window"))
+	}
+	build := buildTarget()
+	return [][]step{app, rest}, []step{{name: "flutter build " + build, dir: "app", cmd: []string{"flutter", "build", build}}}
+}
+
+func makeStep(target string) step {
+	return step{name: target, cmd: []string{"make", target}}
+}
+
+// hasChrome is whether the web app's tests can run here, as make test
+// decides: always on the Mac, on Linux with a Chrome.
+func hasChrome() bool {
+	if runtime.GOOS != "linux" {
+		return true
+	}
+	if os.Getenv("CHROME_EXECUTABLE") != "" {
+		return true
+	}
+	_, err := exec.LookPath("google-chrome")
+	return err == nil
 }
 
 // buildTarget is the desktop app flutter builds here: Linux's on Linux
@@ -81,40 +121,103 @@ func buildTarget() string {
 	return "macos"
 }
 
-// run runs the steps until one fails and gives the exit code for that.
-func run(out *log.Logger, folder string, steps []step) int {
-	for _, s := range steps {
-		file := filepath.Join(folder, strings.ReplaceAll(s.name, " ", "-")+".log")
-		if s.results != "" {
-			// Results left by an earlier run would pass for this one's.
-			if err := os.Remove(s.results); err != nil && !errors.Is(err, os.ErrNotExist) {
-				out.Printf("check-app: FAILED at %s: %v", s.name, err)
-				return 1
-			}
+// outcome is how a step ended.
+type outcome struct {
+	step
+	log  string
+	code int
+	err  error  // the step couldn't run
+	ok   string // what a passing step's line says
+}
+
+// run runs the lanes side by side, then the steps after them, and gives
+// the exit code: the first failed step's, in the lanes' order.
+func run(out *log.Logger, folder string, lanes [][]step, after []step) int {
+	start := time.Now()
+	var mu sync.Mutex // out's lines, one at a time
+	runLane := func(lane []step) []outcome {
+		var ended []outcome
+		for _, s := range lane {
+			o := s.run(folder)
+			mu.Lock()
+			o.report(out)
+			mu.Unlock()
+			ended = append(ended, o)
 		}
-		start := time.Now()
-		code, err := s.exec(file)
-		if err != nil {
-			out.Printf("check-app: FAILED at %s (exit %d): %v", s.name, code, err)
-			return code
-		}
-		results := readResults(s.results)
-		if code == 0 {
-			note := ""
-			if results.passed > 0 {
-				note = fmt.Sprintf(", %d tests", results.passed)
-			}
-			out.Printf("%s: ok%s (%s)", s.name, note, time.Since(start).Round(time.Second))
-			continue
-		}
-		if !results.print(out) {
-			printKeyLines(out, file)
-		}
-		out.Printf("check-app: FAILED at %s (exit %d), full log: %s", s.name, code, file)
-		return code
+		return ended
 	}
-	out.Print("check-app: ok")
-	return 0
+	ended := make([][]outcome, len(lanes)+1)
+	var wg sync.WaitGroup
+	for i, lane := range lanes {
+		wg.Go(func() { ended[i] = runLane(lane) })
+	}
+	wg.Wait()
+	ended[len(lanes)] = runLane(after)
+	var failed []outcome
+	for _, lane := range ended {
+		for _, o := range lane {
+			if o.code != 0 {
+				failed = append(failed, o)
+			}
+		}
+	}
+	took := time.Since(start).Round(time.Second)
+	if len(failed) == 0 {
+		out.Printf("check: ok (%s)", took)
+		return 0
+	}
+	var names []string
+	for _, o := range failed {
+		out.Print("")
+		o.explain(out)
+		names = append(names, o.name)
+	}
+	out.Printf("check: FAILED at %s (exit %d, %s), logs in %s", strings.Join(names, ", "), failed[0].code, took, folder)
+	return failed[0].code
+}
+
+// run runs the step with its output in its log.
+func (s step) run(folder string) outcome {
+	o := outcome{step: s, log: filepath.Join(folder, strings.ReplaceAll(s.name, " ", "-")+".log")}
+	if s.results != "" {
+		// Results left by an earlier run would pass for this one's.
+		if err := os.Remove(s.results); err != nil && !errors.Is(err, os.ErrNotExist) {
+			o.code, o.err = 1, err
+			return o
+		}
+	}
+	start := time.Now()
+	o.code, o.err = s.exec(o.log)
+	if o.code == 0 {
+		note := ""
+		if r := readResults(s.results); r.passed > 0 {
+			note = fmt.Sprintf(", %d tests", r.passed)
+		}
+		o.ok = fmt.Sprintf("ok%s (%s)", note, time.Since(start).Round(time.Second))
+	}
+	return o
+}
+
+// report is the step's line as it ends.
+func (o outcome) report(out *log.Logger) {
+	if o.code == 0 {
+		out.Printf("%s: %s", o.name, o.ok)
+		return
+	}
+	out.Printf("%s: FAILED (exit %d)", o.name, o.code)
+}
+
+// explain says why a failed step failed: its failing tests, or its log's
+// key lines, and where its log is.
+func (o outcome) explain(out *log.Logger) {
+	results := readResults(o.results)
+	switch {
+	case o.err != nil:
+		out.Printf("%s couldn't run: %v", o.name, o.err)
+	case !results.print(out):
+		printKeyLines(out, o.log)
+	}
+	out.Printf("%s: FAILED (exit %d), full log: %s", o.name, o.code, o.log)
 }
 
 // exec runs the step with its output in the file. Its error is for a step

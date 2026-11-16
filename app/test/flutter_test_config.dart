@@ -26,7 +26,8 @@ import 'golden_tolerance.dart';
 import 'harness.dart';
 
 /// Goldens are drawn on macOS only (on Linux about a third differ by 1–4%):
-/// elsewhere they aren't compared or written. On CI (GitHub's macOS image
+/// elsewhere they aren't compared or written, and in a run of the Linux
+/// set's files (`NUSHI_TEST_SET=linux`) one fails. On CI (GitHub's macOS image
 /// draws text a few pixels differently from a Mac), a golden may differ
 /// by what `golden_tolerance.dart` allows; here it must match. Every
 /// shine stands still, its band before the text, and so does every loop on
@@ -47,7 +48,9 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   Shine.stopAt = 0;
   if (Platform.isLinux) configHomeAt('$dataDir/config');
   final local = goldenFileComparator;
-  if (!Platform.isMacOS) {
+  if (Platform.environment['NUSHI_TEST_SET'] == 'linux') {
+    goldenFileComparator = _NotInSet();
+  } else if (!Platform.isMacOS) {
     goldenFileComparator = _NotHere();
   } else if (Platform.environment['CI'] == 'true' &&
       local is LocalFileComparator) {
@@ -99,6 +102,22 @@ class _NotHere extends GoldenFileComparator {
   @override
   Future<void> update(Uri golden, Uint8List imageBytes) =>
       throw FlutterError('Goldens are drawn on macOS only: $golden');
+}
+
+/// A run of the Linux set's files (tools/test-shards, `NUSHI_TEST_SET`):
+/// a golden here fails, on any host, since the set's CI jobs would
+/// otherwise pass it unseen.
+class _NotInSet extends GoldenFileComparator {
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) => throw FlutterError(
+    'This file compares goldens, which CI draws only in the macOS set: '
+    'tools/test-shards must put it there (it looks for '
+    'matchesGoldenFile( in the test file itself): $golden',
+  );
+
+  @override
+  Future<void> update(Uri golden, Uint8List imageBytes) =>
+      compare(imageBytes, golden);
 }
 
 /// CI's comparator: a golden within `goldenWithin` passes. Each that

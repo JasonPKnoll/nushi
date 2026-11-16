@@ -42,7 +42,7 @@ BUILD := $(or $(shell git rev-list --count HEAD 2>/dev/null),1)
 MACOS_MIN := 13.0
 MACOS_CGO := -O2 -g -mmacosx-version-min=$(MACOS_MIN)
 
-.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-web lint lint-go lint-dart lint-linux lint-windows check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
+.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-timings test-web lint lint-go lint-dart lint-linux lint-windows check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
 
 # Starts the daemon in the background (unless one is running), then the app.
 run: daemon app
@@ -205,8 +205,10 @@ $(GOVULNCHECK): tools/lint/go.mod tools/lint/go.sum
 # known vulnerabilities in the code the daemon, the relay and the tools call
 # (govulncheck asks vuln.go.dev, so this needs the network). CI runs the
 # parts as jobs of their own (.github/workflows/ci.yml); make check runs
-# everything they do.
+# everything they do, and tools/ci-changes.sh's self-test (what CI's jobs
+# skip for a change, ADR 0129).
 lint: lint-go lint-dart lint-linux lint-windows
+	tools/ci-changes.sh --self-test
 
 # Go's: on macOS (the keychain's cgo needs its SDK).
 lint-go: $(GOLANGCI) $(GOVULNCHECK)
@@ -243,16 +245,17 @@ lint-windows: $(GOLANGCI)
 # packages only in a platform's *_macos.dart, *_linux.dart or
 # *_windows.dart files (tools/native-edge, ADR 0097, 0104, 0125), and the
 # app's views built from the shared controls and tokens
-# (tools/design-check, docs/design.md): anywhere.
+# (tools/design-check, docs/design.md), and each app test file in one
+# shard of the set its host needs (tools/test-shards -check): anywhere.
 lint-dart:
 	go run ./tools/native-edge $(addsuffix /lib,$(DART_DIRS))
 	go run ./tools/design-check app/lib
+	go run ./tools/test-shards -check
 	$(BUF) lint
 	$(BUF) format --diff --exit-code
 	@for d in $(DART_DIRS); do echo "flutter analyze $$d"; (cd $$d && flutter analyze --fatal-infos) || exit 1; done
 	@for d in $(DART_DIRS); do (cd $$d && find lib test bin -name '*.dart' ! -path 'lib/gen/*' 2>/dev/null | xargs dart format --output=none --set-exit-if-changed) || exit 1; done
 
-check: lint test
 
 # On Linux, no Mac window to test, and the web's tests only with a Chrome.
 ifeq ($(OS),Linux)
@@ -280,13 +283,32 @@ test-packages:
 	cd packages/markdown && flutter test
 	cd packages/svg_path && flutter test
 
-# The app's widget tests and goldens (macOS: the goldens are drawn with its
-# text rendering, and the end-to-end tests run nushid). SHARD=i/n runs
-# every nth test file from the ith, as CI's shards do (each file compiles
-# once, in one shard); FLUTTER_TEST_FLAGS adds flags (CI's --concurrency).
-APP_TESTS = $(if $(SHARD),$(shell cd app && find test -name '*_test.dart' ! -path 'test/web/*' | LC_ALL=C sort | awk -v s='$(SHARD)' 'BEGIN { split(s, a, "/") } (NR - 1) % a[2] == a[1] - 1'))
+# The app's widget tests and goldens, the files tools/test-shards gives
+# (ADR 0129): SET=macos the files that need a Mac (goldens), SET=linux the
+# rest, all of them by default; SHARD=i/n the ith of n shards split by
+# app/test/timings.tsv, as CI's jobs run them. Each shard's files go
+# slowest first, so none is left running at the end. NUSHI_TEST_SET
+# tells the tests their set: a golden in the Linux set's fails
+# (flutter_test_config.dart). FLUTTER_TEST_FLAGS adds flags (CI's
+# --concurrency). A tool that fails stops it: flutter
+# test given no file would run them all.
+APP_SET = $(or $(SET),all)
+APP_SHARD = $(or $(SHARD),1/1)
 test-app:
-	cd app && flutter test $(FLUTTER_TEST_FLAGS) $(APP_TESTS)
+	@files=$$(go run ./tools/test-shards -set '$(APP_SET)' -shard '$(APP_SHARD)') || exit 2; \
+	echo "flutter test $(FLUTTER_TEST_FLAGS): $$(echo "$$files" | wc -l | tr -d ' ') files, set $(APP_SET), shard $(APP_SHARD)"; \
+	cd app && NUSHI_TEST_SET='$(APP_SET)' flutter test $(FLUTTER_TEST_FLAGS) $$files
+
+# app/test/timings.tsv anew from the test times of CI's app shards in
+# RUN, a run of every job (gh run list --workflow CI), downloaded by gh
+# into bin/test-times-<run>: when the suite's times have changed
+# (test-shards -check says when many files are missing from the table).
+# CI's times, not this machine's: a Mac here runs the golden files about
+# three times faster than CI's macOS runner, the rest only about twice.
+test-timings:
+	@test -n "$(RUN)" || { echo "RUN=<a CI run's id>: gh run list --workflow CI"; exit 2; }
+	gh run download $(RUN) -p 'test-times-*' -D bin/test-times-$(RUN)
+	go run ./tools/test-shards -timings bin/test-times-$(RUN)/*/test-times.json
 
 # The Mac window's placement maths (app/macos/Runner/Placement.swift, ADR
 # 0093), what ⌘V attaches (Clipboard.swift, on a pasteboard of its own)
@@ -303,7 +325,8 @@ test-window:
 	xcrun swiftc -o bin/titlebar-test app/macos/Runner/TitleBar.swift app/macos/TitleBarTests/main.swift
 	bin/titlebar-test
 
-# The web app in Chrome with the real nushid and nushi-relay (macOS).
+# The web app in Chrome with the real nushid and nushi-relay (macOS, or
+# Linux with a Chrome, as CI runs it).
 test-web:
 	cd app && flutter test --platform chrome test/web
 
@@ -322,14 +345,22 @@ gallery:
 	cd app && NUSHI_RENDERS='$(GALLERY)' flutter test test/screenshots/gallery.dart
 	@echo "gallery in $(GALLERY)"
 
-# make lint-dart, make test-app and flutter build macos (on Linux, flutter
-# build linux; build only), stopping at the first failure: a line per step,
-# then what failed and the path of the full log, so its output needs no pipe
-# (tools/check-app). Not part of check or CI: the build is for a change to
-# the app. FLUTTER_TEST_FLAGS and SHARD work as for test-app.
+# The one check before a push (tools/check): everything make lint and make
+# test run, the app's suite once, then flutter build macos (on Linux,
+# flutter build linux; build only). The app's suite and the web's tests
+# run beside the lints and the other tests; a failure stops nothing. A line
+# per step, then what failed with the path of its full log, so its output
+# needs no pipe. FLUTTER_TEST_FLAGS works as for test-app (--concurrency 3
+# unless it says).
+check:
+	@go build -o bin/check ./tools/check
+	@bin/check
+
+# make check, under the name it had when it checked only the app (until
+# 2026-11-16), for the briefs that still say it.
 check-app:
-	@go build -o bin/check-app ./tools/check-app
-	@bin/check-app
+	@echo "make check-app is make check now: the lint, every test and the build"
+	@$(MAKE) --no-print-directory check
 
 # What changed in the goldens against BASE (a ref, HEAD by default), new and
 # removed ones included: each file's size, changed box and pixel count, with
