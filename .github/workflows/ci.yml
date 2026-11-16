@@ -73,13 +73,22 @@ jobs:
       # make goes by modification times, and the checkout's go.sum is newer than the cached binaries.
       - if: steps.lint-tools.outputs.cache-hit == 'true'
         run: touch bin/golangci-lint bin/govulncheck
-      # golangci-lint's results per package, kept from the last run (saved under each commit).
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # golangci-lint's results per package: one entry a week, saved by main's pushes only (one under each commit
+      # filled the repository's 10 GB of caches and pushed out Flutter's SDKs). The week's key, or the newest before.
+      - id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - id: lint-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/Library/Caches/golangci-lint
-          key: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-${{ github.sha }}
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-${{ steps.week.outputs.week }}
           restore-keys: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-
       - run: make lint-go
+      - if: ${{ !cancelled() && github.event_name == 'push' && steps.lint-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/golangci-lint
+          key: ${{ steps.lint-cache.outputs.cache-primary-key }}
       # The tests run when the lint fails too, to see both.
       - if: ${{ !cancelled() }}
         run: make test-go
@@ -247,10 +256,14 @@ jobs:
           key: lint-tools-${{ runner.os }}-${{ runner.arch }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('tools/lint/go.mod', 'tools/lint/go.sum') }}
       - if: steps.lint-tools.outputs.cache-hit == 'true'
         run: touch bin/golangci-lint
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Its results as on the Mac: one entry a week, saved by main's pushes.
+      - id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - id: lint-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/golangci-lint
-          key: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-${{ github.sha }}
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-${{ steps.week.outputs.week }}
           restore-keys: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-
       # npm's install runs under bubblewrap on Linux (internal/npm's tests run it); Ubuntu's AppArmor denies it
       # unprivileged user namespaces unless that rule is off.
@@ -265,6 +278,11 @@ jobs:
       # Everything builds, vets and lints for Windows, tests included: what macOS and Linux share stays in _unix.go files (ADR 0124).
       - if: ${{ !cancelled() }}
         run: make lint-windows
+      - if: ${{ !cancelled() && github.event_name == 'push' && steps.lint-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/golangci-lint
+          key: ${{ steps.lint-cache.outputs.cache-primary-key }}
       # go.mod and go.sum name what the code imports, no more and no less.
       - if: ${{ !cancelled() }}
         run: go mod tidy -diff
