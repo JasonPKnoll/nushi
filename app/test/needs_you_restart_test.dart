@@ -82,7 +82,7 @@ void main() {
 
       // The daemon restarts: its agents stopped, the prompt was cancelled,
       // and the new one lists the chat asleep.
-      chats[0] = chat(
+      chats[0] = fake.chats[0] = chat(
         'a',
         'claude',
         'Fix the login redirect',

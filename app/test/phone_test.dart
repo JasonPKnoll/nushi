@@ -470,7 +470,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(fake.calls.whereType<ForkAsChatRequest>().single.chatId, 'c');
       expect(find.text('Web Push from the daemon (fork)'), findsOne);
-      _chats.removeWhere((c) => c.id == 'fork'); // the fake listed it
       await endPhone(tester, phone);
     });
   }
@@ -509,11 +508,12 @@ void main() {
     await tester.tap(find.text('Fork'));
     await tester.pumpAndSettle();
     // The fake announces the fork on its own stream; this one is the app's.
-    subscriptions.last.add(EventsResponse(chatId: 'fork', chat: _chats.last));
+    subscriptions.last.add(
+      EventsResponse(chatId: 'fork', chat: fake.chats.last),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Web Push from the daemon (fork)'), findsOne);
     expect(fake.calls.whereType<SetDeviceViewRequest>().last.chatId, 'fork');
-    _chats.removeWhere((c) => c.id == 'fork'); // the fake listed it
 
     await tester.tap(find.bySemanticsLabel('Back').first);
     await tester.pumpAndSettle();
