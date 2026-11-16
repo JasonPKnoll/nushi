@@ -204,6 +204,11 @@ void main() {
     expect(pane('sub'), isA<SubagentPane>());
     expect(workflowPaneOpen(chat, 'wf'), isTrue);
     expect(workflowPaneOpen(chat, 'sub'), isFalse);
+    // Its call gone, the last pane shown stays the kind it was.
+    expect(pane('cmd'), isA<BackgroundCommandPane>());
+    chat.items.removeWhere((it) => it.id == 'cmd');
+    expect(pane('cmd'), isA<BackgroundCommandPane>());
+    expect(pane('nope'), isA<SubagentPane>());
     await closeView(tester, d);
   });
 
@@ -357,6 +362,53 @@ void main() {
     d.dispose();
     (_, d) = await _app(tester, widths: {'workflow': 500});
     expect(width(), closeTo(500, 1));
+    paneWidths.value = {};
+    showDetails.value = true;
+    d.dispose();
+  }, variant: _mac);
+
+  testWidgets('the run ending leaves the pane with its last tree; its call '
+      'going leaves the pane a workflow’s, saying so', (tester) async {
+    final (fake, d) = await _app(tester);
+    expect(find.text(' 4/7'), findsOne);
+    fake.emit(
+      EventsResponse(
+        chatId: 'c',
+        seq: Int64(1),
+        item: ItemEvent(item: workflowCall('done'), index: 1),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(WorkflowPane), findsOne);
+    expect(find.text(' 7/7'), findsOne);
+    expect(find.byTooltip('Stop'), findsNothing);
+    final width = tester.getSize(find.byType(WorkflowPane)).width;
+    // A rewind past the call: the pane stays a workflow's, as wide.
+    fake.emit(EventsResponse(chatId: 'c', seq: Int64(2), cut: 'wf'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SubagentPane), findsNothing);
+    expect(find.byType(WorkflowPane), findsOne);
+    expect(find.text('This workflow is no longer in the chat.'), findsOne);
+    expect(tester.getSize(find.byType(WorkflowPane)).width, width);
+    // And once the panes are laid out again (anything beside them
+    // changing; here the side chat's hidden flag).
+    final c = d.chats['c']!;
+    c.sideHidden.value = !c.sideHidden.value;
+    await tester.pumpAndSettle();
+    expect(find.byType(SubagentPane), findsNothing);
+    expect(find.text('This workflow is no longer in the chat.'), findsOne);
+    expect(tester.getSize(find.byType(WorkflowPane)).width, width);
+    c.sideHidden.value = !c.sideHidden.value;
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(WorkflowPane),
+        matching: find.byTooltip('Close'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(WorkflowPane), findsNothing);
+    expect(d.chats['c']!.pane.value, isNull);
     paneWidths.value = {};
     showDetails.value = true;
     d.dispose();
