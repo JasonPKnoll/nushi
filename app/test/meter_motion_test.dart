@@ -50,6 +50,9 @@ void main() {
     final n = int.parse(_figure(tester).replaceAll('%', ''));
     expect(n, inExclusiveRange(19, 92));
     expect(_width(tester), inExclusiveRange(0.19, 0.92));
+    // Between the two colors, on its way.
+    final between = tester.widget<Text>(find.byType(Text)).style!.color;
+    expect(between, isNot(anyOf(red, Tokens.dark.textMuted)));
     await tester.pumpAndSettle();
     expect(_figure(tester), '19%');
     expect(
