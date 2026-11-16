@@ -110,15 +110,25 @@ void main() {
   testWidgets('a theme picked shows on the next frame, and rebuilding the '
       'app with the same theme changes nothing below it', (tester) async {
     final d = await _app(tester);
+    expect(_painted(tester, find.byType(SettingsView)), same(Tokens.dark));
     await _tap(tester, find.text('Nord'));
     await tester.pump();
     final nord = builtInTheme('nord')!;
     // No frames of a theme animation, each a rebuild of all that reads it.
     expect(_painted(tester, find.byType(SettingsView)), same(nord.dark));
-    expect(
-      NushiTheme.forTheme(nord, Brightness.dark),
-      same(NushiTheme.forTheme(nord, Brightness.dark)),
-    );
+    // The app rebuilt with the same theme: the same ThemeData, so nothing
+    // that reads it rebuilds.
+    ThemeData? shown() =>
+        tester.widget<MaterialApp>(find.byType(MaterialApp).first).darkTheme;
+    final before = shown();
+    expect(before, isNotNull);
+    tester.element(find.byType(MaterialApp).first).visitAncestorElements((e) {
+      if (e.widget is! ListenableBuilder) return true;
+      e.markNeedsBuild(); // the builder that makes the MaterialApp
+      return false;
+    });
+    await tester.pump();
+    expect(shown(), same(before));
     await closeView(tester, d);
   }, variant: _mac);
 
