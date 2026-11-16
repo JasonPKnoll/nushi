@@ -87,8 +87,8 @@ void main() {
   setUpAll(loadFonts);
 
   testWidgets('Ctrl+Shift+2 shows Changes and Ctrl+Shift+1 Chat; AltGr+1–3 '
-      '(right Alt held) and Ctrl+Alt+1–3 are left to type, the box focused '
-      'or not', (tester) async {
+      '(right Alt held) and Ctrl+Alt+1–3 type, into the box from the window '
+      'and left to the focused box', (tester) async {
     final d = await _app(tester);
     final a = d.chats['a']!;
     expect(await _press(tester, LogicalKeyboardKey.digit2, _ctrlShift), true);
@@ -96,22 +96,23 @@ void main() {
     expect(await _press(tester, LogicalKeyboardKey.digit1, _ctrlShift), true);
     expect(a.shownTab, ChatTab.chat);
 
-    for (final focused in [false, true]) {
-      if (focused) {
-        await tester.tap(_box);
-        await tester.pumpAndSettle();
-      }
-      for (final (digit, typed) in [
-        (LogicalKeyboardKey.digit1, '|'),
-        (LogicalKeyboardKey.digit2, '@'),
-        (LogicalKeyboardKey.digit3, '#'),
-      ]) {
-        for (final held in [_altGr, _ctrlAlt]) {
-          final handled = await _press(tester, digit, held, character: typed);
-          expect(handled, isFalse, reason: '$typed, the box focused: $focused');
-          expect(a.shownTab, ChatTab.chat);
-          expect(d.selectedId, 'a');
-        }
+    // With nothing focused, type to write takes it to the box (ADR 0121),
+    // which takes the focus.
+    await _press(tester, LogicalKeyboardKey.digit2, _altGr, character: '@');
+    expect(a.shownTab, ChatTab.chat);
+    expect(tester.widget<EditableText>(_box).controller.text, '@');
+    expect(tester.widget<EditableText>(_box).focusNode.hasFocus, isTrue);
+
+    for (final (digit, typed) in [
+      (LogicalKeyboardKey.digit1, '|'),
+      (LogicalKeyboardKey.digit2, '@'),
+      (LogicalKeyboardKey.digit3, '#'),
+    ]) {
+      for (final held in [_altGr, _ctrlAlt]) {
+        final handled = await _press(tester, digit, held, character: typed);
+        expect(handled, isFalse, reason: typed);
+        expect(a.shownTab, ChatTab.chat);
+        expect(d.selectedId, 'a');
       }
     }
     await closeView(tester, d);
