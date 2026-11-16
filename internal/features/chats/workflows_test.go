@@ -246,6 +246,41 @@ func TestWorkflowReadsThatFail(t *testing.T) {
 	}
 }
 
+// A run whose files, once found, can't be read again still ends: its
+// agent gone, after the grace, stopped; its agent alive, once they stay
+// gone for WorkflowFind, ended in Nushi's words. Its follower goes.
+func TestAWorkflowWhoseFilesGo(t *testing.T) {
+	for name, agentGoes := range map[string]bool{"its agent goes": true, "its agent stays": false} {
+		t.Run(name, func(t *testing.T) {
+			f := workflowChat(t, Timing{WorkflowGrace: time.Millisecond, WorkflowFind: 20 * time.Millisecond}, runningAs)
+			f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+			f.files.set(func(w model.Workflow) (model.Workflow, error) { return w, fs.ErrNotExist })
+			f.c.mu.Lock()
+			agent := f.c.agent
+			if agentGoes {
+				f.c.agent = nil // halted, as Delete does
+			}
+			f.c.pokeWorkflowsLocked()
+			f.c.mu.Unlock()
+			eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.Final() && len(f.c.following) == 0 })
+			w := workflowOf(f.c)
+			switch {
+			case agentGoes && (w.State != "stopped" || w.End != "Claude quit while it ran"):
+				t.Errorf("its agent gone: %+v", w)
+			case !agentGoes && (w.State != "unknown" || w.End != "its files are gone" || w.RunningCount != 0):
+				t.Errorf("its files gone: %+v", w)
+			}
+			f.c.mu.Lock()
+			f.c.agent = agent
+			n := f.c.workflowsLocked()
+			f.c.mu.Unlock()
+			if n != 0 {
+				t.Errorf("%d still counted", n)
+			}
+		})
+	}
+}
+
 // Each end the snapshot says is the run's.
 func TestWorkflowEnds(t *testing.T) {
 	for _, state := range []string{"done", "failed", "stopped", "unknown"} {

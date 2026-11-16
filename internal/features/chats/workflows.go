@@ -22,11 +22,12 @@ import (
 // the chat reopened since: no agent of this daemon's runs it), and a poke
 // that has it read at once.
 type follow struct {
-	owner Agent
-	poke  chan struct{}
-	found bool      // its files were read once
-	since time.Time // when following began
-	gone  time.Time // when its owner was first seen gone
+	owner   Agent
+	poke    chan struct{}
+	found   bool      // its files were read once
+	since   time.Time // when following began
+	gone    time.Time // when its owner was first seen gone
+	missing time.Time // when its files, found before, were first not there
 }
 
 // workflowLocked notices a call that launched a workflow and follows it,
@@ -130,7 +131,10 @@ func (c *chat) followWorkflow(callID string, f *follow) {
 
 // judgeWorkflow is what a read of a run (got, err) makes of it (cur), and
 // how long to wait for the next read; nil when it is no workflow to show
-// after all (its files never came: the call shows as a plain one).
+// after all (its files never came: the call shows as a plain one). Once
+// its files were found, a read that fails is judged on the run as last
+// read: its agent gone, its files still too long or gone for good end it
+// all the same, so no run reads "running" for good.
 func (c *chat) judgeWorkflow(cur, got model.Workflow, err error, f *follow, gone bool, now time.Time) (*model.Workflow, time.Duration) {
 	poll := c.timing.workflowPoll()
 	switch {
@@ -138,12 +142,20 @@ func (c *chat) judgeWorkflow(cur, got model.Workflow, err error, f *follow, gone
 		return nil, 0
 	case err != nil && !f.found && !errors.Is(err, fs.ErrNotExist) && f.owner == nil:
 		return nil, 0 // a past run whose files can't be read
-	case err != nil: // not there yet, or a read that failed: the next one may not
+	case err != nil && !f.found: // not there yet, or a read that failed: the next one may not
 		return &cur, poll
-	}
-	f.found = true
-	if got.Final() {
-		return &got, 0
+	case err != nil:
+		got = cur
+		if !errors.Is(err, fs.ErrNotExist) {
+			f.missing = time.Time{}
+		} else if f.missing.IsZero() {
+			f.missing = now
+		}
+	default:
+		f.found, f.missing = true, time.Time{}
+		if got.Final() {
+			return &got, 0
+		}
 	}
 	got.Stalled = false
 	switch {
@@ -152,6 +164,9 @@ func (c *chat) judgeWorkflow(cur, got model.Workflow, err error, f *follow, gone
 		return &got, c.timing.workflowGrace()
 	case f.owner != nil && gone:
 		return quit(got, now), 0
+	case !f.missing.IsZero() && now.Sub(f.missing) >= c.timing.workflowFind():
+		got.State, got.End, got.Ended, got.Running, got.RunningCount = "unknown", "its files are gone", now, nil, 0
+		return &got, 0 // Claude's files of the run went (a Move, the session deleted)
 	case f.owner == nil && now.Sub(got.Active) >= c.timing.workflowQuiet():
 		return quit(got, now), 0 // no agent of this daemon's runs it, and its files are still
 	case f.owner != nil && now.Sub(got.Active) >= c.timing.workflowStall():

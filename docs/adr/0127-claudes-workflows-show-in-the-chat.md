@@ -17,7 +17,7 @@ Claude Code's Workflow tool launches a script that runs many subagents in phases
 
 ## Consequences
 - Long runs hold auto-sleep and an update's restart, as subagents do, until they end or stall.
-- An undocumented format can change under Nushi: a call whose files never appear (30 s) shows as the plain call it was; a read that fails keeps the last state.
+- An undocumented format can change under Nushi: a call whose files never appear (30 s) shows as the plain call it was; a read that fails keeps the last state, and the end rules above still apply to it; files found once and then gone for 30 s end the run ("its files are gone").
 - Background Agent-tool subagents are unchanged: they count while the daemon saw them start, and read done after a reopen.
 - A workflow agent's steps are read for the pane by a plain reading of its transcript in Nushi, not the library's replay.
 
