@@ -10,6 +10,7 @@ import 'package:nushi/controls.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart' show DaemonLink, apiVersion;
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
+import 'package:nushi/phone/chat_sheet.dart';
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
@@ -291,12 +292,28 @@ void main() {
                     Option(id: 'n', name: 'No'),
                   ],
                 ),
+                ..._question().items.where((i) => i.id == 'q'),
               ],
             )
           : null;
     final (phone, _) = await _app(tester, fake);
     await tester.tap(find.text('Review the Noise channel'));
     await tester.pumpAndSettle();
+    // The question's options, without the digits a Mac's keys would pick.
+    final question = find.byType(QuestionCard);
+    expect(
+      find.descendant(of: question, matching: find.text('Rekeying')),
+      findsOne,
+    );
+    for (final digit in ['1', '2', '3']) {
+      expect(
+        find.descendant(
+          of: question,
+          matching: find.text(digit, findRichText: true),
+        ),
+        findsNothing,
+      );
+    }
     final text = find.text(long);
     expect(tester.widget<Text>(text).maxLines, 3);
     final paragraph = tester.renderObject<RenderParagraph>(
@@ -422,7 +439,13 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Chat'));
     await tester.pumpAndSettle();
     expect(find.text('relay-fix'), findsOne);
-    expect(find.text('Opus 5.5'), findsWidgets); // the box's picker too
+    expect(
+      find.descendant(
+        of: find.byType(ChatSheet),
+        matching: find.text('Opus 5.5'),
+      ),
+      findsOne,
+    ); // the box's picker shows it too
     expect(find.text('nushi  /Users/me'), findsOne);
     expect(find.text('Pin'), findsOne); // the daemon keeps pins (API 90)
     await render(tester, find.byType(PhoneApp), 'phone_chat_sheet_390');
