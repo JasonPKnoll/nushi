@@ -1,10 +1,9 @@
-# What make check runs, as parallel jobs (one job of 12 minutes before, until 2026-10-27). macOS for what needs it, in four
+# What make check runs, as parallel jobs (one job of 12 minutes before, until 2026-10-27). macOS for what needs it, in three
 # jobs (the account runs five macOS jobs at once, and a release or another repository's CI needs one too): the
 # daemon (proc_info, sandbox-exec, launchd, the keychain's cgo), so Go's lint and tests, with the window's placement
-# maths (swiftc); the web app's end-to-end test
-# (nushid with Chrome); and the app's tests in two shards of test files (its goldens are drawn with macOS's text
+# maths (swiftc); and the app's tests in two shards of test files (its goldens are drawn with macOS's text
 # rendering: on Linux a third of them differ by 1-4%; its end-to-end tests run nushid). Linux for the rest: the
-# protos' and Dart's lint, the Dart packages' tests, and the daemon on Linux (ADR 0101): every Go package's tests,
+# protos' and Dart's lint, the Dart packages' tests, the web app's end-to-end test (nushid with Chrome), and the daemon on Linux (ADR 0101): every Go package's tests,
 # lint, build and vet without cgo; and the Linux app (ADR 0104): its tests in two shards (goldens are compared on macOS
 # only), and its package built on each architecture as the release builds it (tools/release.sh's linux part, on the
 # oldest Ubuntu it supports, for the glibc it needs), installed and started on a virtual display (tools/linux-smoke.sh),
@@ -196,9 +195,10 @@ jobs:
             artifacts/engine/darwin-x64-release ios-sdk.stamp macos-sdk.stamp android-*.stamp
           du -sh "$FLUTTER_ROOT"
 
+  # On Linux since 2026-11-16: nushid runs there (ADR 0101) and the image has Chrome, which frees a macOS runner.
   web:
-    name: Web app in Chrome (macOS)
-    runs-on: macos-latest
+    name: Web app in Chrome (Linux)
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -211,23 +211,12 @@ jobs:
           go-version-file: go.mod
       # As the app's tests do.
       - run: go build ./cmd/nushid ./cmd/nushi-relay ./internal/acptest/fakeagent
-      # The lean SDK, as the app's tests have it.
-      - id: flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: ${{ env.NUSHI_FLUTTER_VERSION }}
           cache: true
-          cache-key: flutter-:os:-:channel:-:version:-:arch:-:hash:-lean
       - run: make test-web
-      # As the app's tests do.
-      - if: always() && steps.flutter.outcome == 'success' && steps.flutter.outputs.CACHE-HIT != 'true'
-        run: |
-          du -sh "$FLUTTER_ROOT"
-          cd "$FLUTTER_ROOT/bin/cache"
-          rm -rf artifacts/engine/ios* artifacts/engine/android-* artifacts/engine/darwin-x64-profile \
-            artifacts/engine/darwin-x64-release ios-sdk.stamp macos-sdk.stamp android-*.stamp
-          du -sh "$FLUTTER_ROOT"
 
   linux:
     name: Go tests (Linux)

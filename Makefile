@@ -303,7 +303,8 @@ test-window:
 	xcrun swiftc -o bin/titlebar-test app/macos/Runner/TitleBar.swift app/macos/TitleBarTests/main.swift
 	bin/titlebar-test
 
-# The web app in Chrome with the real nushid and nushi-relay (macOS).
+# The web app in Chrome with the real nushid and nushi-relay (macOS, or
+# Linux with a Chrome, as CI runs it).
 test-web:
 	cd app && flutter test --platform chrome test/web
 
