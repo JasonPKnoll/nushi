@@ -220,9 +220,15 @@ type Status struct {
 	SessionGone bool
 	// CanSleep says Sleep can stop its agent: the agent reopens sessions.
 	CanSleep bool
-	// Background is how many subagents and background commands its agent
-	// started still run; a turn can end while they do.
+	// Background is how many subagents, background commands and workflows
+	// its agent started still run; a turn can end while they do.
 	Background int
+	// Workflows is how many of those are workflows (model.Workflow) that
+	// run and aren't stalled: the chat counts as working while one does.
+	Workflows int
+	// OwnTurn says the agent works on its own, outside a turn of the user's
+	// (after a background task's end): the chat counts as working.
+	OwnTurn bool
 	// Ended is set only on the status published as a turn ends: how the
 	// chat judged it, the one verdict push and every client go by.
 	Ended TurnEnd

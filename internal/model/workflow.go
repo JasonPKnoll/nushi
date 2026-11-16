@@ -1,0 +1,74 @@
+package model
+
+import "time"
+
+// Workflow is a run a tool call launched: a script of the agent's that
+// runs many subagents in phases, on past the call (Claude's Workflow tool,
+// ADR 0127). Nothing here is the agent's: it is what Nushi read of the
+// run's files, a summary small enough to ride on its item.
+//
+// State is "" while the run isn't followed (the call shows as a plain one),
+// then "running", and at its end "done", "failed", "stopped" or "unknown"
+// (it ended and didn't say how; End holds its word). End is the agent's own
+// word for the end ("completed", "killed", "paused"…), or Nushi's when the
+// agent gave none ("Claude quit while it ran").
+//
+// Started is when the run started, Ended when it ended (zero while it
+// runs), Active when its files last changed. Phases are in the order
+// first reached (or the agent's own list, at the end), 32 at most. Agents
+// counts the run's agents, Done and Failed those that ended so; Running
+// holds the labels of up to 8 that run now, RunningCount how many do.
+// Summary is the agent's own line for the run, at most 2 KB. Stalled says
+// no file of the run changed for so long (an hour) that it no longer
+// counts as working, though nothing says it ended; any change clears it.
+type Workflow struct {
+	RunID, TaskID, Name, Description string
+	State, End                       string
+	Started                          time.Time `json:",omitzero"`
+	Ended                            time.Time `json:",omitzero"`
+	Active                           time.Time `json:",omitzero"`
+	Phases                           []WorkflowPhase
+	Agents, Done, Failed             int
+	Running                          []string
+	RunningCount                     int
+	Summary                          string
+	Stalled                          bool `json:",omitzero"`
+}
+
+// WorkflowPhase is one phase of a workflow: its title and the agent's line
+// on it, and how many of its agents started, ended well and failed.
+type WorkflowPhase struct {
+	Title, Detail         string
+	Started, Done, Failed int
+}
+
+// WorkflowAgent is one agent of a workflow, as its pane lists it: never on
+// an item and never kept. State is "running", "done", "failed" or
+// "stopped". Prompt and Result are the starts of its task and its answer,
+// as the agent kept them.
+type WorkflowAgent struct {
+	ID, Label, Phase, State, Model string
+	Prompt, Result                 string
+	Started, Ended                 time.Time
+	Tokens, ToolCalls              int
+}
+
+// Limits of a workflow's summary on its item, so a run of a thousand agents
+// stays small there (ADR 0127).
+const (
+	WorkflowPhases      = 32
+	WorkflowRunning     = 8
+	WorkflowLabel       = 60   // runes
+	WorkflowSummaryText = 2048 // bytes
+)
+
+// Final says the workflow's state is final.
+func (w *Workflow) Final() bool {
+	return w != nil && (w.State == "done" || w.State == "failed" || w.State == "stopped" || w.State == "unknown")
+}
+
+// Runs says the workflow runs and counts as the chat's work: running and
+// not stalled.
+func (w *Workflow) Runs() bool {
+	return w != nil && w.State == "running" && !w.Stalled
+}
