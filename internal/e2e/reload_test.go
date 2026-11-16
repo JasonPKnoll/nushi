@@ -13,25 +13,35 @@ import (
 	nushiv1 "github.com/afrase/nushi/internal/gen/nushi/v1"
 )
 
+// A reloaded chat shows the transcript it had, for an app following along
+// and in a snapshot after: with Nushi's copy of it, and without one, when
+// only the agent's replay can bring it back (ADR 0047).
 func TestReloadReplaysTheChat(t *testing.T) {
-	ctx := context.Background()
-	d := startDaemon(t, t.TempDir(), &acptest.History{})
-	a := open(t, d)
-	chatID := a.start(&nushiv1.StartChatRequest{Folder: t.TempDir()})
-	a.say(chatID, "hello")
-	snap := a.get(chatID)
-	before := transcript(snap.Items)
+	for name, keep := range map[string]bool{"with a copy": true, "from the replay alone": false} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			d := startDaemon(t, t.TempDir(), &acptest.History{})
+			a := open(t, d)
+			must(a.c.SetSettings(ctx, connect.NewRequest(&nushiv1.SetSettingsRequest{Settings: &nushiv1.Settings{KeepTranscripts: &keep}})))
+			chatID := a.start(&nushiv1.StartChatRequest{Folder: t.TempDir()})
+			a.say(chatID, "hello")
+			snap := a.get(chatID)
+			before := transcript(snap.Items)
+			if before == "" {
+				t.Fatal("no transcript to reload")
+			}
 
-	// The app follows along: the transcript is cut, then replayed.
-	must(a.c.ReloadChat(ctx, connect.NewRequest(&nushiv1.ReloadChatRequest{ChatId: chatID})))
-	snap.Status.Busy = true
-	if got := transcript(a.follow(chatID, snap)); got != before {
-		t.Errorf("transcript after reload:\n%s\nwant:\n%s", got, before)
+			must(a.c.ReloadChat(ctx, connect.NewRequest(&nushiv1.ReloadChatRequest{ChatId: chatID})))
+			snap.Status.Busy = true
+			if got := transcript(a.follow(chatID, snap)); got != before {
+				t.Errorf("transcript after reload:\n%s\nwant:\n%s", got, before)
+			}
+			if got := transcript(a.get(chatID).Items); got != before {
+				t.Errorf("snapshot after reload:\n%s\nwant:\n%s", got, before)
+			}
+			a.say(chatID, "again")
+		})
 	}
-	if got := transcript(a.get(chatID).Items); got != before {
-		t.Errorf("snapshot after reload:\n%s\nwant:\n%s", got, before)
-	}
-	a.say(chatID, "again")
 }
 
 // A chat without messages has nothing in the agent's history (Claude keeps
