@@ -172,7 +172,7 @@ func TestExpiredChatKeptForItsCopy(t *testing.T) {
 	_, _ = svc.Get("c")
 	c := svc.chats["c"]
 	eventually(t, c, func() bool { return c.sessionGone && !c.busy })
-	time.Sleep(100 * time.Millisecond) // expire runs on its own
+	svc.expires.Wait() // the expire the reopen began, done
 	if got := shown(c); got != "user:one agent:m1 notice:session_gone" {
 		t.Fatalf("shown %s", got)
 	}

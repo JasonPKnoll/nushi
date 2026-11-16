@@ -50,6 +50,9 @@ type Service struct {
 	ctx    context.Context //nolint:containedctx // the service's life, which Close ends
 	cancel context.CancelFunc
 	loops  sync.WaitGroup // its loops (sleep, copies, letting go), which Close waits for
+	// expires are the expires a reopen began (resume), which nothing waits
+	// for but a test, to see what one did.
+	expires sync.WaitGroup
 
 	pinMu sync.Mutex // Pin's, one order at a time
 

@@ -162,7 +162,7 @@ func (s *Service) resume(c *chat) {
 	switch {
 	case gone:
 		c.goneLocked("")
-		go s.expire(context.WithoutCancel(ctx), c, "the agent says so")
+		s.expires.Go(func() { s.expire(context.WithoutCancel(ctx), c, "the agent says so") })
 	case err != nil:
 		c.failedLocked(err)
 	}

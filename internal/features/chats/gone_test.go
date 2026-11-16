@@ -136,7 +136,7 @@ func TestAChatStaysUnlessItsSessionIsSurelyGone(t *testing.T) {
 			_, _ = svc.Get("c")
 			cc := svc.chats["c"]
 			eventually(t, cc, func() bool { return !cc.busy })
-			time.Sleep(20 * time.Millisecond) // an expire would have begun
+			svc.expires.Wait() // one the reopen began (by now, as it set busy), done
 			if ids, _ := ev.removed(); len(ids) > 0 || len(sessions.deleted) > 0 {
 				t.Errorf("removed %v", ids)
 			}
