@@ -18,8 +18,9 @@
 #
 # Each job's timeout is two to three times its longest recent run with warm caches (2026-11-16: Go's tests on macOS 4.1
 # minutes, the web 2.4 on Linux, Linux's Go 3), room for a cold cache's downloads and builds: a hung test ends there, not
-# at GitHub's six hours on a scarce macOS runner. The app's shards (5-6 minutes when they ran every file by name) keep
-# 15. Windows' and the Linux package's (a cold Flutter build) are as they were.
+# at GitHub's six hours on a scarce macOS runner. The app's shards: 15, over twice their longest by time (5.7 minutes,
+# 2026-11-16; 25 when a macOS shard ran every other file and took up to 13). Windows' and the Linux package's (a cold
+# Flutter build) are as they were.
 name: CI
 
 on:
@@ -208,9 +209,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
-    # 2026-11-16: a shard takes 7-13 minutes and one ran past 15 with every test passing, so 25, two times its longest,
-    # until the shards are balanced by measured time.
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
