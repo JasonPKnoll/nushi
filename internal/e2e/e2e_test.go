@@ -467,10 +467,10 @@ func (a *app) follow(chatID string, snap *nushiv1.GetChatResponse) []*nushiv1.It
 	}
 	for done := false; !done; {
 		e := a.waitFor("the chat to be idle", func(e *nushiv1.EventsResponse) bool { return e.ChatId == chatID })
-		if e.Seq > snap.Seq {
+		if e.Seq > snap.Seq { // one from before the snapshot, still in the stream, says nothing of now
 			items = apply(items, e)
+			done = idle(e)
 		}
-		done = idle(e)
 	}
 	return items
 }
