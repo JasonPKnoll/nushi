@@ -62,11 +62,13 @@ extension DaemonLink on Daemon {
     var build = '';
     var version = '';
     var os = '';
+    var pid = 0;
     var found = UpdateCheck();
     try {
       // A daemon that hangs counts as gone, rather than stalling the pings.
       final r = await client.ping(PingRequest()).timeout(wait);
       (api, build, version, os) = (r.apiVersion, r.build, r.version, r.os);
+      pid = r.pid;
       found = r.update;
       pingError = null;
     } on Object catch (e) {
@@ -76,7 +78,10 @@ extension DaemonLink on Daemon {
       }
     }
     final ok = api > 0;
-    if (ok) _launcher.launches = 0;
+    if (ok) {
+      _launcher.launches = 0;
+      daemonPid = pid;
+    }
     if (ok && !remote) _sawUpdate(found);
     if (ok && _events == null) _subscribe();
     if (ok && (!connected || build != _build)) macView.forget();
@@ -179,7 +184,7 @@ extension DaemonLink on Daemon {
       attrs: {'build': _build, 'bundled': ?bundled},
     );
     final before = _build;
-    await native.install.stop(dataDir);
+    await native.install.stop(dataDir, pid: daemonPid);
     // The first ping that fails starts the bundled daemon.
     _launcher.launched = DateTime(0);
     for (var i = 0; i < 50 && connected; i++) {

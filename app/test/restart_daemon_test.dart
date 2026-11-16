@@ -46,8 +46,8 @@ void main() {
     expect((d.connected, phase), (true, 'new'));
   });
 
-  test('a restart stops the daemon of the data folder and starts the '
-      'packaged one once it has gone', () async {
+  test('a restart stops the daemon of the data folder, by the pid it '
+      'said, and starts the packaged one once it has gone', () async {
     fakeInstall.daemon = '/opt/nushi/lib/nushid';
     var phase = 'old';
     final fake = FakeDaemon([])
@@ -56,7 +56,11 @@ void main() {
           Code.unavailable,
           'no daemon',
         ),
-        PingRequest() => PingResponse(apiVersion: apiVersion, build: phase),
+        PingRequest() => PingResponse(
+          apiVersion: apiVersion,
+          build: phase,
+          pid: 4242,
+        ),
         _ => null,
       };
     final d = Daemon(transport: fake);
@@ -72,6 +76,7 @@ void main() {
     );
     await d.restartDaemon();
     expect(fakeInstall.stopped, [dataDir]);
+    expect(fakeInstall.stoppedPids, [4242]);
     expect(fakeInstall.launched, [dataDir]);
   });
 

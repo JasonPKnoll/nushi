@@ -11,13 +11,13 @@ import 'package:nushi/native_windows.dart';
 
 void main() {
   test("Windows's set is whole: its words, no menu bar, Explorer, and a "
-      "daemon the app can't stop yet", () {
+      'daemon it stops by its stop event', () {
     final set = windowsNative();
     expect(set.conventions, same(windowsConventions));
     expect(set.window.menuBar, isFalse);
     expect(set.desktop, isA<WindowsDesktop>());
     expect(set.install, isA<WindowsAppInstall>());
-    expect(set.install.canStop, isFalse);
+    expect(set.install.canStop, isTrue);
   });
 
   test('presenting with no window of the app to find (a test has none) does '

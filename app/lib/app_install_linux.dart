@@ -104,7 +104,7 @@ class LinuxAppInstall implements AppInstall {
   /// still says nushid after an upgrade replaced its file, where `exe`
   /// would say "(deleted)"), and gets SIGTERM.
   @override
-  Future<void> stop(String dataDir) async {
+  Future<void> stop(String dataDir, {int pid = 0}) async {
     final pid = await socketPeer('$dataDir/nushid.sock');
     if (pid == null) return;
     final String comm;
