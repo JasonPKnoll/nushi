@@ -192,12 +192,16 @@ func TestAServerThatNeverAnswers(t *testing.T) {
 	row(t, s, "web", NotAnswering)
 }
 
+// The server answers only once the test has seen it not answering: a
+// delay of its own could pass before a loaded machine looked.
 func TestAServerThatAnswersLate(t *testing.T) {
-	s, _, _ := setup(t, entry("web", freePort(t), "-delay", "1500ms"))
+	answer := filepath.Join(t.TempDir(), "answer")
+	s, _, _ := setup(t, entry("web", freePort(t), "-after", answer))
 	s.ReadyWithin = 300 * time.Millisecond
 	_, err := s.Start(t.Context(), "c", Pick{Name: "web"})
 	testcheck.NoErr(t, err)
 	row(t, s, "web", NotAnswering)
+	testcheck.Write(t, answer, "")
 	row(t, s, "web", Running)
 }
 

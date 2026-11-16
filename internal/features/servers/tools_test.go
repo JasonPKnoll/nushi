@@ -331,16 +331,19 @@ func TestAFailedStartTellsTheAgent(t *testing.T) {
 }
 
 // preview_start answers after StartWait for a server still starting;
-// its page is shown once it answers.
+// its page is shown once it answers, which it does here only after
+// preview_start has.
 func TestASlowServerIsShownOnceItAnswers(t *testing.T) {
 	p := freePort(t)
-	s, _, _ := setup(t, entry("web", p, "-delay", "800ms"))
+	answer := filepath.Join(t.TempDir(), "answer")
+	s, _, _ := setup(t, entry("web", p, "-after", answer))
 	s.StartWait = 100 * time.Millisecond
 	set, events := agentTools(s)
 	text, err := call(t, set, "preview_start", map[string]string{"name": "web"})
 	if err != nil || !strings.Contains(text, "hasn't answered yet") || len(events.shown()) != 0 {
 		t.Fatalf("preview_start: %q, %v, shown %q", text, err, events.shown())
 	}
+	testcheck.Write(t, answer, "")
 	if !testcheck.Eventually(func() bool { return len(events.shown()) == 1 }) {
 		t.Error("never shown")
 	}

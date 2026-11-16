@@ -1,7 +1,8 @@
 // Command fakeserver is a dev server for the servers feature's tests: it
 // answers HTTP on localhost's PORT (or the port of --port N), after
-// -delay, or never (-never), or prints and exits (-exit), and may leave a
-// child that setsid out of its terminal (-child, its pid written there).
+// -delay, or once a file is there (-after), or never (-never), or prints
+// and exits (-exit), and may leave a child that setsid out of its
+// terminal (-child, its pid written there).
 package main
 
 import (
@@ -18,6 +19,7 @@ import (
 
 func main() {
 	delay := flag.Duration("delay", 0, "wait so long before listening")
+	after := flag.String("after", "", "wait for this file to be there before listening")
 	never := flag.Bool("never", false, "never listen")
 	exit := flag.Int("exit", -1, "print and exit with this code")
 	child := flag.String("child", "", "start a child in a session of its own, its pid written to this file")
@@ -48,6 +50,12 @@ func main() {
 		return
 	}
 	time.Sleep(*delay)
+	for *after != "" {
+		if _, err := os.Stat(*after); err == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	p := *port
 	if p == "" {
 		p = os.Getenv("PORT")
