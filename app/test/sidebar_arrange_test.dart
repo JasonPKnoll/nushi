@@ -334,8 +334,17 @@ void main() {
     d.dispose();
   });
 
-  testWidgets('the arrangement is kept across a relaunch', (tester) async {
+  testWidgets('the arrangement is saved for the next launch', (tester) async {
     final (d, _) = await arrangedSidebar(tester);
+    final before = readSaved();
+    for (final key in [
+      'sidebarGroupBy',
+      'sidebarSort',
+      'sidebarAscending',
+      'sidebarShows',
+    ]) {
+      expect(before[key], isNull, reason: key);
+    }
     await _pick(tester, ['Group by', 'Agent']);
     await _pick(tester, ['Sort by', 'Name']);
     await _pick(tester, ['Show', 'Status']);
@@ -345,9 +354,6 @@ void main() {
     expect(saved['sidebarSort'], 'name');
     expect(saved['sidebarAscending'], true);
     expect(saved['sidebarShows'], ['agent', 'branch', 'project']);
-    // As the next launch reads them.
-    expect(GroupBy.values.asNameMap()[saved['sidebarGroupBy']], GroupBy.agent);
-    expect(SortBy.values.asNameMap()[saved['sidebarSort']], SortBy.name);
   });
 
   testWidgets('the menu works from the keyboard', (tester) async {
