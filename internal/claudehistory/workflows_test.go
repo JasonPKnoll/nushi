@@ -159,19 +159,28 @@ func TestWorkflowActive(t *testing.T) {
 	}
 }
 
-// Nothing of the run yet is fs.ErrNotExist; a bad id names no file.
+// Nothing of the run yet is fs.ErrNotExist; a bad id names no file, even
+// where a journal waits at the path it would lead to.
 func TestNoWorkflowFiles(t *testing.T) {
-	l, id, folder, _ := fakeRun(t, "", "")
+	l, id, folder, session := fakeRun(t, "", "")
 	if _, err := l.ReadWorkflow(id, folder, model.Workflow{RunID: "wf_abc"}); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("none: %v", err)
 	}
+	for _, run := range []string{"wf_abc", filepath.Join("wf_..", "x"), "x"} {
+		testcheck.Write(t, filepath.Join(session, "subagents", "workflows", run, "journal.jsonl"), launchedLine+startA)
+	}
+	projects := filepath.Dir(filepath.Dir(session))
+	testcheck.Write(t, filepath.Join(projects, "x", "subagents", "workflows", "wf_abc", "journal.jsonl"), launchedLine+startA)
+	if _, err := l.ReadWorkflow(id, folder, model.Workflow{RunID: "wf_abc"}); err != nil {
+		t.Fatalf("the good one: %v", err)
+	}
 	for _, w := range []model.Workflow{{RunID: "wf_../x"}, {RunID: "x"}, {RunID: "wf_abc", TaskID: "../t"}} {
-		if _, err := l.ReadWorkflow(id, folder, w); err == nil {
-			t.Errorf("%+v: read", w)
+		if got, err := l.ReadWorkflow(id, folder, w); err == nil {
+			t.Errorf("%+v: read %+v", w, got)
 		}
 	}
-	if _, err := l.ReadWorkflow("../x", folder, model.Workflow{RunID: "wf_abc"}); err == nil {
-		t.Error("a session id with a path")
+	if got, err := l.ReadWorkflow("../x", folder, model.Workflow{RunID: "wf_abc"}); err == nil {
+		t.Errorf("a session id with a path: read %+v", got)
 	}
 }
 
