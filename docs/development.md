@@ -14,7 +14,8 @@ make run         # starts nushid in the background (if it isn't running), then t
 make stop        # stops nushid
 make test        # all tests (test-go, test-packages, test-app, test-web, test-window)
 make lint        # the linters and format checks, below (lint-go, lint-dart)
-make check       # lint, then test
+make check       # lint, test and the desktop build: the one check before a push
+make test-timings  # app/test/timings.tsv from the last make check's test times
 make gen         # regenerate the API code after editing proto/
 make lines       # hand-written line counts
 make package     # a release "Nushi.app" with nushid inside (signed: Install, below, says with what)
@@ -50,7 +51,7 @@ tools/linux-smoke.sh dist/nushi-1.2.0-linux-amd64.tar.gz  # install and start it
 - `buf lint` and `buf format`;
 - `flutter analyze` and `dart format`, for the app and each package.
 
-`make check` runs it and then the tests.
+`make check` runs it, the tests and the desktop app's build (`tools/check`): the app's suite (`--concurrency 3`) and then the web's tests in one lane, the lints and the other tests in another beside it, then `flutter build macos` (`linux` on Linux). A failure stops nothing, so one run shows every failure; each step's log is in `bin/check-logs`. `make check-app` is the same, under its old name.
 
 **Go.** golangci-lint and govulncheck are pinned in their own module, `tools/lint/go.mod`. `make lint` builds them into `bin/` and runs them: nothing to install, and the daemon's `go.mod` doesn't take their dependencies.
 

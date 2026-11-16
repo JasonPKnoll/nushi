@@ -59,37 +59,62 @@ func sh(name, code string) step {
 	return step{name: name, cmd: []string{"sh", "-c", "echo log of " + name + "; exit " + code}}
 }
 
-// Steps stop at the first failure, whose code comes back; the verdict with
-// the log's path is the last line, and the log has the whole output.
-func TestRunStopsAtFirstFailure(t *testing.T) {
+// Every step runs, a failure or not: the lanes side by side, then the
+// steps after them. Each failure says why with its log's path, the first
+// one's code comes back, and the verdict naming them all is the last line.
+func TestRunReportsEveryFailure(t *testing.T) {
 	dir := t.TempDir()
 	var out strings.Builder
-	code := run(log.New(&out, "", 0), dir, []step{sh("one", "0"), sh("two", "3"), sh("three", "0")})
+	lanes := [][]step{{sh("one", "0"), sh("two", "3")}, {sh("three", "0"), sh("five", "4")}}
+	code := run(log.New(&out, "", 0), dir, lanes, []step{sh("six", "5")})
 	if code != 3 {
-		t.Errorf("exit %d, want the step's 3", code)
+		t.Errorf("exit %d, want the first failed step's 3", code)
 	}
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	file := filepath.Join(dir, "two.log")
-	if want := "check-app: FAILED at two (exit 3), full log: " + file; lines[len(lines)-1] != want {
-		t.Errorf("last line %q, want %q", lines[len(lines)-1], want)
+	text := out.String()
+	for _, name := range []string{"one", "three"} {
+		if !strings.Contains(text, name+": ok (") {
+			t.Errorf("no ok line for %s:\n%s", name, text)
+		}
 	}
-	if !strings.HasPrefix(lines[0], "one: ok (") {
-		t.Errorf("first line %q", lines[0])
+	for _, name := range []string{"two", "five", "six"} {
+		file := filepath.Join(dir, name+".log")
+		if !strings.Contains(text, name+": FAILED (exit ") || !strings.Contains(text, "full log: "+file) {
+			t.Errorf("%s's failure isn't reported:\n%s", name, text)
+		}
+		data, err := os.ReadFile(file)
+		testcheck.NoErr(t, err)
+		if string(data) != "log of "+name+"\n" {
+			t.Errorf("log %q", data)
+		}
 	}
-	if strings.Contains(out.String(), "three") {
-		t.Errorf("ran past the failure:\n%s", out.String())
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	if last := lines[len(lines)-1]; !strings.HasPrefix(last, "check: FAILED at two, five, six (exit 3, ") {
+		t.Errorf("last line %q", last)
 	}
-	data, err := os.ReadFile(file)
-	testcheck.NoErr(t, err)
-	if string(data) != "log of two\n" {
-		t.Errorf("log %q", data)
+}
+
+// The steps after the lanes wait for both, and the lanes run side by side.
+func TestLanesRunSideBySide(t *testing.T) {
+	dir := t.TempDir()
+	mark := filepath.Join(dir, "mark")
+	// Each lane waits for the other's mark: in a row, the first would wait forever.
+	wait := func(name, mine, theirs string) step {
+		return step{name: name, cmd: []string{"sh", "-c", "touch " + mark + mine + "; i=0; while [ ! -e " + mark + theirs + " ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i+1)); done; [ -e " + mark + theirs + " ]"}}
+	}
+	after := step{name: "after", cmd: []string{"sh", "-c", "[ -e " + mark + "a ] && [ -e " + mark + "b ]"}}
+	var out strings.Builder
+	if code := run(log.New(&out, "", 0), dir, [][]step{{wait("a", "a", "b")}, {wait("b", "b", "a")}}, []step{after}); code != 0 {
+		t.Errorf("exit %d:\n%s", code, out.String())
+	}
+	if !strings.HasSuffix(strings.TrimSpace(out.String()), ")") || !strings.Contains(out.String(), "check: ok (") {
+		t.Errorf("verdict:\n%s", out.String())
 	}
 }
 
 // A failure with no line that says why still shows the end of its log.
 func TestFailureIsNeverSilent(t *testing.T) {
 	var out strings.Builder
-	if code := run(log.New(&out, "", 0), t.TempDir(), []step{sh("one", "1")}); code != 1 {
+	if code := run(log.New(&out, "", 0), t.TempDir(), nil, []step{sh("one", "1")}); code != 1 {
 		t.Errorf("exit %d", code)
 	}
 	if !strings.Contains(out.String(), "log of one") {
@@ -100,15 +125,19 @@ func TestFailureIsNeverSilent(t *testing.T) {
 // A signal has no exit code; it must not read as success.
 func TestKilledStepFails(t *testing.T) {
 	s := step{name: "killed", cmd: []string{"sh", "-c", "kill -9 $$"}}
-	if code := run(log.New(&strings.Builder{}, "", 0), t.TempDir(), []step{s}); code != 1 {
+	if code := run(log.New(&strings.Builder{}, "", 0), t.TempDir(), nil, []step{s}); code != 1 {
 		t.Errorf("exit %d", code)
 	}
 }
 
 func TestCommandNotFoundFails(t *testing.T) {
 	s := step{name: "gone", cmd: []string{"no-such-command-here"}}
-	if code := run(log.New(&strings.Builder{}, "", 0), t.TempDir(), []step{s}); code != 1 {
+	var out strings.Builder
+	if code := run(log.New(&out, "", 0), t.TempDir(), [][]step{{s}}, nil); code != 1 {
 		t.Errorf("exit %d", code)
+	}
+	if !strings.Contains(out.String(), "gone couldn't run") {
+		t.Errorf("why isn't said:\n%s", out.String())
 	}
 }
 

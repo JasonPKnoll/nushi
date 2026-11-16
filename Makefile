@@ -256,7 +256,6 @@ lint-dart:
 	@for d in $(DART_DIRS); do echo "flutter analyze $$d"; (cd $$d && flutter analyze --fatal-infos) || exit 1; done
 	@for d in $(DART_DIRS); do (cd $$d && find lib test bin -name '*.dart' ! -path 'lib/gen/*' 2>/dev/null | xargs dart format --output=none --set-exit-if-changed) || exit 1; done
 
-check: lint test
 
 # On Linux, no Mac window to test, and the web's tests only with a Chrome.
 ifeq ($(OS),Linux)
@@ -300,11 +299,11 @@ test-app:
 	echo "flutter test $(FLUTTER_TEST_FLAGS): $$(echo "$$files" | wc -l | tr -d ' ') files, set $(APP_SET), shard $(APP_SHARD)"; \
 	cd app && NUSHI_TEST_SET='$(APP_SET)' flutter test $(FLUTTER_TEST_FLAGS) $$files
 
-# app/test/timings.tsv anew from the test times the last make check-app
+# app/test/timings.tsv anew from the test times the last make check
 # wrote, when the suite's times have changed (test-shards -check says when
 # many files are missing from it).
 test-timings:
-	go run ./tools/test-shards -timings bin/check-app-logs/test-app.json
+	go run ./tools/test-shards -timings bin/check-logs/test-app.json
 
 # The Mac window's placement maths (app/macos/Runner/Placement.swift, ADR
 # 0093), what ⌘V attaches (Clipboard.swift, on a pasteboard of its own)
@@ -341,14 +340,22 @@ gallery:
 	cd app && NUSHI_RENDERS='$(GALLERY)' flutter test test/screenshots/gallery.dart
 	@echo "gallery in $(GALLERY)"
 
-# make lint-dart, make test-app and flutter build macos (on Linux, flutter
-# build linux; build only), stopping at the first failure: a line per step,
-# then what failed and the path of the full log, so its output needs no pipe
-# (tools/check-app). Not part of check or CI: the build is for a change to
-# the app. FLUTTER_TEST_FLAGS and SHARD work as for test-app.
+# The one check before a push (tools/check): everything make lint and make
+# test run, the app's suite once, then flutter build macos (on Linux,
+# flutter build linux; build only). The app's suite and the web's tests
+# run beside the lints and the other tests; a failure stops nothing. A line
+# per step, then what failed with the path of its full log, so its output
+# needs no pipe. FLUTTER_TEST_FLAGS works as for test-app (--concurrency 3
+# unless it says).
+check:
+	@go build -o bin/check ./tools/check
+	@bin/check
+
+# make check, under the name it had when it checked only the app (until
+# 2026-11-16), for the briefs that still say it.
 check-app:
-	@go build -o bin/check-app ./tools/check-app
-	@bin/check-app
+	@echo "make check-app is make check now: the lint, every test and the build"
+	@$(MAKE) --no-print-directory check
 
 # What changed in the goldens against BASE (a ref, HEAD by default), new and
 # removed ones included: each file's size, changed box and pixel count, with
