@@ -268,10 +268,16 @@ func TestQueuedImagesGoOnlyToAnAgentThatTakesThem(t *testing.T) {
 		}
 		agent.mu.Lock()
 		last := agent.prompt
+		if steer {
+			last = agent.steerBlocks
+		}
 		agent.mu.Unlock()
+		if len(last) == 0 || last[0].Text == nil || last[0].Text.Text != "pic" {
+			t.Fatalf("steer %v: the agent's last message isn't the queued one: %+v", steer, last)
+		}
 		for _, b := range last {
-			if b.Image != nil && !steer {
-				t.Error("an image went to an agent that takes none")
+			if b.Image != nil {
+				t.Errorf("steer %v: an image went to an agent that takes none", steer)
 			}
 		}
 		agent.release()

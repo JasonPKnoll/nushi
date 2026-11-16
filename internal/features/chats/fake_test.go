@@ -159,7 +159,8 @@ type fakeAgent struct {
 	steerable   bool
 	prompts     []string // every prompt's text, and every message steered in
 	steered     []string
-	wire        []string // prompts and cancels, in the order they reach the agent
+	steerBlocks []acp.ContentBlock // the last message steered in, whole
+	wire        []string           // prompts and cancels, in the order they reach the agent
 	forkMeta    map[string]any
 	forkedFrom  []acp.SessionID           // each fork's session, in order
 	history     []acp.SessionUpdate       // what session/load replays
@@ -446,7 +447,7 @@ func (f *fakeAgent) Steer(_ context.Context, _ acp.SessionID, prompt []acp.Conte
 	if f.refuseSteer || f.steerErr != nil {
 		return false, f.steerErr
 	}
-	f.steered = append(f.steered, prompt[0].Text.Text)
+	f.steered, f.steerBlocks = append(f.steered, prompt[0].Text.Text), prompt
 	return true, nil
 }
 
