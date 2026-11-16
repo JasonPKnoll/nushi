@@ -226,12 +226,18 @@ lint-linux: $(GOLANGCI)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GOLANGCI) run ./...
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOLANGCI) run ./...
 
-# Every package built for Windows without cgo (ADR 0123): what it lacks
-# answers errors.ErrUnsupported, and code macOS and Linux share is in a
-# _unix.go file. Build only: most tests are Unix's, so vet (which builds
-# them) and lint would fail on those.
-lint-windows:
+# Every package built, vetted and linted for Windows without cgo (ADR
+# 0123): what it lacks answers errors.ErrUnsupported, code macOS and Linux
+# share is in a _unix.go file, and a test of Unix's behaviour in a
+# _unix_test.go one, so the _windows.go files and their tests are checked
+# anywhere. unused is off: what only Unix's files call (the terminal's
+# reading, which Windows's stand-in never starts) is unused there, and
+# lint-go and lint-linux run it. amd64 only: Windows's types don't differ
+# by architecture as Linux's do.
+lint-windows: $(GOLANGCI)
 	GOOS=windows CGO_ENABLED=0 go build ./...
+	GOOS=windows CGO_ENABLED=0 go vet ./...
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 $(GOLANGCI) run --disable unused ./...
 
 # The protos' and Dart's, and the native code of the app and its Dart
 # packages only in a platform's *_macos.dart, *_linux.dart or
