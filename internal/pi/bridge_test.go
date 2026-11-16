@@ -568,14 +568,23 @@ func TestCompactAndName(t *testing.T) {
 	}
 
 	wait = begin(t, c, store, s.SessionID, "wait")
+	// The steer never reaches pi, so the fake can't say it came: the
+	// bridge's hook says it is waiting on the turn, before the stop (one
+	// that came after it would be refused either way).
+	waiting := make(chan struct{})
+	waits := func() { close(waiting) }
+	steerWaits.Store(&waits)
+	t.Cleanup(func() { steerWaits.Store(nil) })
 	steered := make(chan bool)
 	go func() {
 		ok, _ := c.Steer(context.Background(), s.SessionID, []acp.ContentBlock{{Type: "text", Text: &acp.TextContent{Text: "/compact"}}})
 		steered <- ok
 	}()
-	// Time for the steer to wait on the turn (it never reaches pi, so the
-	// fake can't say); one that comes after the stop isn't steered either.
-	time.Sleep(50 * time.Millisecond)
+	select {
+	case <-waiting:
+	case <-time.After(turnTimeout):
+		t.Fatal("/compact's steer never waited on the turn")
+	}
 	if err := c.Cancel(context.Background(), &acp.CancelNotification{SessionID: s.SessionID}); err != nil {
 		t.Error(err)
 	}

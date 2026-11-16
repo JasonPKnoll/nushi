@@ -505,6 +505,10 @@ func (s *session) abortSent() {
 // pi: a test holds it there.
 var beforeAbort atomic.Pointer[func()]
 
+// steerWaits, when set, is called as a steered command of the bridge's
+// own starts waiting for the running turn to end: a test waits for it.
+var steerWaits atomic.Pointer[func()]
+
 // steer hands text to the running turn, which takes it after the tools
 // running now; false when no turn runs (a stopped one that waits for pi's
 // abort doesn't). One of ownCommands isn't taken: it waits for the turn
@@ -517,6 +521,9 @@ func (s *session) steer(ctx context.Context, text string, images []image) (bool,
 		return false, nil
 	}
 	if _, _, own := ownCommand(text); own { // a turn of its own, once this one ends
+		if waits := steerWaits.Load(); waits != nil {
+			(*waits)()
+		}
 		select {
 		case <-idle:
 		case <-s.ended:
