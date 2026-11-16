@@ -182,6 +182,7 @@ void main() {
     final before = pickTileImage;
     addTearDown(() => pickTileImage = before);
     final picks = Directory('$dataDir/picked')..createSync(recursive: true);
+    addTearDown(() => picks.deleteSync(recursive: true));
     final photo = File('${picks.path}/photo.png')
       ..writeAsBytesSync(await photoPng(tester));
     final gif = File('${picks.path}/spin.gif')..writeAsBytesSync(animatedGif());
@@ -278,7 +279,6 @@ void main() {
     expect(projectTiles.value, isEmpty);
     expect(stored(), isEmpty);
     d.dispose();
-    picks.deleteSync(recursive: true);
   });
 
   testWidgets('an image is framed by a drag, a scroll and the Zoom slider, '

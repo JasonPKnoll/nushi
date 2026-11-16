@@ -18,6 +18,7 @@ import 'package:nushi/review.dart';
 import 'package:nushi/run_state.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme_files.dart';
+import 'package:nushi/tile_images.dart';
 import 'package:nushi/tile_mark.dart';
 
 import 'config_home_linux.dart';
@@ -38,11 +39,11 @@ import 'harness.dart';
 /// age a golden shows never moves. No test sees what another left: the
 /// app's prefs as at launch, nothing the app holds in memory while it runs
 /// (`run_state.dart`'s: agents, caches, drafts, groups opened…), no pull
-/// request read, review comments, clones or theme files known, no image
-/// decoded, the shared clock of what loops at its start; the Mac's native
-/// edge (on every host), no speller, a fake install, so nothing starts or
-/// stops a daemon, a fake file manager, so nothing opens on the desktop,
-/// and a phone paired with a Mac.
+/// request read, review comments, clones or theme files known, no tile's
+/// image kept, no image decoded, the shared clock of what loops at its
+/// start; the Mac's native edge (on every host), no speller, a fake
+/// install, so nothing starts or stops a daemon, a fake file manager, so
+/// nothing opens on the desktop, and a phone paired with a Mac.
 /// The test process's data folder goes when its tests end; on Linux it
 /// holds the process's `XDG_CONFIG_HOME` too, where enchant makes its
 /// folder, so no test writes in the user's.
@@ -99,6 +100,9 @@ void startAfresh() {
   forgetJiraView();
   forgetGitHubView();
   unawaited(themeFiles.forget());
+  // No tile's image another test kept: its copies are files in the
+  // process's data folder, which a test counts.
+  if (tileImagesDir.existsSync()) tileImagesDir.deleteSync(recursive: true);
   // What loops starts at its rest, not where the test before left the
   // shared clock.
   pulseClock.rewind();
