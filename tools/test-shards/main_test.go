@@ -227,3 +227,24 @@ func TestRewriteTable(t *testing.T) {
 		t.Errorf("a report without -timings exits %d", code)
 	}
 }
+
+// A slow host's shard and a fast one's weigh the same once scaled to
+// their set's mean; another set's report is scaled by its own.
+func TestEvenHosts(t *testing.T) {
+	runs := []map[string]float64{
+		{"test/a_test.dart": 2, "test/b_test.dart": 2},
+		{"test/c_test.dart": 8, "test/d_test.dart": 8},
+		{"test/e_test.dart": 3},
+	}
+	evenHosts(runs, []string{"test/a_test.dart", "test/b_test.dart", "test/c_test.dart", "test/d_test.dart"})
+	want := []map[string]float64{
+		{"test/a_test.dart": 5, "test/b_test.dart": 5},
+		{"test/c_test.dart": 5, "test/d_test.dart": 5},
+		{"test/e_test.dart": 3},
+	}
+	for i := range runs {
+		if !maps.Equal(runs[i], want[i]) {
+			t.Errorf("report %d: %v, want %v", i, runs[i], want[i])
+		}
+	}
+}

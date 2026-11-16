@@ -21,7 +21,8 @@ import (
 // header opens the table, saying what it is.
 const header = `# Each app test file's weight in seconds, for tools/test-shards' split:
 # its run in CI's shard of its set (macOS or Linux) plus the shard's
-# median load. Only the balance of CI's shards depends on it.
+# median load, each shard scaled to its set's mean, since hosts differ
+# in speed. Only the balance of CI's shards depends on it.
 # make test-timings RUN=<CI run> rewrites it from that run's reports.
 `
 
@@ -119,8 +120,7 @@ func rewriteTable(t tests, reports []string) error {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	sums := map[string]float64{}
-	counts := map[string]int{}
+	var runs []map[string]float64
 	for _, report := range reports {
 		data, err := os.ReadFile(report)
 		if err != nil {
@@ -130,6 +130,12 @@ func rewriteTable(t tests, reports []string) error {
 		if len(times) == 0 {
 			return fmt.Errorf("%s has no test file's time", report)
 		}
+		runs = append(runs, times)
+	}
+	evenHosts(runs, t.macos)
+	sums := map[string]float64{}
+	counts := map[string]int{}
+	for _, times := range runs {
 		for f, w := range times {
 			sums[f] += w
 			counts[f]++
@@ -150,6 +156,62 @@ func rewriteTable(t tests, reports []string) error {
 		return fmt.Errorf("writing the timings: %w", err)
 	}
 	return nil
+}
+
+// evenHosts scales each report of a set to the set's mean total: CI's
+// hosts differ in speed (one macOS host ran a shard four times slower
+// than another, 2026-11-16), and the shards were split to weigh the same,
+// so what tells one shard's total from another's is mostly its host. A
+// report holds one set's files, as CI's shards do (or every file, as a
+// local run's does, which then has its own set).
+func evenHosts(runs []map[string]float64, macos []string) {
+	mac := map[string]bool{}
+	for _, f := range macos {
+		mac[f] = true
+	}
+	set := func(times map[string]float64) string {
+		n := 0
+		for f := range times {
+			if mac[f] {
+				n++
+			}
+		}
+		switch n {
+		case 0:
+			return "linux"
+		case len(times):
+			return "macos"
+		}
+		return "all"
+	}
+	totals := map[string][]float64{}
+	for _, times := range runs {
+		k := set(times)
+		totals[k] = append(totals[k], sum(times))
+	}
+	for _, times := range runs {
+		all := totals[set(times)]
+		scale := mean(all) / sum(times)
+		for f := range times {
+			times[f] *= scale
+		}
+	}
+}
+
+func sum(times map[string]float64) float64 {
+	var s float64
+	for _, w := range times {
+		s += w
+	}
+	return s
+}
+
+func mean(xs []float64) float64 {
+	var s float64
+	for _, x := range xs {
+		s += x
+	}
+	return s / float64(len(xs))
 }
 
 // reportTimes reads flutter test's JSON report: each file's weight, the
