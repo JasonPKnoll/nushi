@@ -61,8 +61,12 @@ void main() {
   });
 
   test('a pref reset as at launch is saved as it was again', () async {
-    // The test before changed them; resetAppSettings put them back.
-    showDetails.value = true;
+    sidebarGroupBy.value = GroupBy.date;
+    sidebarShows.toggle(RowPart.agent);
+    await pumpEventQueue();
+    expect(readSaved()['sidebarGroupBy'], 'date');
+    resetAppSettings(); // as before every test
+    showDetails.value = !showDetails.value;
     await pumpEventQueue();
     expect(readSaved()['sidebarGroupBy'], 'repository');
     expect(readSaved()['sidebarShows'], _newer['sidebarShows']);

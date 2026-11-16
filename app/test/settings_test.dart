@@ -79,6 +79,9 @@ final _saved = <String, Object?>{
   'subagentWide': true,
 };
 
+/// The older app's keys in [_saved], which the next save drops.
+const _dropped = {'worktrees', 'subagentWide'};
+
 /// Every pref, so each is read (made) before a save.
 List<ValueNotifier<Object?>> get _all => [
   showDetails,
@@ -160,13 +163,22 @@ void main() {
     expect(_all.map((p) => p.value), hasLength(47)); // each made
     showDetails.value = true;
     await pumpEventQueue();
-    expect(readSaved(), {
+    // A pref this file's other tests read that wasn't in the file (the
+    // chats' own, when one of them ran first) is saved too, as it is by
+    // default: what's compared is every key that was there.
+    final saved = readSaved();
+    final expected = {
       ...(Map.of(_saved)
         ..remove('worktrees')
         ..remove('subagentWide')),
       'details': true,
       'panes': {'browser': 600.0},
-    });
+    };
+    expect({
+      for (final key in saved.keys)
+        if (expected.containsKey(key) || _dropped.contains(key))
+          key: saved[key],
+    }, expected);
     expect(_appJson.statSync().mode & 0x1ff, 0x180);
   });
 
@@ -194,10 +206,11 @@ void main() {
   });
 
   test('each test starts with the prefs as at launch', () {
-    // The test before forgot both chats.
-    expect(chatsKept(), {'x', 'y'});
+    forgetChats({'x', 'y'});
+    expect(chatsKept(), isEmpty);
     appearance.value = ThemeMode.light;
-    resetAppSettings();
+    resetAppSettings(); // as before every test
+    expect(chatsKept(), {'x', 'y'});
     expect(appearance.value, ThemeMode.dark);
   });
 }

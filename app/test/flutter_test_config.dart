@@ -59,49 +59,54 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
       local.basedir.resolve('flutter_test_config.dart'),
     );
   }
-  setUp(() {
-    clock = () => fixtureNow;
-    // The Mac's native edge, over channels a test may answer, but no
-    // speller: one that sets its own gets it (ADR 0097); an install that
-    // runs nothing; a file manager that opens nothing (the Mac's runs
-    // `open`, which would show Finder or the user's own files): a test
-    // that wants the real one sets it.
-    native = macosNative()
-      ..speller = null
-      ..install = FakeAppInstall()
-      ..desktop = FakeDesktop();
-    phoneHost = macConventions;
-    resetAppSettings();
-    // What the app holds while it runs (caches, half-written comments,
-    // groups opened…), each made through run_state.dart.
-    forgetRunState();
-    // A mark's ink is measured by the engine, on the real clock: a
-    // test that looks at where it lands turns it on and waits.
-    centreMarksByInk = false;
-    // And what's kept beside it: pull requests read (on disk too),
-    // review comments (read from disk at first), the Jira and GitHub
-    // views' places, theme files.
-    forgetPulls();
-    forgetReviews();
-    forgetReviewDrafts();
-    forgetJiraView();
-    forgetGitHubView();
-    unawaited(themeFiles.forget());
-    // No image another test decoded: one in the cache is drawn in a
-    // widget's first frame, one that isn't only once its decode ends, so
-    // a picture would depend on the tests before it. (A test that never
-    // made the binding has no cache.)
-    if (BindingBase.debugBindingType() != null) {
-      PaintingBinding.instance.imageCache
-        ..clear()
-        ..clearLiveImages();
-    }
-  });
+  setUp(startAfresh);
   tearDownAll(() {
     final dir = Directory(dataDir);
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   });
   await testMain();
+}
+
+/// What every test starts with, as the comment above says: run before
+/// each (setUp), and by a test that checks what one test leaves the next
+/// (`test_setup_test.dart`), in the place of the test after it.
+void startAfresh() {
+  clock = () => fixtureNow;
+  // The Mac's native edge, over channels a test may answer, but no
+  // speller: one that sets its own gets it (ADR 0097); an install that
+  // runs nothing; a file manager that opens nothing (the Mac's runs
+  // `open`, which would show Finder or the user's own files): a test
+  // that wants the real one sets it.
+  native = macosNative()
+    ..speller = null
+    ..install = FakeAppInstall()
+    ..desktop = FakeDesktop();
+  phoneHost = macConventions;
+  resetAppSettings();
+  // What the app holds while it runs (caches, half-written comments,
+  // groups opened…), each made through run_state.dart.
+  forgetRunState();
+  // A mark's ink is measured by the engine, on the real clock: a
+  // test that looks at where it lands turns it on and waits.
+  centreMarksByInk = false;
+  // And what's kept beside it: pull requests read (on disk too),
+  // review comments (read from disk at first), the Jira and GitHub
+  // views' places, theme files.
+  forgetPulls();
+  forgetReviews();
+  forgetReviewDrafts();
+  forgetJiraView();
+  forgetGitHubView();
+  unawaited(themeFiles.forget());
+  // No image another test decoded: one in the cache is drawn in a
+  // widget's first frame, one that isn't only once its decode ends, so
+  // a picture would depend on the tests before it. (A test that never
+  // made the binding has no cache.)
+  if (BindingBase.debugBindingType() != null) {
+    PaintingBinding.instance.imageCache
+      ..clear()
+      ..clearLiveImages();
+  }
 }
 
 /// Off macOS: every golden passes unseen, and none is written.

@@ -6,28 +6,28 @@ import 'package:nushi/native.dart';
 import 'package:nushi/palette.dart';
 
 import 'fake_desktop.dart';
+import 'flutter_test_config.dart';
 
-// What every test starts with (flutter_test_config.dart's setUp).
+// What every test starts with (flutter_test_config.dart's setUp, which
+// runs startAfresh): each test here leaves something and starts afresh
+// itself, as the test after it would, so it checks the same in any order.
 
 void main() {
-  test('nothing a test does opens on the desktop', () async {
+  test('nothing a test does opens on the desktop, and the next test’s '
+      'file manager was asked nothing', () async {
     expect(native.desktop, isA<FakeDesktop>());
     await native.desktop.reveal('/Users/me/nushi/README.md');
     expect(fakeDesktop(), [
       ['-R', '/Users/me/nushi/README.md'],
     ]);
-  });
-
-  test('the next test’s file manager was asked nothing', () {
+    startAfresh();
     expect(fakeDesktop(), isEmpty);
   });
 
   test('what one test leaves in memory the next doesn’t see', () {
     Collapsible.opened.add('tool-1');
     recentRows.add('chat:c');
-  });
-
-  test('…as the one before left it', () {
+    startAfresh();
     expect(Collapsible.opened, isEmpty);
     expect(recentRows, isEmpty);
   });
