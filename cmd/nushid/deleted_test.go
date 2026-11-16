@@ -9,38 +9,52 @@ import (
 	"time"
 )
 
-// A daemon inside an app stops once its executable is gone at two checks
-// in a row, not when it's back by the next (an upgrade); one outside an
-// app never does.
+// A daemon outside an app is never watched; one inside sees its
+// executable go missing.
 func TestAppDeleted(t *testing.T) {
 	dir := t.TempDir()
 	exe, app := packagedDaemon(t, dir)
 	if appDeleted(filepath.Join(dir, "bin", "nushid"), time.Millisecond) != nil {
 		t.Error("a daemon outside an app is watched")
 	}
-	const every = 100 * time.Millisecond
-	gone := appDeleted(exe, every)
-
-	// Replaced before the next check: still running.
-	if err := os.Remove(exe); err != nil {
-		t.Fatal(err)
+	missing := exeMissing(exe)
+	if missing() {
+		t.Error("its executable is missing while there")
 	}
-	if err := os.WriteFile(exe, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-gone:
-		t.Fatal("stopped while its app was replaced")
-	case <-time.After(4 * every):
-	}
-
 	if err := os.RemoveAll(app); err != nil {
 		t.Fatal(err)
 	}
+	if !missing() {
+		t.Error("its executable isn't missing with its app deleted")
+	}
+}
+
+// The watch stops once the executable is missing at two checks in a row,
+// not when it's back by the next (an upgrade). The ticks are sent by hand:
+// a tick is taken only once the check before it is done, so a stop too
+// early is seen at the next tick, never raced.
+func TestWhenGone(t *testing.T) {
+	tick := make(chan time.Time)
+	answers := make(chan bool)
+	gone := whenGone(tick, func() bool { return <-answers })
+	check := func(missing bool) {
+		t.Helper()
+		select {
+		case tick <- time.Time{}:
+		case <-gone:
+			t.Fatal("stopped too early")
+		}
+		answers <- missing
+	}
+
+	check(true)
+	check(false) // replaced before the next check
+	check(true)
+	check(true)
 	select {
 	case <-gone:
-	case <-time.After(20 * every):
-		t.Fatal("still running with its app deleted")
+	case <-time.After(5 * time.Second):
+		t.Fatal("still running with its executable missing twice")
 	}
 }
 

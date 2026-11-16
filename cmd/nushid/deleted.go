@@ -22,11 +22,25 @@ func appDeleted(exe string, every time.Duration) <-chan struct{} {
 	if !inApp(exe) {
 		return nil
 	}
+	return whenGone(time.Tick(every), exeMissing(exe))
+}
+
+// exeMissing reports whether there's no file at exe.
+func exeMissing(exe string) func() bool {
+	return func() bool {
+		_, err := os.Stat(exe)
+		return errors.Is(err, fs.ErrNotExist)
+	}
+}
+
+// whenGone is closed once missing is true at two ticks in a row:
+// [appDeleted]'s loop, with its clock and its look at the file passed in.
+func whenGone(tick <-chan time.Time, missing func() bool) <-chan struct{} {
 	gone := make(chan struct{})
 	go func() {
 		missed := 0
-		for range time.Tick(every) {
-			if _, err := os.Stat(exe); errors.Is(err, fs.ErrNotExist) {
+		for range tick {
+			if missing() {
 				missed++
 			} else {
 				missed = 0
