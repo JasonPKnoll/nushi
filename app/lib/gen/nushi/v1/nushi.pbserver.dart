@@ -63,6 +63,10 @@ abstract class NushiServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.CancelTurnRequest request);
   $async.Future<$0.StopTaskResponse> stopTask(
       $pb.ServerContext ctx, $0.StopTaskRequest request);
+  $async.Future<$0.GetWorkflowResponse> getWorkflow(
+      $pb.ServerContext ctx, $0.GetWorkflowRequest request);
+  $async.Future<$0.GetWorkflowAgentResponse> getWorkflowAgent(
+      $pb.ServerContext ctx, $0.GetWorkflowAgentRequest request);
   $async.Future<$0.ForkChatResponse> forkChat(
       $pb.ServerContext ctx, $0.ForkChatRequest request);
   $async.Future<$0.CloseSideChatResponse> closeSideChat(
@@ -372,6 +376,10 @@ abstract class NushiServiceBase extends $pb.GeneratedService {
         return $0.CancelTurnRequest();
       case 'StopTask':
         return $0.StopTaskRequest();
+      case 'GetWorkflow':
+        return $0.GetWorkflowRequest();
+      case 'GetWorkflowAgent':
+        return $0.GetWorkflowAgentRequest();
       case 'ForkChat':
         return $0.ForkChatRequest();
       case 'CloseSideChat':
@@ -687,6 +695,10 @@ abstract class NushiServiceBase extends $pb.GeneratedService {
         return cancelTurn(ctx, request as $0.CancelTurnRequest);
       case 'StopTask':
         return stopTask(ctx, request as $0.StopTaskRequest);
+      case 'GetWorkflow':
+        return getWorkflow(ctx, request as $0.GetWorkflowRequest);
+      case 'GetWorkflowAgent':
+        return getWorkflowAgent(ctx, request as $0.GetWorkflowAgentRequest);
       case 'ForkChat':
         return forkChat(ctx, request as $0.ForkChatRequest);
       case 'CloseSideChat':

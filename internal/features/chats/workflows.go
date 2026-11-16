@@ -249,7 +249,7 @@ func (s *Service) WorkflowAgent(chatID, callID, agentID string, limit int) ([]mo
 func (s *Service) workflowCall(chatID, callID string) (*chat, model.Item, error) {
 	c, err := s.find(chatID)
 	if err != nil {
-		return nil, model.Item{}, err
+		return nil, model.Item{}, fmt.Errorf("%w: %w", ErrNoWorkflow, err)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
