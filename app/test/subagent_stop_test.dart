@@ -164,12 +164,11 @@ void main() {
   testWidgets('a stopped subagent says so everywhere; a running one stops '
       'from its row, its pane and the card', (tester) async {
     final (d, fake) = await _app(tester, 1700);
-    // The stopped one: its row and the card say "stopped", time frozen.
-    expect(
-      find.textContaining('stopped · 2 tool calls · 1m 02s'),
-      findsWidgets,
-    );
+    // The stopped one: its row says "stopped", time frozen (its pane and
+    // the card's finished ones below).
     final card = find.byType(DetailsPanel);
+    final stopped = find.textContaining('stopped · 2 tool calls · 1m 02s');
+    expect(find.descendant(of: _line('a'), matching: stopped), findsOne);
     final cardStops = find.descendant(of: card, matching: _stops);
     // The card's running ones show theirs, as Claude's rail; the rows
     // none until under the pointer.
@@ -210,6 +209,17 @@ void main() {
       'b',
       's',
     ]);
+
+    // The card's finished ones, opened: the stopped one says so there too.
+    expect(
+      find.descendant(of: card, matching: find.text('stopped')),
+      findsNothing,
+    );
+    await tester.tap(
+      find.descendant(of: card, matching: find.text('1 finished')),
+    );
+    await _pump(tester);
+    expect(find.descendant(of: card, matching: find.text('stopped')), findsOne);
     d.dispose();
   }, variant: _mac);
 
