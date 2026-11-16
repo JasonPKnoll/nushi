@@ -13,7 +13,7 @@ An asleep chat holds nothing of its transcript ([ADR 0103](0103-an-asleep-chat-l
 - **No proto change**: `ImageData` already carries a reference (ADR 0099).
 
 ## Consequences
-- Measured on that chat (`TestAwakeChatHeap`, `NUSHI_MEASURE_HEAP=1`): awake after its copy was written, 79.0 MB of live heap became 25.9 MB; woken from its copy, 79.0 MB became 25.8 MB, as reading back no longer reads its images.
+- Measured on that chat (`BenchmarkAwakeChatHeap`): awake after its copy was written, 79.0 MB of live heap became 25.9 MB; woken from its copy, 79.0 MB became 25.8 MB, as reading back no longer reads its images.
 - A page of an asleep chat no longer reads its images' files; a fetch reads one file, and the inline paths read each image they send (as before).
 - A held image's file must outlive it: rewriting a copy keeps the files its records name, and a rewind's message reads its images before the cut.
 

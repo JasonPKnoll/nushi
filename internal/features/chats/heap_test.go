@@ -6,14 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/afrase/nushi/internal/model"
-	"github.com/afrase/nushi/internal/testcheck"
 	"github.com/afrase/nushi/internal/transcripts"
 )
 
@@ -40,54 +38,64 @@ func liveHeap() uint64 {
 	return m.HeapAlloc
 }
 
-// TestAwakeChatHeap measures what an awake chat holds (ADR 0105): ADR
-// 0103's synthetic chat of 5,600 items (about 20 MB of text) with 200
+// BenchmarkAwakeChatHeap measures what an awake chat holds (ADR 0105):
+// ADR 0103's synthetic chat of 5,600 items (about 20 MB of text) with 200
 // screenshots of 270 KB, every item written to its copy as a turn's end
-// writes it, then let go and read back as waking does. It runs only with
-// NUSHI_MEASURE_HEAP set (`NUSHI_MEASURE_HEAP=1 go test -run
-// TestAwakeChatHeap -v ./internal/features/chats`).
-func TestAwakeChatHeap(t *testing.T) {
-	if os.Getenv("NUSHI_MEASURE_HEAP") == "" {
-		t.Skip("NUSHI_MEASURE_HEAP not set")
-	}
-	agent := &fakeAgent{}
-	testcheck.NoErr(t, json.Unmarshal([]byte(claudeSession), &agent.session))
-	store, err := transcripts.Open(filepath.Join(t.TempDir(), "transcripts"))
-	testcheck.NoErr(t, err)
-	svc := newService(t, []Kind{{Harness: testHarness{Name: "claude", Title: "Claude"}, Launch: agent.launch}},
-		Options{Scratch: t.TempDir(), Copies: store})
-	t.Cleanup(svc.Close)
-	id, err := svc.Start(t.Context(), "", t.TempDir(), false)
-	testcheck.NoErr(t, err)
-	c := svc.chats[id]
-	before := liveHeap()
-
+// writes it, then let go and read back as waking does. It reports the
+// live heap of each, in MB (`go test -run '^$' -bench AwakeChatHeap
+// -benchtime 1x ./internal/features/chats`).
+func BenchmarkAwakeChatHeap(b *testing.B) {
 	const items, images, imageSize = 5600, 200, 270 << 10
 	text := strings.Repeat("a line of the agent's answer, as long as most. ", 75) // ~3.6 KB
-	c.mu.Lock()
-	for i := range items {
-		it := model.Item{ID: fmt.Sprintf("m%d", i), Kind: model.AgentMessage, Text: fmt.Sprintf("%d %s", i, text)}
-		if i%(items/images) == 0 {
-			png := pngOf(imageSize, 1600, 1000)
-			it.Kind, it.Status, it.Title = model.ToolCall, "completed", "screenshot"
-			it.Images = []model.Image{{MimeType: "image/png", Data: png, Hash: ImageHash(png)}}
+	var held, woken uint64
+	for range b.N {
+		agent := &fakeAgent{}
+		if err := json.Unmarshal([]byte(claudeSession), &agent.session); err != nil {
+			b.Fatal(err)
 		}
-		c.items = append(c.items, it)
-		c.unsaved[it.ID] = true
+		store, err := transcripts.Open(filepath.Join(b.TempDir(), "transcripts"))
+		if err != nil {
+			b.Fatal(err)
+		}
+		svc := New(b.Context(), []Kind{{Harness: testHarness{Name: "claude", Title: "Claude"}, Launch: agent.launch}},
+			Options{Remembered: &memModes{}, Sessions: &memSessions{}, Scratch: b.TempDir(), Copies: store})
+		id, err := svc.Start(b.Context(), "", b.TempDir(), false)
+		if err != nil {
+			b.Fatal(err)
+		}
+		c := svc.chats[id]
+		before := liveHeap()
+
+		c.mu.Lock()
+		for i := range items {
+			it := model.Item{ID: fmt.Sprintf("m%d", i), Kind: model.AgentMessage, Text: fmt.Sprintf("%d %s", i, text)}
+			if i%(items/images) == 0 {
+				png := pngOf(imageSize, 1600, 1000)
+				it.Kind, it.Status, it.Title = model.ToolCall, "completed", "screenshot"
+				it.Images = []model.Image{{MimeType: "image/png", Data: png, Hash: ImageHash(png)}}
+			}
+			c.items = append(c.items, it)
+			c.unsaved[it.ID] = true
+		}
+		c.copyLocked(true)
+		c.mu.Unlock()
+		held += liveHeap() - before
+
+		// Woken: its items let go (ADR 0103), then read back from the copy.
+		c.mu.Lock()
+		c.items, c.inCopy = nil, true
+		c.itemsBackLocked()
+		n := len(c.items)
+		c.mu.Unlock()
+		woken += liveHeap() - before
+		if n != items {
+			b.Fatalf("read back %d items of %d", n, items)
+		}
+		runtime.KeepAlive(c)
+		svc.Close()
+		svc.loops.Wait()
 	}
-	c.copyLocked(true)
-	c.mu.Unlock()
-
-	held := liveHeap() - before
-	t.Logf("awake chat of %d items, %d images of %d KB: %.1f MB live heap", items, images, imageSize>>10, float64(held)/(1<<20))
-
-	// Woken: its items let go (ADR 0103), then read back from the copy.
-	c.mu.Lock()
-	c.items, c.inCopy = nil, true
-	c.itemsBackLocked()
-	n := len(c.items)
-	c.mu.Unlock()
-	woken := liveHeap() - before
-	t.Logf("read back from its copy (%d items): %.1f MB live heap", n, float64(woken)/(1<<20))
-	runtime.KeepAlive(c)
+	mb := func(n uint64) float64 { return float64(n) / float64(b.N) / (1 << 20) }
+	b.ReportMetric(mb(held), "MB-awake")
+	b.ReportMetric(mb(woken), "MB-woken")
 }
