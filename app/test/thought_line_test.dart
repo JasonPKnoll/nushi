@@ -92,6 +92,8 @@ void main() {
     expect(find.text('One.'), findsNothing);
     expect(find.text('Two'), findsOneWidget);
     await tester.pumpWidget(_app('One. Two.', live: false, still: true));
+    // Folded in the same frame: no line, its last words or whole.
+    expect(find.text('Two'), findsNothing);
     expect(find.text('Two.'), findsNothing);
   });
 
