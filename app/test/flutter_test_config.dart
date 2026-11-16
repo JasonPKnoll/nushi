@@ -20,6 +20,7 @@ import 'package:nushi/settings.dart';
 import 'package:nushi/theme_files.dart';
 import 'package:nushi/tile_images.dart';
 import 'package:nushi/tile_mark.dart';
+import 'package:re_editor/re_editor.dart' show kIsAndroid, kIsIOS, kIsMacOS;
 
 import 'config_home_linux.dart';
 import 'fake_app_install.dart';
@@ -50,6 +51,16 @@ import 'harness.dart';
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   Shine.stopAt = 0;
   if (Platform.isLinux) configHomeAt('$dataDir/config');
+  // re_editor asks which platform it is on once, when its first editor is
+  // built, and keeps the answer for the process: asked here as the Mac,
+  // or the file's first editor test would decide whether every later one
+  // has a desktop's scrollbar and the Mac's keys (a test's platform is
+  // Android unless it says).
+  debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+  if (!kIsMacOS || kIsAndroid || kIsIOS) {
+    throw StateError('re_editor had asked its platform already');
+  }
+  debugDefaultTargetPlatformOverride = null;
   final local = goldenFileComparator;
   if (Platform.environment['NUSHI_TEST_SET'] == 'linux') {
     goldenFileComparator = _NotInSet();
