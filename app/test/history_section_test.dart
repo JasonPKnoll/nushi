@@ -175,19 +175,25 @@ void main() {
     expect(newest.first.id, 'c0');
   });
 
-  /// Settings › Chat history in the window over [fake].
+  /// Settings › Chat history in the window over [fake]; the sidebar
+  /// hidden unless [sidebar], since with hundreds of chats building it is
+  /// most of a test's time and it isn't what's tested.
   Future<Daemon> open(
     WidgetTester tester,
     FakeDaemon fake, {
     Size size = const Size(1700, 1000),
     Brightness brightness = Brightness.dark,
-  }) => pumpSettingsApp(
-    tester,
-    fake,
-    SettingsSection.history,
-    size: size,
-    brightness: brightness,
-  );
+    bool sidebar = false,
+  }) {
+    sidebarHidden.value = !sidebar;
+    return pumpSettingsApp(
+      tester,
+      fake,
+      SettingsSection.history,
+      size: size,
+      brightness: brightness,
+    );
+  }
 
   testWidgets('largest first; the headers sort by title, size and last '
       'used, again the other way', (tester) async {
@@ -476,11 +482,13 @@ void main() {
     ]) {
       testWidgets('200 copies scrolled, some picked, $sizeName, '
           '$theme', (tester) async {
+        // The whole window, to look at.
         final d = await open(
           tester,
           _fake(200),
           size: size,
           brightness: brightness,
+          sidebar: true,
         );
         await tester.drag(
           _inSettings(find.byType(CustomScrollView)),
@@ -514,12 +522,12 @@ void main() {
         // Wide, it's Chat history's window golden (the sidebar hidden: it
         // has its own); small, a render.
         final golden = sizeName == 'wide';
-        if (golden) sidebarHidden.value = true;
         final d = await open(
           tester,
           _fake(200),
           size: size,
           brightness: brightness,
+          sidebar: !golden,
         );
         await tester.enterText(_inSettings(find.byType(TextField)), 'review');
         await tester.pumpAndSettle();
