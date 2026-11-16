@@ -38,37 +38,35 @@ type journal struct {
 	skipping bool // within a line past maxJournalLine
 	rows     []journalRow
 	byKey    map[string]int
-	launched bool
 	skipped  int // lines passed over
 }
 
 // read reads what was added to the journal since the last read; a journal
 // smaller than what was read is read again from its start (it was
-// rewritten). changed says the rows changed.
-func (j *journal) read(r io.ReaderAt, size int64) (changed bool, err error) {
+// rewritten).
+func (j *journal) read(r io.ReaderAt, size int64) error {
 	if size < j.off {
 		*j = journal{}
-		changed = true
 	}
 	end := min(size, maxJournal)
 	buf := make([]byte, journalChunk)
 	for j.off < end {
 		n, err := r.ReadAt(buf[:min(int64(len(buf)), end-j.off)], j.off)
 		if n == 0 && err != nil {
-			return changed, err
+			return err
 		}
 		j.off += int64(n)
-		changed = j.take(buf[:n]) || changed
+		j.take(buf[:n])
 	}
 	if size > maxJournal {
-		return changed, errJournalTooBig
+		return errJournalTooBig
 	}
-	return changed, nil
+	return nil
 }
 
 // take takes a piece of the journal: each line it ends, and what follows
 // its last newline as carry.
-func (j *journal) take(b []byte) (changed bool) {
+func (j *journal) take(b []byte) {
 	for len(b) > 0 {
 		i := bytes.IndexByte(b, '\n')
 		if i < 0 {
@@ -77,7 +75,7 @@ func (j *journal) take(b []byte) (changed bool) {
 			} else {
 				j.carry, j.skipping = nil, true
 			}
-			return changed
+			return
 		}
 		line := b[:i]
 		b = b[i+1:]
@@ -90,17 +88,16 @@ func (j *journal) take(b []byte) (changed bool) {
 			line = append(j.carry, line...)
 			j.carry = nil
 		}
-		changed = j.line(line) || changed
+		j.line(line)
 	}
-	return changed
 }
 
 // line applies one journal line; a line that isn't one of the known kinds,
 // or not as expected, is passed over.
-func (j *journal) line(line []byte) bool {
+func (j *journal) line(line []byte) {
 	line = bytes.TrimSpace(bytes.TrimPrefix(line, []byte("\xef\xbb\xbf")))
 	if len(line) == 0 {
-		return false
+		return
 	}
 	var l struct {
 		Type    string `json:"type"`
@@ -111,7 +108,7 @@ func (j *journal) line(line []byte) bool {
 	}
 	if json.Unmarshal(line, &l) != nil {
 		j.skipped++
-		return false
+		return
 	}
 	if j.byKey == nil {
 		j.byKey = map[string]int{}
@@ -119,24 +116,20 @@ func (j *journal) line(line []byte) bool {
 	i, known := j.byKey[l.Key]
 	switch {
 	case l.Type == "launched":
-		again := j.launched
-		j.launched, j.rows, j.byKey = true, nil, map[string]int{}
-		return again
+		j.rows, j.byKey = nil, map[string]int{}
 	case l.Key == "":
+		j.skipped++
 	case l.Type == "started" && known:
 		r := &j.rows[i]
 		r.AgentID, r.State = cmp.Or(l.AgentID, r.AgentID), "running"
 		r.Label, r.Phase = cmp.Or(l.Label, r.Label), cmp.Or(l.Phase, r.Phase)
-		return true
 	case l.Type == "started":
 		j.byKey[l.Key] = len(j.rows)
 		j.rows = append(j.rows, journalRow{Key: l.Key, AgentID: l.AgentID, Label: l.Label, Phase: l.Phase, State: "running"})
-		return true
 	case (l.Type == "result" || l.Type == "failed") && known:
 		r := &j.rows[i]
 		r.AgentID, r.State = cmp.Or(r.AgentID, l.AgentID), map[string]string{"result": "done", "failed": "failed"}[l.Type]
-		return true
+	default:
+		j.skipped++
 	}
-	j.skipped++
-	return false
 }

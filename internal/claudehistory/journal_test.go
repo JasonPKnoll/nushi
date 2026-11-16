@@ -12,7 +12,7 @@ import (
 func readAll(t *testing.T, s string) journal {
 	t.Helper()
 	var j journal
-	if _, err := j.read(strings.NewReader(s), int64(len(s))); err != nil {
+	if err := j.read(strings.NewReader(s), int64(len(s))); err != nil {
 		t.Fatal(err)
 	}
 	return j
@@ -70,12 +70,12 @@ func TestJournalLines(t *testing.T) {
 func TestJournalGrows(t *testing.T) {
 	var j journal
 	s := launchedLine + strings.TrimSuffix(startA, "\n")
-	j.read(strings.NewReader(s), int64(len(s)))
+	_ = j.read(strings.NewReader(s), int64(len(s)))
 	if len(j.rows) != 0 {
 		t.Fatalf("a line without its end: %q", states(j))
 	}
 	s += "\n"
-	j.read(strings.NewReader(s), int64(len(s)))
+	_ = j.read(strings.NewReader(s), int64(len(s)))
 	if states(j) != "map:a=running:a1" {
 		t.Fatalf("once ended: %q", states(j))
 	}
@@ -84,7 +84,7 @@ func TestJournalGrows(t *testing.T) {
 	var k journal
 	for end := 0; end < len(long); {
 		end = min(len(long), end+3<<20)
-		k.read(strings.NewReader(long[:end]), int64(end))
+		_ = k.read(strings.NewReader(long[:end]), int64(end))
 		if len(k.carry) > maxJournalLine {
 			t.Fatalf("carry %d", len(k.carry))
 		}
@@ -99,18 +99,18 @@ func TestJournalGrows(t *testing.T) {
 func TestJournalRewindAndLimits(t *testing.T) {
 	var j journal
 	s := launchedLine + startA + startB
-	j.read(strings.NewReader(s), int64(len(s)))
+	_ = j.read(strings.NewReader(s), int64(len(s)))
 	s = launchedLine + startB
-	j.read(strings.NewReader(s), int64(len(s)))
+	_ = j.read(strings.NewReader(s), int64(len(s)))
 	if states(j) != "map:b=running:a2" {
 		t.Errorf("rewritten: %q", states(j))
 	}
 	r := &countingReader{Reader: strings.NewReader(s)}
-	j.read(r, int64(len(s)))
+	_ = j.read(r, int64(len(s)))
 	if r.n != 0 {
 		t.Errorf("read %d bytes with nothing new", r.n)
 	}
-	if _, err := j.read(zeros{}, maxJournal+1); !errors.Is(err, errJournalTooBig) {
+	if err := j.read(zeros{}, maxJournal+1); !errors.Is(err, errJournalTooBig) {
 		t.Errorf("too big: %v", err)
 	}
 }
@@ -147,9 +147,9 @@ func TestJournalResume(t *testing.T) { // synthetic: no resumed run was recorded
 
 // Read in random pieces, generated journals give the rows one read gives.
 func TestJournalIncrementalIsWhole(t *testing.T) {
-	rng := rand.New(rand.NewPCG(1, 2))
+	rng := rand.New(rand.NewPCG(1, 2)) //nolint:gosec // seeded, so each run tries the same journals
 	lines := []string{launchedLine, startA, startB, resultA, `{"type":"failed","key":"k2","agentId":""}` + "\n", "{bad\n",
-		`{"type":"started","key":"k3","agentId":"a3","label":"é漢","phase":"Review"}` + "\n", `{"type":"result","key":"k3","result":{"a":1}}` + "\n"}
+		`{"type":"started","key":"k3","agentId":"a3","label":"é\u6f22","phase":"Review"}` + "\n", `{"type":"result","key":"k3","result":{"a":1}}` + "\n"}
 	for range 500 {
 		var b bytes.Buffer
 		for range rng.IntN(20) {
@@ -160,7 +160,7 @@ func TestJournalIncrementalIsWhole(t *testing.T) {
 		var j journal
 		for end := 0; end < len(s); {
 			end = min(len(s), end+1+rng.IntN(40))
-			j.read(strings.NewReader(s[:end]), int64(end))
+			_ = j.read(strings.NewReader(s[:end]), int64(end))
 		}
 		if states(j) != states(whole) {
 			t.Fatalf("%q: %q, whole %q", s, states(j), states(whole))
@@ -178,7 +178,7 @@ func FuzzJournal(f *testing.F) {
 		var off int64
 		for end := 0; end < len(s); {
 			end = min(len(s), end+step)
-			j.read(strings.NewReader(s[:end]), int64(end))
+			_ = j.read(strings.NewReader(s[:end]), int64(end))
 			if j.off < off {
 				t.Fatal("went back")
 			}

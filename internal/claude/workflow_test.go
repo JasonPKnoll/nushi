@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -41,10 +42,7 @@ func TestWorkflowCallReadsItsResponse(t *testing.T) {
 func TestNoWorkflowWithoutARun(t *testing.T) {
 	ok := map[string]any{"taskType": "local_workflow", "runId": "wf_abc", "taskId": "w1"}
 	with := func(k string, v any) map[string]any {
-		m := map[string]any{}
-		for k, v := range ok {
-			m[k] = v
-		}
+		m := maps.Clone(ok)
 		m[k] = v
 		return m
 	}

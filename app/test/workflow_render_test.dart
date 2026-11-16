@@ -27,7 +27,7 @@ final Chat _chat = chat(
   status: ChatStatus(background: 1, workflows: 1),
 );
 
-final _items = [
+final List<Item> _items = [
   Item(
     id: 'u',
     kind: ItemKind.ITEM_KIND_USER_MESSAGE,

@@ -244,7 +244,7 @@ func TestWorkflowSummaryBounds(t *testing.T) {
 	var b strings.Builder
 	b.WriteString(launchedLine)
 	for i := range 500 {
-		b.WriteString(`{"type":"started","key":"k` + itoa(i) + `","agentId":"a` + itoa(i) + `","label":"` + strings.Repeat("長", 80) + `","phase":"P` + itoa(i%40) + `"}` + "\n")
+		b.WriteString(`{"type":"started","key":"k` + itoa(i) + `","agentId":"a` + itoa(i) + `","label":"` + strings.Repeat("\u9577", 80) + `","phase":"P` + itoa(i%40) + `"}` + "\n")
 	}
 	b.WriteString(`{"type":"started","key":"s","agentId":"as","label":"ghp_abcdefghijklmnopqrstuvwxyz0123","phase":"P0"}` + "\n")
 	l, id, folder, _ := fakeRun(t, b.String(), "")

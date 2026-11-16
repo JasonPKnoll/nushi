@@ -168,7 +168,7 @@ func (r *run) readJournal(root *os.Root, runID string) error {
 	defer f.Close() //nolint:errcheck // read-only
 	r.active = latest(r.active, fi.ModTime())
 	if !r.tooBig {
-		if _, err := r.j.read(f, fi.Size()); errors.Is(err, errJournalTooBig) {
+		if err := r.j.read(f, fi.Size()); errors.Is(err, errJournalTooBig) {
 			r.tooBig = true
 		}
 	}

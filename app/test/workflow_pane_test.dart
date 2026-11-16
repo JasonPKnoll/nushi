@@ -20,7 +20,7 @@ Int64 _ms(Duration ago) =>
     Int64(fixtureNow.subtract(ago).millisecondsSinceEpoch);
 
 /// The agents GetWorkflow answers for [workflowCall]'s run.
-final agents = [
+final List<WorkflowAgent> agents = [
   WorkflowAgent(
     id: 'a1',
     label: 'map:files',

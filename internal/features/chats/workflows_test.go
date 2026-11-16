@@ -44,7 +44,7 @@ func (f *fakeWorkflows) WorkflowAgents(string, string, model.Workflow) ([]model.
 	return f.agents, nil
 }
 
-func (f *fakeWorkflows) WorkflowAgentItems(_, _ string, _ model.Workflow, id string, limit int) ([]model.Item, int, error) {
+func (f *fakeWorkflows) WorkflowAgentItems(_, _ string, _ model.Workflow, id string, _ int) ([]model.Item, int, error) {
 	if id == "" {
 		return nil, 0, fs.ErrNotExist
 	}
@@ -158,20 +158,14 @@ func workflowOf(c *chat) *model.Workflow {
 	return &w
 }
 
-func followed(c *chat) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.following) > 0
-}
-
 // waitStatus waits for a status that holds.
-func (f workflowFixture) waitStatus(t *testing.T, ok func(model.Status) bool) model.Status {
+func (f workflowFixture) waitStatus(t *testing.T, ok func(model.Status) bool) {
 	t.Helper()
 	for {
 		select {
 		case e := <-f.events:
 			if e.Status != nil && ok(*e.Status) {
-				return *e.Status
+				return
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatal("no such status")

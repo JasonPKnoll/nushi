@@ -36,7 +36,7 @@ func (s *server) GetWorkflowAgent(_ context.Context, req *connect.Request[nushiv
 	if err != nil {
 		return nil, workflowErr(err)
 	}
-	out := &nushiv1.GetWorkflowAgentResponse{Earlier: int32(earlier), Agent: workflowAgentProto(agent)} //nolint:gosec // at most a journal's agents' steps
+	out := &nushiv1.GetWorkflowAgentResponse{Earlier: int32(earlier), Agent: workflowAgentProto(agent)}
 	for i := range items {
 		out.Items = append(out.Items, itemProto(&items[i], false))
 	}
@@ -54,15 +54,15 @@ func workflowErr(err error) error {
 
 func workflowProto(w model.Workflow) *nushiv1.Workflow {
 	out := &nushiv1.Workflow{RunId: w.RunID, TaskId: w.TaskID, Name: w.Name, Description: w.Description, State: w.State, End: w.End,
-		Started: unixMs(w.Started), Ended: unixMs(w.Ended), Active: unixMs(w.Active), Agents: int32(w.Agents), Done: int32(w.Done), //nolint:gosec // counts of a run's agents
-		Failed: int32(w.Failed), Running: w.Running, RunningCount: int32(w.RunningCount), Summary: w.Summary, Stalled: w.Stalled} //nolint:gosec // as above
+		Started: unixMs(w.Started), Ended: unixMs(w.Ended), Active: unixMs(w.Active), Agents: int32(w.Agents), Done: int32(w.Done),
+		Failed: int32(w.Failed), Running: w.Running, RunningCount: int32(w.RunningCount), Summary: w.Summary, Stalled: w.Stalled}
 	for _, p := range w.Phases {
-		out.Phases = append(out.Phases, &nushiv1.WorkflowPhase{Title: p.Title, Detail: p.Detail, Started: int32(p.Started), Done: int32(p.Done), Failed: int32(p.Failed)}) //nolint:gosec // as above
+		out.Phases = append(out.Phases, &nushiv1.WorkflowPhase{Title: p.Title, Detail: p.Detail, Started: int32(p.Started), Done: int32(p.Done), Failed: int32(p.Failed)})
 	}
 	return out
 }
 
 func workflowAgentProto(a model.WorkflowAgent) *nushiv1.WorkflowAgent {
 	return &nushiv1.WorkflowAgent{Id: a.ID, Label: a.Label, Phase: a.Phase, State: a.State, Model: a.Model, Started: unixMs(a.Started),
-		Ended: unixMs(a.Ended), Tokens: int32(min(a.Tokens, 1<<31-1)), ToolCalls: int32(min(a.ToolCalls, 1<<31-1)), Prompt: a.Prompt, Result: a.Result} //nolint:gosec // capped
+		Ended: unixMs(a.Ended), Tokens: int32(min(a.Tokens, 1<<31-1)), ToolCalls: int32(min(a.ToolCalls, 1<<31-1)), Prompt: a.Prompt, Result: a.Result}
 }
