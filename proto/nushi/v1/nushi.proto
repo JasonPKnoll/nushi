@@ -92,6 +92,12 @@ service NushiService {
   // the user's (Item.to_subagent_stop) that waits for its next chance. It
   // shows as stopped once the agent says so.
   rpc StopTask(StopTaskRequest) returns (StopTaskResponse);
+  // A workflow a tool call launched (Item.workflow), with its agents, as
+  // the agent's files say now (API 120). The Mac's only: the phone has no
+  // Workflow pane.
+  rpc GetWorkflow(GetWorkflowRequest) returns (GetWorkflowResponse);
+  // One agent of a workflow: its last steps (API 120). The Mac's only.
+  rpc GetWorkflowAgent(GetWorkflowAgentRequest) returns (GetWorkflowAgentResponse);
   // Opens a side chat: a session the agent forks from the chat's (ACP
   // session/fork, when status.can_fork). It knows the conversation so far
   // but doesn't add to it, isn't listed or stored, and ends with
@@ -2352,6 +2358,105 @@ message Item {
   // arguments), for the card to show; empty when the name is none of the
   // folder's entries or can't run (API 111, ADR 0100).
   string server_command = 39;
+  // For a call that launched a workflow (Claude's Workflow, API 120, ADR
+  // 0127): its run, as the daemon follows it; unset while it isn't (the
+  // call then shows as a plain one).
+  Workflow workflow = 40;
+}
+
+// A workflow: a run a tool call launched, a script of the agent's running
+// many subagents in phases, on past the call (ADR 0127). A summary small
+// enough to ride on its item; GetWorkflow has its agents.
+message Workflow {
+  // The agent's ids for the run and its task (Stop goes by the task's).
+  string run_id = 1;
+  string task_id = 2;
+  // Its name and what it does, in the agent's words.
+  string name = 3;
+  string description = 4;
+  // "running", then "done", "failed", "stopped" or "unknown" (it ended and
+  // the agent's word for how is in end).
+  string state = 5;
+  // How it ended: the agent's word ("completed", "killed"…), or Nushi's
+  // when the agent gave none ("Claude quit while it ran").
+  string end = 6;
+  // When it started and ended, and when its files last changed, in Unix
+  // milliseconds; 0 when not known.
+  int64 started = 7;
+  int64 ended = 8;
+  int64 active = 9;
+  // Its phases, in the order reached (32 at most).
+  repeated WorkflowPhase phases = 10;
+  // How many agents it ran, and of those how many ended well and failed.
+  int32 agents = 11;
+  int32 done = 12;
+  int32 failed = 13;
+  // The labels of up to 8 agents running now, and how many run.
+  repeated string running = 14;
+  int32 running_count = 15;
+  // How a failed run ended, in the agent's words (its error's first line).
+  string summary = 16;
+  // Nothing of it changed for so long (an hour) that it no longer counts as
+  // the chat's work, though nothing says it ended.
+  bool stalled = 17;
+}
+
+// A phase of a workflow: its title, the agent's line on it, and how many
+// of its agents started, ended well and failed.
+message WorkflowPhase {
+  string title = 1;
+  string detail = 2;
+  int32 started = 3;
+  int32 done = 4;
+  int32 failed = 5;
+}
+
+// One agent of a workflow: its id, label and phase, "running", "done",
+// "failed" or "stopped", the model it ran on, when it started and ended
+// (Unix milliseconds, 0 when not known), what it spent, and the starts of
+// its task and its answer, as the agent kept them.
+message WorkflowAgent {
+  string id = 1;
+  string label = 2;
+  string phase = 3;
+  string state = 4;
+  string model = 5;
+  int64 started = 6;
+  int64 ended = 7;
+  int32 tokens = 8;
+  int32 tool_calls = 9;
+  string prompt = 10;
+  string result = 11;
+}
+
+message GetWorkflowRequest {
+  string chat_id = 1;
+  // The call that launched it.
+  string call_id = 2;
+}
+
+message GetWorkflowResponse {
+  Workflow workflow = 1;
+  // Its agents in the order they started, 500 at most: more says there
+  // are others.
+  repeated WorkflowAgent agents = 2;
+  bool more = 3;
+}
+
+message GetWorkflowAgentRequest {
+  string chat_id = 1;
+  string call_id = 2;
+  string agent_id = 3;
+  // The most of its last steps to send; 0: 400.
+  int32 limit = 4;
+}
+
+message GetWorkflowAgentResponse {
+  // Its steps, oldest first, as transcript items (ids "wf/<agent>/…").
+  repeated Item items = 1;
+  // How many steps came before those.
+  int32 earlier = 2;
+  WorkflowAgent agent = 3;
 }
 
 // A code review's result: the effort level it ran at ("medium"; "" when
@@ -2502,8 +2607,9 @@ message ChatStatus {
   // (it deleted it). The chat stays only for its worktree's or scratch
   // folder's work; DeleteChat is what's left.
   bool session_gone = 13;
-  // How many subagents and background commands the chat's agent started
-  // still run (API 84): a turn can end while they do.
+  // How many subagents, background commands and workflows the chat's
+  // agent started still run (API 84; workflows API 120): a turn can end
+  // while they do.
   int32 background = 14;
   // Set only on the status published as a turn ends (API 107): how the
   // daemon judged it, the verdict push and every client go by.
@@ -2511,6 +2617,12 @@ message ChatStatus {
   // With TURN_END_FAILED, what ended the turn: the agent's error, or that
   // it quit mid-turn (API 107).
   string failure = 17;
+  // How many of background are workflows that run (API 120): the chat
+  // counts as working while one does.
+  int32 workflows = 18;
+  // The agent works on its own, outside a turn of the user's (after a
+  // background task's end; API 120): the chat counts as working.
+  bool own_turn = 19;
 }
 
 // How a turn ended, as the daemon judged it (ChatStatus.ended).

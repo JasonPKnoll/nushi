@@ -107,6 +107,9 @@ func itemProto(it *model.Item, refs bool) *nushiv1.Item {
 	if sh := it.BackgroundCommand; sh != nil {
 		out.BackgroundCommand = &nushiv1.BackgroundCommand{Id: sh.ID, State: sh.State, Started: unixMs(sh.Started), Ended: unixMs(sh.Ended), Output: sh.Output, End: sh.End}
 	}
+	if w := it.Workflow; w != nil && w.State != "" { // unset until the run is followed, as the proto says
+		out.Workflow = workflowProto(*w)
+	}
 	if sa := it.Subagent; sa != nil {
 		out.Subagent = &nushiv1.Subagent{State: sa.State, Started: unixMs(sa.Started), Ended: unixMs(sa.Ended), Result: sa.Result, Session: sa.Session}
 	}
@@ -154,7 +157,7 @@ func usageProto(u model.Usage) *nushiv1.Usage {
 func statusProto(st model.Status) *nushiv1.ChatStatus {
 	return &nushiv1.ChatStatus{Busy: st.Busy, Waiting: st.Waiting, CanFork: st.CanFork, CanWriteCommit: st.CanWriteCommit, Images: st.Images, CanRewind: st.CanRewind,
 		McpChanged: st.MCPChanged, Started: unixMs(st.Started), CanAskContext: st.CanAskContext, Asleep: st.Asleep, CanSleep: st.CanSleep, ReopenFailed: st.ReopenFailed, SessionGone: st.SessionGone,
-		Background: int32(st.Background), Ended: turnEndProto[st.Ended], Failure: st.Failure}
+		Background: int32(st.Background), Ended: turnEndProto[st.Ended], Failure: st.Failure, Workflows: int32(st.Workflows), OwnTurn: st.OwnTurn}
 }
 
 // turnEndProto is each turn's end as the API says it.

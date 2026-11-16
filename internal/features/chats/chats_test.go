@@ -486,8 +486,8 @@ func TestBackgroundCommandsAreFollowed(t *testing.T) {
 	c.mu.Lock()
 	said := slices.Compact(slices.Clone(counts))
 	c.mu.Unlock()
-	if !slices.Equal(said, []int{1, 0}) {
-		t.Errorf("the status said %v running in the background, want 1, then 0", said)
+	if !slices.Equal(said, []int{0, 1, 0}) { // the call came outside a turn: the own turn's status first
+		t.Errorf("the status said %v running in the background, want 0 (its own turn), 1, then 0", said)
 	}
 
 	// Its agent gone without a word of its end: only that it started.

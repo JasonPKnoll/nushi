@@ -21,6 +21,14 @@ type Timing struct {
 	CommandPoll   time.Duration // how often a running background command's output is read (a second)
 	LetGoCheck    time.Duration // how often the chats no client shows are looked at (a minute)
 	CopiesCheck   time.Duration // how often copies past their days are looked for (an hour)
+	// A workflow's files are read every WorkflowPoll (a second), every
+	// WorkflowStalledPoll once it stalled (30 s); one never found by
+	// WorkflowFind (30 s) shows as a plain call. Its agent gone, a last
+	// read comes after WorkflowGrace (2 s); a run no agent of this
+	// daemon's runs ends once its files are still for WorkflowQuiet (two
+	// minutes), and one whose agent lives stalls once they are still for
+	// WorkflowStall (an hour). ADR 0127.
+	WorkflowPoll, WorkflowStalledPoll, WorkflowFind, WorkflowGrace, WorkflowQuiet, WorkflowStall time.Duration
 }
 
 func (t Timing) stopGrace() time.Duration     { return cmp.Or(t.StopGrace, 5*time.Second) }
@@ -29,3 +37,11 @@ func (t Timing) sleepCheck() time.Duration    { return cmp.Or(t.SleepCheck, time
 func (t Timing) commandPoll() time.Duration   { return cmp.Or(t.CommandPoll, time.Second) }
 func (t Timing) letGoCheck() time.Duration    { return cmp.Or(t.LetGoCheck, time.Minute) }
 func (t Timing) copiesCheck() time.Duration   { return cmp.Or(t.CopiesCheck, time.Hour) }
+func (t Timing) workflowPoll() time.Duration  { return cmp.Or(t.WorkflowPoll, time.Second) }
+func (t Timing) workflowStalledPoll() time.Duration {
+	return cmp.Or(t.WorkflowStalledPoll, 30*time.Second)
+}
+func (t Timing) workflowFind() time.Duration  { return cmp.Or(t.WorkflowFind, 30*time.Second) }
+func (t Timing) workflowGrace() time.Duration { return cmp.Or(t.WorkflowGrace, 2*time.Second) }
+func (t Timing) workflowQuiet() time.Duration { return cmp.Or(t.WorkflowQuiet, 2*time.Minute) }
+func (t Timing) workflowStall() time.Duration { return cmp.Or(t.WorkflowStall, time.Hour) }

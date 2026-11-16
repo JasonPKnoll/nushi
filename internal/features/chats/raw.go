@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/secrets"
 )
 
 // rawCap is how much of a tool call's raw input or output an item keeps.
@@ -32,14 +33,14 @@ func keepRaw(it *model.Item, input, output json.RawMessage) {
 }
 
 // inputText is a tool call's input as indented JSON, what looks secret
-// masked (maskSecrets) before it is cut; "" when it holds nothing ({},
+// masked (secrets.MaskInput) before it is cut; "" when it holds nothing ({},
 // null).
 func inputText(raw json.RawMessage) string {
 	raw = bytes.TrimSpace(raw)
 	if empty(raw) {
 		return ""
 	}
-	return cut(maskSecrets(string(raw)))
+	return cut(secrets.MaskInput(string(raw)))
 }
 
 // outputText is a tool call's raw result: a string as it is, a list of text

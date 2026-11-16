@@ -127,6 +127,38 @@ void main() {
     await closeView(tester, d);
   });
 
+  testWidgets('working counts a turn, a running workflow and an own turn, '
+      'each chat once', (tester) async {
+    viewport(tester, const Size(720, 360));
+    final d = await FakeDaemon([
+      chat(
+        't',
+        'claude',
+        'T',
+        status: ChatStatus(busy: true, started: Int64(1)),
+      ),
+      chat('w', 'claude', 'W', status: ChatStatus(background: 1, workflows: 1)),
+      chat('o', 'claude', 'O', status: ChatStatus(ownTurn: true)),
+      chat(
+        'all',
+        'claude',
+        'All',
+        status: ChatStatus(
+          busy: true,
+          started: Int64(1),
+          workflows: 1,
+          ownTurn: true,
+        ),
+      ),
+      chat('b', 'claude', 'B', status: ChatStatus(background: 1)),
+      chat('i', 'claude', 'I'),
+    ]).connect(tester);
+    await tester.pumpWidget(themed(StatusBar(d)));
+    await tester.pump();
+    expect(find.text('4 working'), findsOne);
+    await closeView(tester, d);
+  });
+
   testWidgets("a daemon that can't read memory is asked once, the window "
       'shown again or not, and the card shows none', (tester) async {
     var reads = 0; // the fake doesn't keep a call its answer fails

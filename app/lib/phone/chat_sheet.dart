@@ -16,6 +16,7 @@ import 'package:nushi/pickers.dart' show ConfigNames;
 import 'package:nushi/subagents.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/widgets.dart';
+import 'package:nushi/workflows.dart';
 
 /// The phone's chat ⋯: what the chat runs in (its folder, branch and
 /// model) and what can be done to it from a phone: Rename, Fork ([onFork],
@@ -67,13 +68,26 @@ class _ChatSheetState extends State<ChatSheet> {
     }
   }
 
-  /// The running subagents and background commands it can stop.
+  /// The running subagents, background commands and workflows it can
+  /// stop.
   List<String> get _running => [
     for (final s in subagentsOf(widget.chat.withRunning))
       if (subagentStoppable(s)) s.call.id,
     for (final it in backgroundCommandsOf(widget.chat.withRunning))
       if (commandRunning(it)) it.id,
+    for (final it in workflowsOf(widget.chat.withRunning))
+      if (workflowLive(it.workflow)) it.id,
   ];
+
+  /// What Stop names when one task runs: a workflow by its name.
+  String _stopOne(String id) {
+    final wf = workflowsOf(widget.chat.withRunning)
+        .where((it) => it.id == id)
+        .firstOrNull;
+    return wf == null
+        ? 'Stop the background task'
+        : 'Stop Workflow: ${wf.workflow.name}';
+  }
 
   Future<void> _rename() async {
     final title = await showDialog<String>(
@@ -174,7 +188,7 @@ class _ChatSheetState extends State<ChatSheet> {
               if (running.isNotEmpty)
                 (
                   running.length == 1
-                      ? 'Stop the background task'
+                      ? _stopOne(running.single)
                       : 'Stop ${running.length} background tasks',
                   () => _then(() async {
                     for (final id in running) {

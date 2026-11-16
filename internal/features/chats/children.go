@@ -185,7 +185,7 @@ func (s *Service) StopTask(ctx context.Context, chatID, callID string) error {
 	case call == nil:
 		c.mu.Unlock()
 		return errors.New("that task is no longer in the chat")
-	case !running(*call):
+	case !running(*call) && (call.Workflow == nil || call.Workflow.State != "running"): // a stalled workflow may still run
 		c.mu.Unlock()
 		return errors.New("that task isn't running")
 	}
@@ -221,6 +221,8 @@ func (c *chat) stopTaskLocked(callID string) (*model.ToSubagent, error) {
 		return &model.ToSubagent{Agent: call.Title, AgentID: call.BackgroundCommand.ID, Stop: true}, nil
 	case call.Agent != "" && call.AgentID != "":
 		return &model.ToSubagent{Agent: call.Agent, AgentID: call.AgentID, Stop: true}, nil
+	case stopWorkflow(*call) != nil:
+		return stopWorkflow(*call), nil
 	}
 	return nil, errors.New("the agent didn't say how to reach that task")
 }
@@ -233,6 +235,9 @@ func (c *chat) stoppedLocked(call model.Item) {
 		return
 	}
 	id := c.kind.background.Stopped(call)
+	if id != "" && slices.ContainsFunc(c.items, func(it model.Item) bool { return it.Workflow != nil && it.TaskID == id }) {
+		c.pokeWorkflowsLocked() // its snapshot is written as it stops
+	}
 	i := slices.IndexFunc(c.items, func(it model.Item) bool { return it.Agent != "" && it.AgentID == id })
 	if id == "" || i < 0 || c.items[i].Subagent == nil || c.items[i].Subagent.State != "running" {
 		return

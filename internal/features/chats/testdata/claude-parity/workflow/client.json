@@ -1,0 +1,47 @@
+{
+ "timeout": "120s",
+ "steps": [
+  {
+   "initialize": {}
+  },
+  {
+   "new": "s1",
+   "meta": {
+    "claudeCode": {
+     "options": {
+      "settings": {
+       "permissions": {
+        "allow": [
+         "Workflow"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "prompt": "run the workflow",
+   "session": "s1",
+   "async": "p1"
+  },
+  {
+   "await": "p1"
+  },
+  {
+   "waitFor": {
+    "method": "session/update",
+    "params": {
+     "update": {
+      "sessionUpdate": "usage_update",
+      "_meta": {
+       "_claude/origin": {
+        "kind": "task-notification"
+       }
+      }
+     }
+    }
+   }
+  }
+ ]
+}

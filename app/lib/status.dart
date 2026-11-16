@@ -200,10 +200,12 @@ class _ChatDotState extends State<ChatDot> with TickerProviderStateMixin {
       case .failed:
         return Icon(Icons.error_outline, size: size * 1.6, color: t.crashed);
       case .working:
-        return CustomPaint(
+        final mark = CustomPaint(
           size: const Size.square(size * 1.6),
           painter: StatusMark(t.running, ringing: !still),
         );
+        // A turn needs no words; work the user didn't start does.
+        return chat.busy ? mark : tooltip(context, workingWords(chat), mark);
       case .background:
         return tooltip(
           context,
@@ -282,10 +284,19 @@ class _ChatDotState extends State<ChatDot> with TickerProviderStateMixin {
   }
 }
 
-/// "2 subagents or commands running in the background".
+/// "Working in the background: 2 background tasks" (subagents, commands
+/// and stalled workflows).
 String backgroundWords(int n) =>
-    'Working in the background: $n '
-    '${n == 1 ? 'subagent or command' : 'subagents or commands'}';
+    'Working in the background: $n background '
+    '${n == 1 ? 'task' : 'tasks'}';
+
+/// Why a chat with no turn of the user's running counts as working: a
+/// workflow runs (ADR 0127), or the agent works on its own.
+String workingWords(ChatState chat) => chat.workflows > 0
+    ? chat.workflows == 1
+          ? 'Running a workflow'
+          : 'Running ${chat.workflows} workflows'
+    : 'Working on its own, after a background task';
 
 /// The dot of a chat that needs the user: a size up from the others, in a
 /// wider soft ring, in the same room.

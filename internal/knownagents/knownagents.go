@@ -78,7 +78,7 @@ type Agent struct {
 func All(projects string) []Agent {
 	all := []Agent{
 		{
-			Harness: claude.Harness{}, Local: claudehistory.Local{Projects: projects},
+			Harness: claude.Harness{}, Local: claudehistory.Local{Projects: projects, Workflows: claudehistory.NewRuns()},
 			Agent:  agents.Agent{CLI: claude.CLI, SignedIn: claude.SignedIn},
 			Skills: claudeskills.Claude{}, Trust: claudetrust.Trust{},
 			MCP: func(func() (model.AgentRun, error)) mcp.Config { return claudemcp.Claude{} },

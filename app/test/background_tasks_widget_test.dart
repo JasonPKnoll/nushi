@@ -9,6 +9,7 @@ import 'package:nushi/widgets.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
+import 'workflow_card_test.dart' show workflowCall;
 
 Item _subagent(String id, String state) => Item(
   id: id,
@@ -83,6 +84,65 @@ void main() {
       tester.getTopLeft(find.textContaining('Task 5')).dy,
       lessThan(tester.getTopLeft(find.textContaining('Task 0')).dy),
     );
+    await closeView(tester, d);
+  });
+
+  testWidgets('workflows: running ones first, a stalled one says "no '
+      'activity", ended ones wait under "n finished"; a click opens the '
+      'pane, Stop only while it runs', (tester) async {
+    final fake = FakeDaemon([]);
+    final d = await fake.connect(tester);
+    final chat = ChatState('c', '/x');
+    chat.items.addAll([
+      workflowCall('done', id: 'w-done')..workflow.name = 'over',
+      workflowCall('running', id: 'w-run')..workflow.name = 'busy',
+      workflowCall('unknown', id: 'w-ended')..workflow.name = 'paused',
+      workflowCall('running', stalled: true, id: 'w-quiet')
+        ..workflow.name = 'quiet',
+    ]);
+    final widget = backgroundTasksWidget(chat, d)!;
+    await tester.pumpWidget(
+      themed(
+        SingleChildScrollView(
+          child: Column(
+            children: [
+              widget.summary!,
+              for (final r in widget.rows) r.$2 as Widget,
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(find.text('2 running'), findsOne);
+    double top(String name) => tester.getTopLeft(find.text(name)).dy;
+    expect(top('busy'), lessThan(top('quiet')));
+    expect(find.text('no activity'), findsOne);
+    expect(find.text('over'), findsNothing);
+    expect(find.text('paused'), findsNothing);
+    expect(find.byTooltip('Stop'), findsNWidgets(2)); // both still run
+
+    await tester.tap(find.text('2 finished'));
+    await tester.pump();
+    expect(top('quiet'), lessThan(top('2 finished')));
+    expect(top('paused'), lessThan(top('over'))); // the latest first
+    expect(find.text('ended'), findsOne);
+    expect(find.byTooltip('Stop'), findsNWidgets(2)); // none on ended ones
+
+    await tester.tap(find.text('over'));
+    expect(chat.pane.value, 'w-done');
+    await tester.tap(find.text('quiet'));
+    expect(chat.pane.value, 'w-quiet');
+
+    Finder stopIn(String name) => find.descendant(
+      of: find.ancestor(of: find.text(name), matching: find.byType(Tap)).first,
+      matching: find.byTooltip('Stop'),
+    );
+    expect(stopIn('over'), findsNothing);
+    expect(stopIn('paused'), findsNothing);
+    await tester.tap(stopIn('busy'));
+    await tester.pump();
+    final stop = fake.calls.whereType<StopTaskRequest>().single;
+    expect((stop.chatId, stop.callId), ('c', 'w-run'));
     await closeView(tester, d);
   });
 }

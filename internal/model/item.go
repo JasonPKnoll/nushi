@@ -142,6 +142,9 @@ type Item struct {
 	BackgroundCommand *BackgroundCommand `json:"Shell"`
 	// Findings is a code review's result, for a tool call that reports one.
 	Findings *Findings
+	// Workflow is the run a tool call launched (Claude's Workflow), once
+	// the daemon follows it; TaskID is then the agent's id for its task.
+	Workflow *Workflow `json:",omitempty"`
 	// ServerCommand is, for the ask to run Nushi's preview_start tool, the
 	// command the named launch file entry runs, as resolved when the ask
 	// came, for the card (ADR 0100).

@@ -161,6 +161,7 @@ type chat struct {
 
 	mu           sync.Mutex
 	items        []model.Item
+	following    map[string]*follow              // workflows followed, by their call (workflows.go)
 	busy         bool                            // running a turn, or reopening or moving the session
 	halting      bool                            // being deleted: never reopens
 	stopping     bool                            // its agent is being stopped: nothing more goes to it
@@ -194,7 +195,8 @@ type chat struct {
 	parent       *chat                 // a side chat's chat
 	base         []model.Item          // a side chat's: the chat's transcript as it forked, which a kept one starts with (forks.go)
 	started      time.Time             // when the running turn started
-	background   int                   // subagents and background commands running, as last said
+	background   int                   // subagents, background commands and workflows running, as last said
+	workflows    int                   // workflows running, as last said
 	killed       []string              // background commands Nushi stopped since the last prompt, by the agent's id: told with the next (stopNote)
 	edited       []string              // files the user saved in the preview since the last prompt: told with the next (editNote)
 	done         chan struct{}         // closed when the running turn ends
@@ -264,11 +266,11 @@ func (c *chat) emitLocked(e model.Event) {
 		c.unsaved[e.Item.ID] = true
 	}
 	c.publish(e)
-	// A subagent or background command started or ended: the status says
-	// how many run.
-	if e.Item != nil && (e.Item.BackgroundCommand != nil || e.Item.Subagent != nil) {
-		if n := c.runningLocked(); n != c.background {
-			c.background = n
+	// A subagent, background command or workflow started or ended: the
+	// status says how many run.
+	if e.Item != nil && (e.Item.BackgroundCommand != nil || e.Item.Subagent != nil || e.Item.Tool == "Workflow") {
+		if n, w := c.runningLocked(), c.workflowsLocked(); n != c.background || w != c.workflows {
+			c.background, c.workflows = n, w
 			c.statusChangedLocked()
 		}
 	}
@@ -399,10 +401,11 @@ func (c *chat) statusLocked() model.Status {
 	return model.Status{Busy: c.busy, Started: c.started, Waiting: c.waitsLocked(), CanFork: c.canFork, Images: c.canImage,
 		CanRewind: c.forkAt != nil, MCPChanged: c.mcpChanged, CanAskContext: !idle && c.canAskContextLocked() == nil, CanWriteCommit: !idle && c.canWriteCommitLocked() == nil,
 		Asleep: idle && !c.reopenFailed, ReopenFailed: idle && c.reopenFailed, SessionGone: idle && c.reopenFailed && c.sessionGone, CanSleep: c.parent == nil && c.canSleepLocked() == nil,
-		Background: c.runningLocked()}
+		Background: c.runningLocked(), Workflows: c.workflowsLocked(), OwnTurn: c.ownTurn}
 }
 
-// runningLocked counts the subagents and background commands that run.
+// runningLocked counts the subagents, background commands and workflows
+// that run.
 func (c *chat) runningLocked() int {
 	n := 0
 	for i := range c.items {
@@ -413,9 +416,22 @@ func (c *chat) runningLocked() int {
 	return n
 }
 
-// running says whether it is a subagent or background command that runs.
+// workflowsLocked counts the workflows that run.
+func (c *chat) workflowsLocked() int {
+	n := 0
+	for i := range c.items {
+		if c.items[i].Workflow.Runs() {
+			n++
+		}
+	}
+	return n
+}
+
+// running says whether it is a subagent, background command or workflow
+// that runs (a stalled workflow doesn't).
 func running(it model.Item) bool {
-	return it.BackgroundCommand != nil && it.BackgroundCommand.State == "running" || it.Subagent != nil && it.Subagent.State == "running"
+	return it.BackgroundCommand != nil && it.BackgroundCommand.State == "running" || it.Subagent != nil && it.Subagent.State == "running" ||
+		it.Workflow.Runs()
 }
 
 func (c *chat) statusChangedLocked() {
