@@ -5,14 +5,14 @@
 // kern.proc.all and a command line is kern.procargs2, readable for the
 // user's own processes (proctree_darwin.go); on Linux both come from
 // /proc, each process's stat and cmdline (proctree_linux.go, through
-// procfs). Another OS reads no processes (proctree_other.go, ADR 0097).
+// procfs). Another OS reads no processes (proctree_other.go, ADR 0097),
+// and Windows signals none (signal_windows.go).
 package proctree
 
 import (
 	"errors"
 	"fmt"
 	"slices"
-	"syscall"
 	"time"
 
 	"github.com/afrase/nushi/internal/model"
@@ -87,7 +87,7 @@ func (Tree) StopGroup(root int, p model.Process) error {
 		return errors.New("the process doesn't lead a group of its own")
 	}
 	termed := now()
-	if err := syscall.Kill(-p.Pid, syscall.SIGTERM); err != nil {
+	if err := signalGroup(p.Pid, false); err != nil {
 		return fmt.Errorf("signalling the process group: %w", err)
 	}
 	time.AfterFunc(Grace, func() { killRest(p.Pid, termed) })
@@ -112,7 +112,7 @@ func killRest(pgid int, termed time.Time) {
 		left = true
 	}
 	if left {
-		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+		_ = signalGroup(pgid, true)
 	}
 }
 
@@ -140,11 +140,11 @@ func (Tree) Args(pid int) []string { return Args(pid) }
 // were killed.
 func (Tree) Stop(ps []model.Process) {
 	if live := same(ps); len(live) > 0 {
-		signal(live, syscall.SIGTERM)
+		signal(live, false)
 		for end := time.Now().Add(Grace); time.Now().Before(end) && len(live) > 0; live = same(live) {
 			time.Sleep(50 * time.Millisecond)
 		}
-		signal(live, syscall.SIGKILL)
+		signal(live, true)
 	}
 }
 
@@ -165,12 +165,13 @@ func same(ps []model.Process) []model.Process {
 	return out
 }
 
-// signal sends sig to each of ps, and to the group of one that leads it.
-func signal(ps []model.Process, sig syscall.Signal) {
+// signal sends each of ps SIGTERM, or SIGKILL with hard, and the group of
+// one that leads it too.
+func signal(ps []model.Process, hard bool) {
 	for _, p := range ps {
 		if p.Pgid == p.Pid {
-			_ = syscall.Kill(-p.Pid, sig)
+			_ = signalGroup(p.Pid, hard)
 		}
-		_ = syscall.Kill(p.Pid, sig)
+		_ = signalOne(p.Pid, hard)
 	}
 }

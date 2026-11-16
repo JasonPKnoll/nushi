@@ -3,7 +3,8 @@
 // flock(2). fcntl's F_GETLK sees those on macOS, where flock and POSIX
 // locks are one kind; on Linux they are apart and F_GETLK never sees a
 // flock lock, so Held also reads /proc/locks, the kernel's list of every
-// lock held (held_linux.go).
+// lock held (held_linux.go). On Windows a lock is LockFileEx's, and none
+// is read without taking it (filelock_windows.go, ADR 0124).
 package filelock
 
 import (
@@ -11,9 +12,10 @@ import (
 	"fmt"
 	"os"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
+
+// errBusy is tryLock's answer when another process holds the lock.
+var errBusy = errors.New("held by another process")
 
 // Held says whether some process holds a lock on the file at path; false
 // when there is no such file.
@@ -26,29 +28,22 @@ func Held(path string) bool {
 	return held(f)
 }
 
-// posixHeld says fcntl's F_GETLK finds a lock on f that another process
-// holds.
-func posixHeld(f *os.File) bool {
-	lk := unix.Flock_t{Type: unix.F_WRLCK}
-	return unix.FcntlFlock(f.Fd(), unix.F_GETLK, &lk) == nil && lk.Type != unix.F_UNLCK
-}
-
-// Lock takes path's lock as an agent does (flock(2), exclusive; the file
-// made if missing), trying for up to wait while another process holds it.
-// unlock lets it go.
+// Lock takes path's lock as an agent does (exclusive; the file made if
+// missing), trying for up to wait while another process holds it. unlock
+// lets it go.
 func Lock(path string, wait time.Duration) (unlock func(), err error) {
 	f, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0o644) //nolint:gosec // an agent's lock file beside its settings
 	if err != nil {
 		return nil, err
 	}
 	for deadline := time.Now().Add(wait); ; {
-		err = unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+		err = tryLock(f)
 		if err == nil {
-			return func() { _ = f.Close() }, nil // closing lets the lock go
+			return func() { release(f) }, nil
 		}
-		if !errors.Is(err, unix.EWOULDBLOCK) || time.Now().After(deadline) {
+		if !errors.Is(err, errBusy) || time.Now().After(deadline) {
 			_ = f.Close() // the lock's error is the one to return
-			if errors.Is(err, unix.EWOULDBLOCK) {
+			if errors.Is(err, errBusy) {
 				err = fmt.Errorf("%s is held by another process", path)
 			}
 			return nil, err

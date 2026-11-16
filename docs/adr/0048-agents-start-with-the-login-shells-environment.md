@@ -1,6 +1,6 @@
 # 0048. Agents start with the login shell's environment, which the daemon reads itself
 
-Supersedes [0028](0028-agents-get-the-login-shells-environment.md).
+Supersedes [0028](0028-agents-get-the-login-shells-environment.md). Amended by [0126](0126-agents-on-windows-start-with-the-registrys-environment.md): on Windows, which has no login shell, agents start with the registry's environment, as Windows builds it for a new process.
 
 ## Context
 0028 gave agents the daemon's own environment, trusting the launch to have made it the login shell's (`nushid -login`, [0036](0036-the-daemon-is-a-background-helper-app.md)). A daemon started any other way had that way's: one opened without `-login` (a restart by hand, which `open` gives the opener's environment) had the opener's, and an agent chat failed with "No API key for FIREWORKS_API_KEY", a fish universal variable (`set -Ux`) only fish has. A variable added to the shell's config also reached agents only after a daemon restart.

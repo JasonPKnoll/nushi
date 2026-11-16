@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nushi/app_install.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/widgets.dart';
@@ -36,7 +37,7 @@ class TokenNotices extends StatelessWidget {
       : needsRestart
       ? Notice(
           '$problem. Restarting stops running turns and closes terminals.',
-          action: native.install.daemon == null ? null : 'Restart daemon',
+          action: native.install.restartsDaemon ? 'Restart daemon' : null,
           onAction: onRestart,
         )
       : const SizedBox.shrink();

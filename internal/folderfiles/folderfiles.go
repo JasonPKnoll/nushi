@@ -18,10 +18,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 
 	"github.com/afrase/nushi/internal/git"
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/openflag"
 	"github.com/afrase/nushi/internal/regularfile"
 )
 
@@ -150,7 +150,7 @@ func (w *walker) stop(path string) bool {
 // walk stops among them. A link or a fifo put there since the walk saw a
 // folder is neither followed nor waited on.
 func readDir(path string, n int) ([]fs.DirEntry, error) {
-	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW|syscall.O_DIRECTORY, 0) //nolint:gosec // a folder of the walk, opened for its names
+	f, err := os.OpenFile(path, os.O_RDONLY|openflag.NonBlock|openflag.NoFollow|openflag.Directory, 0) //nolint:gosec // a folder of the walk, opened for its names
 	if err != nil {
 		return nil, err
 	}

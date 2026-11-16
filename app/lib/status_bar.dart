@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:connectrpc/connect.dart';
 import 'package:flutter/material.dart';
 
 import 'package:nushi/agent_mark.dart';
+import 'package:nushi/app_install.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_menu.dart';
 import 'package:nushi/daemon.dart';
@@ -67,8 +69,12 @@ class _StatusBarState extends State<StatusBar> {
     super.dispose();
   }
 
+  /// Whether the daemon said it can't read memory: then nothing asks
+  /// again, the window shown or not.
+  bool _unread = false;
+
   Future<void> _read() async {
-    if (!widget.daemon.connected) return;
+    if (_unread || !widget.daemon.connected) return;
     try {
       final m = await widget.daemon.client.getMemory(
         GetMemoryRequest(appPid: pid),
@@ -80,6 +86,14 @@ class _StatusBarState extends State<StatusBar> {
       }
       _last[widget.daemon] = m;
       setState(() => _memory = m);
+    } on ConnectException catch (e) {
+      // The daemon's OS doesn't say (Windows, so far): asking again
+      // won't change that, so the card shows no memory. Any other
+      // failure keeps the last reading until the next one.
+      if (e.code == Code.unimplemented) {
+        _timer.cancel();
+        _unread = true;
+      }
     } on Object {
       // The last reading stays until the next one.
     }
@@ -296,14 +310,14 @@ class _MemoryButton extends StatelessWidget {
         row(
           label('Nushi daemon'),
           m.daemon.toInt(),
-          action: native.install.daemon == null
-              ? null
-              : Button(
+          action: native.install.restartsDaemon
+              ? Button(
                   label: daemon.restarting ? 'Restarting…' : 'Restart',
                   onPressed: daemon.restarting
                       ? null
                       : () => restartDaemonAsking(context, daemon),
-                ),
+                )
+              : null,
         ),
         if (m.other > 0) row(label('Terminals and other'), m.other.toInt()),
         if (asleep > 0)

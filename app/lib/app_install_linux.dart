@@ -86,6 +86,9 @@ class LinuxAppInstall implements AppInstall {
   String get stopByHand => 'end nushid in the system monitor';
 
   @override
+  bool get canStop => true;
+
+  @override
   Future<void> launch(String dataDir) async {
     final program = daemon;
     if (program == null) return;
@@ -121,18 +124,6 @@ class LinuxAppInstall implements AppInstall {
     kill(pid);
   }
 }
-
-/// The daemon's environment: the app's, without Nushi's own variables (a
-/// `NUSHID_DATA` or token the app inherited), the data folder for
-/// `-login` to keep (`NUSHID_DATA`), and the app's `NUSHI_DATA` when it
-/// has one (development), which the daemon's dev mode follows, as the
-/// Mac's `openHelper` passes it.
-Map<String, String> launchEnvironment(Map<String, String> env, String dir) => {
-  for (final MapEntry(:key, :value) in env.entries)
-    if (!key.startsWith('NUSHI_') && !key.startsWith('NUSHID_')) key: value,
-  'NUSHID_DATA': dir,
-  'NUSHI_DATA': ?env['NUSHI_DATA'],
-};
 
 Future<void> _detach(
   String program,

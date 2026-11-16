@@ -20,6 +20,9 @@ class FakeAppInstall implements AppInstall {
   @override
   String get stopByHand => 'quit nushid in Activity Monitor';
 
+  @override
+  bool canStop = true;
+
   /// The data folders it was asked to start a daemon on, in order.
   final launched = <String>[];
 

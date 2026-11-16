@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/afrase/nushi/internal/features/tools"
@@ -88,9 +87,7 @@ func TestRefusesAndSaysWhy(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(folder, "folder.md"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := syscall.Mkfifo(filepath.Join(folder, "pipe.md"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	testcheck.Fifo(t, filepath.Join(folder, "pipe.md"))
 	// A link in the agent's own folder, leaving it, however it was written.
 	notes := filepath.Join(dir, "notes")
 	testcheck.Write(t, filepath.Join(notes, "x.txt"), "")

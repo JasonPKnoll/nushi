@@ -4,12 +4,15 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/composer.dart';
+import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/native.dart';
 import 'package:nushi/replies.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/widgets.dart' show confirm;
+import 'package:nushi/window_drag_windows.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -147,6 +150,41 @@ void main() {
     expect(_boxFocused(tester), isFalse);
     await closeView(tester, d);
   }, variant: mac);
+
+  testWidgets('on Windows AltGr, Control and right Alt there, types its '
+      'character; Control or Alt alone keeps its meaning', (tester) async {
+    native
+      ..conventions = windowsConventions
+      ..window = const WindowsWindow();
+    final d = await _open(tester);
+    await _clickTranscript(tester);
+    Future<void> held(List<LogicalKeyboardKey> keys, String c) async {
+      for (final k in keys) {
+        await tester.sendKeyDownEvent(k, platform: 'windows');
+      }
+      await tester.sendKeyDownEvent(
+        LogicalKeyboardKey.digit2,
+        platform: 'windows',
+        character: c,
+      );
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.digit2);
+      for (final k in keys.reversed) {
+        await tester.sendKeyUpEvent(k, platform: 'windows');
+      }
+      await tester.pumpAndSettle();
+    }
+
+    await held([LogicalKeyboardKey.altLeft], '2');
+    await held([LogicalKeyboardKey.controlLeft], '2');
+    expect(_boxText(tester), '');
+    await held([
+      LogicalKeyboardKey.controlLeft,
+      LogicalKeyboardKey.altRight,
+    ], '@');
+    expect(_boxText(tester), '@');
+    expect(_boxFocused(tester), isTrue);
+    await closeView(tester, d);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
   testWidgets('R on a selection still replies', (tester) async {
     final d = await _open(tester);
