@@ -96,8 +96,10 @@ func TestPinMessage(t *testing.T) {
 	}
 	side, err := svc.Fork(t.Context(), c.id)
 	testcheck.NoErr(t, err)
-	if err := svc.PinMessage(side, "m1", true); err == nil {
-		t.Error("a side chat took a pin")
+	sideChat := svc.chats[side]
+	answered(t, svc, agent, sideChat, "aside?", "aside") // a message of its own, pinnable in a chat
+	if err := svc.PinMessage(side, idOf(t, sideChat, "agent:aside"), true); err == nil || errors.Is(err, ErrNotMessage) {
+		t.Errorf("pinning a side chat's own message = %v, want the side chat refused", err)
 	}
 
 	// Deleting the chat takes its pins with its record.
