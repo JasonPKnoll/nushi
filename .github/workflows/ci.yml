@@ -203,11 +203,13 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    # Three test files at once: the runner has three cores, and flutter test takes half of them (one).
+    # Three test files at once: the runner has three cores, and flutter test takes half of them (one). Each file's
+    # tests in a random order, as Go's are (-shuffle=on): a test that passes only after another fails here; flutter
+    # test prints the seed first, for make test-app FLUTTER_TEST_FLAGS=--test-randomize-ordering-seed=<seed>.
     env:
       SET: macos
       SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-      FLUTTER_TEST_FLAGS: --concurrency 3 --file-reporter json:build/test-times.json
+      FLUTTER_TEST_FLAGS: --concurrency 3 --test-randomize-ordering-seed=random --file-reporter json:build/test-times.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -395,11 +397,12 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    # Four test files at once: the runner has four cores. A golden in this set fails (make test-app).
+    # Four test files at once: the runner has four cores. A golden in this set fails (make test-app). Each file's tests
+    # in a random order, as the macOS shards run theirs.
     env:
       SET: linux
       SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-      FLUTTER_TEST_FLAGS: --concurrency 4 --file-reporter json:build/test-times.json
+      FLUTTER_TEST_FLAGS: --concurrency 4 --test-randomize-ordering-seed=random --file-reporter json:build/test-times.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

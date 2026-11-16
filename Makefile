@@ -290,7 +290,10 @@ test-packages:
 # slowest first, so none is left running at the end. NUSHI_TEST_SET
 # tells the tests their set: a golden in the Linux set's fails
 # (flutter_test_config.dart). FLUTTER_TEST_FLAGS adds flags (CI's
-# --concurrency). A tool that fails stops it: flutter
+# --concurrency, and its --test-randomize-ordering-seed=random, which
+# runs each file's tests in a random order and finds those that pass
+# only in the file's; flutter test prints the seed, and the same flag
+# with it runs that order again). A tool that fails stops it: flutter
 # test given no file would run them all.
 APP_SET = $(or $(SET),all)
 APP_SHARD = $(or $(SHARD),1/1)
