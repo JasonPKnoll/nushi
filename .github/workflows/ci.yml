@@ -12,6 +12,10 @@
 # app/test/timings.tsv, slowest first (ADR 0128); a shard's count is its matrix's, nowhere else. The ACP library,
 # github.com/afrase/acp-go, has its own CI. Actions are pinned by commit.
 #
+# A push or a pull request runs only the jobs its change can affect (the changes job, tools/ci-changes.sh): a docs-only
+# change none, a Go-only one all but the golden shards, an app-only one all but Go's five jobs. Anything else, and any
+# path it can't place, runs everything; the release counts only a run that skipped nothing (release.yml).
+#
 # Each job's timeout is two to three times its longest recent run with warm caches (2026-11-16: Go's tests on macOS 4.1
 # minutes, the web 2.4 on Linux, Linux's Go 3), room for a cold cache's downloads and builds: a hung test ends there, not
 # at GitHub's six hours on a scarce macOS runner. The app's shards (5-6 minutes when they ran every file by name) keep
@@ -45,8 +49,35 @@ env:
   NUSHI_FLUTTER_VERSION: 3.47.7
 
 jobs:
+  # What the change can affect (tools/ci-changes.sh, ADR 0128): the other jobs run only for it. A pull request's whole
+  # branch, a push's own commits; any other event (the release's call) runs everything.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      go: ${{ steps.paths.outputs.go }}
+      app: ${{ steps.paths.outputs.app }}
+      code: ${{ steps.paths.outputs.code }}
+    steps:
+      # The history without its files' contents: the diff needs only names.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: tools/ci-changes.sh "$EVENT" "$BASE" "$HEAD" | tee -a "$GITHUB_OUTPUT"
+
   go:
     name: Go tests (macOS)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: macos-latest
     timeout-minutes: 15
     # The tests in a new order each run: one that passes only after another shows (the log has the seed).
@@ -69,6 +100,8 @@ jobs:
   # Beside the tests, not before them (2026-11-16): a macOS slot the web job left.
   go-lint:
     name: Go lint (macOS)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -116,6 +149,8 @@ jobs:
 
   lint:
     name: Proto and Dart lint (Linux)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -148,6 +183,8 @@ jobs:
 
   packages:
     name: Dart packages (Linux)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -168,6 +205,8 @@ jobs:
 
   goldens:
     name: App goldens (macOS, ${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
     timeout-minutes: 15
     strategy:
@@ -220,6 +259,8 @@ jobs:
   # On Linux since 2026-11-16: nushid runs there (ADR 0101) and the image has Chrome, which frees a macOS runner.
   web:
     name: Web app in Chrome (Linux)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -242,6 +283,8 @@ jobs:
 
   linux:
     name: Go tests (Linux)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # As on the Mac: the tests in a new order each run.
@@ -269,6 +312,8 @@ jobs:
   # Beside Linux's tests, not after them: the two lints took as long as the tests (2026-11-16).
   linux-lint:
     name: Go lint (Linux, Windows)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -317,6 +362,8 @@ jobs:
     # package's tests build there too, but the rest assume Unix. The daemon is built as the app runs it. Unmeasured
     # yet: 20 until it has run.
     name: Go on Windows
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -342,6 +389,8 @@ jobs:
 
   linux-app:
     name: App tests (Linux, ${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -372,6 +421,8 @@ jobs:
 
   linux-package:
     name: App (Linux, ${{ matrix.arch }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
