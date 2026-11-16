@@ -37,10 +37,9 @@
        Its .slot (or, on wide screens, the element named by data-slot-wide) says where the system sits on screen. -->
   <section id="top" class="hero" data-cam="0.32 -0.35 3.6 0.9 Claude 0 0">
     <div class="hero-text">
-      <p class="kicker">Nushi · for Mac and Linux</p>
       <h1><span class="h1a">Every coding agent.</span> <em class="h1b">One window<span class="dot">.</span></em></h1>
       <p class="lede">Claude, Codex, Pi and the others you already have, side by side.</p>
-      <p class="lede two">A chat started here picks up in your terminal, and the other way round.</p>
+      <p class="lede two">Each chat is the agent's own session, so you can carry it on in a terminal.</p>
       <div class="cta">
         <button class="brew" type="button" data-copy="brew install --cask afrase/tap/nushi" aria-label="Copy the Homebrew install command">
           <code>brew install --cask afrase/tap/nushi</code><span class="copied" aria-live="polite">Copy</span>
@@ -54,8 +53,7 @@
 
   <section id="window" class="window" data-cam="0.26 0.5 3.4 1.1 sun 0 0">
     <div class="head">
-      <p class="num"><b>01</b> The window</p>
-      <h2>A chat, its plan, and <em>what it touches.</em></h2>
+      <h2>The chat, and everything around it.</h2>
       <p>The plan, a subagent in its own pane, and the context, changes and pull request beside it.</p>
     </div>
     <div class="stage">
@@ -69,10 +67,8 @@
   <section id="agents" class="agents" data-cam="0.44 1.3 3.3 0.8 Claude 0 1" aria-labelledby="agents-h">
     <div class="agents-grid">
       <div class="agents-copy">
-        <p class="num"><b>02</b> Agents</p>
-        <h2 id="agents-h">Pick up where <em>the terminal</em> left off.</h2>
-        <p>Nushi has no model or permissions of its own. Each agent is the CLI you installed and signed in to, talking over the <a href="https://agentclientprotocol.com">Agent Client Protocol</a>.</p>
-        <p class="hint">Point at a name to find its planet.</p>
+        <h2 id="agents-h">The agents you already use.</h2>
+        <p>Nushi runs the agent CLIs you've installed and signed in to, over the <a href="https://agentclientprotocol.com">Agent Client Protocol</a>. It has no model of its own.</p>
       </div>
       <div class="agents-sky"><div class="slot"></div></div>
     </div>
@@ -92,8 +88,7 @@
   <section id="tour" class="tour" aria-label="What sits beside the chat">
     <div class="steps">
       <article class="step is-on" data-cam="0.30 2.1 3.5 1.0 Codex 0 0" data-slot-wide="#frame-slot">
-        <p class="num"><b>03</b> Changes</p>
-        <h2><button type="button" class="step-b">Review it like <em>a pull request.</em></button></h2>
+        <h2><button type="button" class="step-b">Review the changes.</button></h2>
         <p>A side-by-side or unified diff of the chat's work. Comment on lines; the agent gets them as one message.</p>
         <figure class="shot step-shot"><div class="slot"></div><img loading="lazy" src="images/changes.png" width="1280" height="800" alt="The Changes tab: a file tree and a side-by-side diff with two review comments"></figure>
 
@@ -117,29 +112,25 @@
       </article>
 
       <article class="step" data-cam="0.42 2.9 3.4 1.0 Pi 0 0" data-slot-wide="#frame-slot">
-        <p class="num"><b>04</b> Previews</p>
-        <h2><button type="button" class="step-b">Watch the file <em>take shape.</em></button></h2>
+        <h2><button type="button" class="step-b">See files as they change.</button></h2>
         <p>Markdown, HTML, images, PDFs, CSVs and Mermaid diagrams preview beside the chat, live as the agent rewrites them. Files open in tabs, and you can edit the source.</p>
         <figure class="shot step-shot"><div class="slot"></div><img loading="lazy" src="images/preview.png" width="1280" height="800" alt="A Markdown design note previewed beside the chat that wrote it"></figure>
       </article>
 
       <article class="step" data-cam="0.30 3.7 3.5 1.0 OpenCode 0 0" data-slot-wide="#frame-slot">
-        <p class="num"><b>05</b> Pull requests</p>
-        <h2><button type="button" class="step-b">Blockers <em>first.</em></button></h2>
+        <h2><button type="button" class="step-b">Pull requests, blockers first.</button></h2>
         <p>Checks, reviews and threads, with what blocks the merge on top. Send a failing check to the agent in one click, then merge from the tab.</p>
         <figure class="shot step-shot"><div class="slot"></div><img loading="lazy" src="images/pull-request.png" width="1280" height="800" alt="The Pull request tab: status lights and a to-do list of a failing check and review threads"></figure>
       </article>
 
       <article class="step" data-cam="0.44 4.4 3.4 1.0 PiG 0 0" data-slot-wide="#frame-slot">
-        <p class="num"><b>06</b> Jira</p>
-        <h2><button type="button" class="step-b">Start from <em>the ticket.</em></button></h2>
+        <h2><button type="button" class="step-b">Start from a Jira issue.</button></h2>
         <p>Your issues and sprints as a task list. Start work opens a chat in a worktree named after the issue.</p>
         <figure class="shot step-shot"><div class="slot"></div><img loading="lazy" src="images/jira.png" width="1280" height="800" alt="The Jira view: a sprint's issues by status, with their assignees"></figure>
       </article>
 
       <article class="step" data-cam="0.30 5.2 3.5 1.0 Ante 0 0" data-slot-wide="#frame-slot">
-        <p class="num"><b>07</b> Terminals</p>
-        <h2><button type="button" class="step-b">Terminals that <em>outlive the app.</em></button></h2>
+        <h2><button type="button" class="step-b">Terminals that outlive the app.</button></h2>
         <p>A terminal under each chat, kept by a small background daemon. Quit Nushi and the test run keeps going.</p>
         <figure class="shot step-shot"><div class="slot"></div><img loading="lazy" src="images/terminal.png" width="1280" height="800" alt="A terminal under a chat, showing a test run"></figure>
       </article>
@@ -163,8 +154,7 @@
 
   <section id="phone" class="phone" data-cam="0.6 5.9 3.4 0.8 sun 0 0" aria-labelledby="phone-h">
     <div class="phone-copy">
-      <p class="num"><b>08</b> Phone</p>
-      <h2 id="phone-h">Step away. <em>Keep it going.</em></h2>
+      <h2 id="phone-h">Answer from your phone.</h2>
       <p>Follow chats and answer an agent's questions from your phone. End-to-end encrypted, through a relay you run yourself.</p>
       <a class="more" href="https://github.com/afrase/nushi/blob/main/docs/remote.md">How the phone link works <span aria-hidden="true">→</span></a>
     </div>
@@ -188,7 +178,7 @@
         <p>Steps in <a href="https://github.com/afrase/nushi/blob/main/docs/install.md#on-linux">Installing on Linux</a>.</p>
       </div>
     </div>
-    <p class="then">Nushi updates itself. Open it, add an agent in Settings › Agents, and the <a href="https://github.com/afrase/nushi/wiki">guide</a> takes it from there.</p>
+    <p class="then">Nushi updates itself. Open it, add an agent in Settings › Agents. The <a href="https://github.com/afrase/nushi/wiki">guide</a> has the rest.</p>
   </section>
 </main>
 

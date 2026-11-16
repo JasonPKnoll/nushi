@@ -1,11 +1,12 @@
 // The orrery: Nushi's mark as a small solar system behind the page. The amber sun, the two broken rings (four
 // arcs each, as in the mark) and the agents as planets on them, in real 3D (perspective, lit from the sun).
-// Each [data-cam] element is a camera stop: scrolling moves between stops (orbit, tilt) and racks focus to a
-// different planet. Below a screenshot the sun sits just behind its top edge, so the screenshot eclipses it.
+// Each [data-cam] element is a camera stop: scrolling moves between stops (orbit, tilt). Focus stays on the sun's
+// plane, so what's nearer or farther softens a little, never more. Below a screenshot the sun sits just behind its top edge, so the screenshot eclipses it.
 // At the last stop the camera looks straight down and the system settles into the flat mark above Install.
 //
-// Depth of field: a few canvases, each blurred by a fixed CSS amount. Every piece is drawn onto the two canvases
-// either side of its own blur, crossfaded, so blur changes smoothly and never steps.
+// Depth of field: canvases blurred by fixed CSS amounts about a pixel apart, so a step between them can't be
+// seen. Every piece is drawn whole and opaque onto the one nearest its own blur (crossfading two half-transparent
+// copies showed seams). A ring is cut where a planet sits on it, so no line ever crosses a planet.
 // The cursor tilts the camera at once, and planets lean toward a nearby cursor and spring back. Scrolling fast
 // winds the rings a little. Nothing turns on its own: the loop runs only while something is still moving, then
 // stops, so an idle page costs nothing. One still frame under Reduce Motion. Plain canvas, no library.
@@ -17,13 +18,13 @@
 
   // Signed blur levels in CSS px: positive is behind the focal plane, negative in front; stacked far to near.
   // Blurred canvases are drawn at lower resolution, which the blur hides.
-  const LEVELS = [14, 5, 0, -6, -16];
+  const LEVELS = [3.2, 2.1, 1, 0, -1.2, -2.4, -3.6];
   const layers = LEVELS.map((lv) => {
     const c = document.createElement('canvas');
     sky.append(c);
     const ctx = c.getContext('2d');
     if (lv) c.style.filter = `blur(${Math.abs(lv)}px)`;
-    return { c, ctx, lv, res: lv === 0 ? 1 : Math.abs(lv) > 8 ? 0.4 : 0.6, used: false };
+    return { c, ctx, lv, res: Math.abs(lv) <= 1 ? 1 : 0.75, used: false };
   });
   if (!layers[0].ctx) return;
 
@@ -70,7 +71,7 @@
 
   // Reusable draw items (no closures or arrays made per frame).
   const K_STAR = 0, K_GLOW = 1, K_PIECE = 2, K_SUN = 3, K_PLANET = 4;
-  const PIECES_PER_ARC = 7;
+  const PIECES_PER_ARC = 14;
   const pool = [];
   const item = (i) => pool[i] || (pool[i] = { k: 0, d: 0, c: 0, x: 0, y: 0, r: 0, a: 0, col: '', p: null, pts: new Float32Array(44), n: 0 });
   let items = [];
@@ -150,7 +151,7 @@
   }
   const P = { X: 0, Y: 0, depth: 0, s: 0 };
   // Signed circle of confusion, in px, for something at this depth.
-  const coc = (depth) => (cam.K * 40 * (depth - cam.focal)) / depth;
+  const coc = (depth) => (cam.K * 9 * (depth - cam.focal)) / depth;
 
   const pointer = { x: -1e4, y: -1e4, in: false, mouse: false };
   let chosen = null;
@@ -193,16 +194,14 @@
       }
     }
 
-    // Focus: the stop's planet, or the agent being pointed at, racked smoothly.
-    const name = chosen || T.focus;
+    // Focus stays on the sun.
     for (const p of PLANETS) {
       const g = RINGS[p.ring];
       const a = (p.a + g.turn) * D2R;
       proj(g.r * Math.cos(a), 0, -g.r * Math.sin(a), p);
       p.rad = p.size * p.s * (0.55 + 0.45 * cam.flat) * (p.mark ? 1 : 1 - cam.flat);
     }
-    const fp = PLANETS.find((p) => p.name === name);
-    const fd = fp ? fp.depth : cam.D;
+    const fd = cam.D;
     cam.focal += (fd - cam.focal) * (still ? 1 : 1 - Math.exp(-dt * 6));
     if (Math.abs(fd - cam.focal) > 1e-3) busy = true;
 
@@ -234,11 +233,9 @@
   // Draw one item onto the two canvases either side of its blur, faded by how close it is to each.
   function put(it) {
     const c = Math.max(LEVELS[LEVELS.length - 1], Math.min(LEVELS[0], it.c));
-    let i = 0;
-    while (i < LEVELS.length - 2 && c < LEVELS[i + 1]) i++;
-    const f = (LEVELS[i] - c) / (LEVELS[i] - LEVELS[i + 1]);
-    if (1 - f > 0.01) paint(layers[i], it, (1 - f) * it.a);
-    if (f > 0.01) paint(layers[i + 1], it, f * it.a);
+    let i = 0, best = 1e9;
+    for (let j = 0; j < LEVELS.length; j++) { const e = Math.abs(LEVELS[j] - c); if (e < best) { best = e; i = j; } }
+    paint(layers[i], it, it.a);
   }
   let sunX = 0, sunY = 0, sunS = 0;
   function paint(L, it, alpha) {
@@ -308,6 +305,18 @@
     it.n = n;
   }
 
+  // Whether a ring is cut at this angle (degrees) for a planet sitting there; never once it's the flat mark.
+  function cut(g, deg) {
+    const k = 1 - Math.min(1, cam.flat * 2); // the gaps close as it flattens into the mark
+    if (k <= 0) return false;
+    for (const p of PLANETS) {
+      if (RINGS[p.ring] !== g) continue;
+      let d = Math.abs(((deg - p.a - g.turn) % 360 + 540) % 360 - 180);
+      if (d < (((p.size * 1.9) / g.r) / D2R) * k) return true;
+    }
+    return false;
+  }
+
   let shownDim = -1;
   function draw() {
     if (Math.abs(T.dim - shownDim) > 0.005) { shownDim = T.dim; sky.style.opacity = T.dim.toFixed(3); }
@@ -327,7 +336,7 @@
     const sd = P.depth;
     {
       const it = item(n++);
-      it.k = K_GLOW; it.d = sd + 3; it.c = 14; it.x = sunX; it.y = sunY; it.r = sunS * 0.9; it.a = 1;
+      it.k = K_GLOW; it.d = sd + 3; it.c = LEVELS[0]; it.x = sunX; it.y = sunY; it.r = sunS * 0.9; it.a = 1;
     }
 
     // Rings: each arc in short pieces, so each piece is blurred for its own depth.
@@ -337,12 +346,16 @@
         const a0 = g.from + a * 90 + g.turn;
         for (let j = 0; j < PIECES_PER_ARC; j++) {
           const b0 = a0 + (g.span * j) / PIECES_PER_ARC, b1 = a0 + (g.span * (j + 1)) / PIECES_PER_ARC;
+          if (cut(g, (b0 + b1) / 2)) continue;
           const it = item(n++);
-          piece(it, g, b0, b1, j === 0, j === PIECES_PER_ARC - 1);
+          const step = g.span / PIECES_PER_ARC;
+          const first = j === 0 || cut(g, b0 - step / 2), last = j === PIECES_PER_ARC - 1 || cut(g, b1 + step / 2);
+          // Each piece reaches a little into its neighbours, so their soft edges overlap instead of leaving a seam.
+          piece(it, g, first ? b0 : b0 - step * 0.35, last ? b1 : b1 + step * 0.35, first, last);
           const mid = ((b0 + b1) / 2) * D2R;
           proj(g.r * Math.cos(mid), 0, -g.r * Math.sin(mid), P);
           const d = P.depth;
-          const fade = (0.3 + 0.36 * Math.min(1, Math.max(0, (cam.D + 1.2 - d) / 2.4))) * (1 - flat) + flat;
+          const fade = 0.5 * (1 - flat) + flat; // one colour along the ring: depth shows by blur and size, not shade
           // Slate when seen in 3D, mist once it's the flat mark.
           const r = Math.round(base[0] + ((47 + (238 - 47) * (0.5 + 0.5 * flat)) - base[0]) * fade);
           const gg = Math.round(base[1] + ((74 + (241 - 74) * (0.5 + 0.5 * flat)) - base[1]) * fade);

@@ -84,8 +84,6 @@ main { overflow-x: clip; } /* slots are invisible measuring boxes and may reach 
 .bar .gh { padding: 6px 14px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--mist); }
 .bar .gh:hover { border-color: var(--amber); }
 
-.num { font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
-.num b { color: var(--amber); font-weight: 500; margin-right: 10px; }
 .shot { margin: 0; position: relative; }
 .shot img {
   border-radius: 14px; border: 1px solid rgb(238 241 245 / .12);
@@ -117,7 +115,6 @@ main { overflow-x: clip; } /* slots are invisible measuring boxes and may reach 
   padding: 48px var(--gut) 72px;
 }
 .hero-text { position: relative; }
-.kicker { font: 500 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 26px; }
 h1 { font: 400 clamp(50px, 6.5vw, 100px)/.95 var(--serif); letter-spacing: -.025em; }
 h1 span, h1 em { display: block; }
 h1 em .dot { display: inline; }
@@ -141,9 +138,7 @@ h1 em .dot { display: inline; }
 /* 02 Agents: the planets on the right, the names in big type below. */
 .agents { padding: 12vh 0 4vh; }
 .agents-grid { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 40px; align-items: center; padding: 0 var(--gut); min-height: 62vh; }
-.agents-copy > p:not(.num) { margin-top: 22px; font-size: 18px; max-width: 500px; }
-.agents-copy > p.hint { margin-top: 14px; font: 400 12px var(--mono); color: var(--muted); }
-@media (hover: none) { .agents-copy > p.hint { display: none; } }
+.agents-copy > p { margin-top: 22px; font-size: 18px; max-width: 500px; }
 .agents-sky { position: relative; align-self: stretch; min-height: 380px; }
 .agents-sky .slot { width: min(100%, 600px); left: 50%; top: 50%; transform: translate(-50%, -50%); }
 .roster { margin-top: 2vh; overflow: clip; }
@@ -167,7 +162,7 @@ h1 em .dot { display: inline; }
 .step h2 { font-size: clamp(34px, 3.6vw, 52px); }
 .step-b { all: unset; cursor: pointer; border-radius: 6px; }
 .step-b:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
-.step > p:not(.num) { margin-top: 18px; font-size: 18px; max-width: 470px; }
+.step > p { margin-top: 18px; font-size: 18px; max-width: 470px; }
 .step-shot { margin-top: 32px; }
 .frame-col { display: none; }
 
@@ -235,7 +230,7 @@ h1 em .dot { display: inline; }
 
 /* 08 Phone */
 .phone { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; padding: 18vh var(--gut) 14vh; }
-.phone-copy > p:not(.num) { margin-top: 20px; font-size: 18px; max-width: 460px; }
+.phone-copy > p { margin-top: 20px; font-size: 18px; max-width: 460px; }
 .more { display: inline-block; margin-top: 22px; font-weight: 500; text-decoration: none; border-bottom: 1px solid rgb(245 165 36 / .6); padding-bottom: 2px; }
 .phone-shot { justify-self: center; width: min(320px, 72vw); }
 .phone-shot img { border-radius: 34px; will-change: transform; }
