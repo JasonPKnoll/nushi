@@ -159,14 +159,12 @@ func TestDialerWithoutListener(t *testing.T) {
 	expectClosed(t, d)
 }
 
-// A dialer that never speaks never takes the listener.
+// A dialer that never speaks never takes the listener: one that speaks
+// while it's still there meets the listener.
 func TestSilentDialerTakesNothing(t *testing.T) {
-	lim := Defaults
-	lim.DialWait = 200 * time.Millisecond
-	url := start(t, lim)
+	url := start(t, Defaults)
 	key := newKey()
-	l, _ := pair(t, url, key)
-	time.Sleep(300 * time.Millisecond) // the silent dialer is gone
+	l, _ := pair(t, url, key) // its dialer says nothing, and stays
 	var dl Dialer
 	d, err := dl.Dial(context.Background(), url, idOf(key))
 	if err != nil {
@@ -175,6 +173,19 @@ func TestSilentDialerTakesNothing(t *testing.T) {
 	t.Cleanup(func() { _ = d.Close() })
 	send(t, d, "me")
 	expect(t, l, "me")
+}
+
+// A dialer has SpeakWait for its first message.
+func TestSilentDialerIsClosed(t *testing.T) {
+	lim := Defaults
+	lim.SpeakWait = 100 * time.Millisecond
+	var dl Dialer
+	d, err := dl.Dial(context.Background(), start(t, lim), newID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = d.Close() })
+	expectClosed(t, d)
 }
 
 func TestListenerMayNotSpeakFirst(t *testing.T) {

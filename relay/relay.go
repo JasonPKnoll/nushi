@@ -28,7 +28,9 @@ type Limits struct {
 	Rate       int           // bytes a second a connection may send once its burst is spent
 	Burst      int           // bytes a connection may send at once
 	Idle       time.Duration // a connection that sends nothing, not even a ping, for this long is closed
-	DialWait   time.Duration // how long a dialer waits for a listener, and a listener has to prove its key
+	DialWait   time.Duration // how long a dialer that has spoken waits for a listener
+	SpeakWait  time.Duration // how long a dialer has for its first message
+	ProveWait  time.Duration // how long a listener has to prove its key
 	MaxWait    time.Duration // how long a listener may wait for a dialer; it then connects again
 	PerID      int           // dialers on one id
 	PerIP      int           // connections from one address (an IPv6 /64); at most half of Total
@@ -66,7 +68,7 @@ type Limits struct {
 // Defaults suit one person's phones and Macs.
 // Many people can share one company's address, so PerIP is generous.
 var Defaults = Limits{MaxMessage: 65535, Rate: 1 << 20, Burst: 8 << 20, Idle: 90 * time.Second,
-	DialWait: 10 * time.Second, MaxWait: time.Hour, PerID: 16, PerIP: 200, PerNet: 250, ListenPerIP: 32, NewRate: 2, NewBurst: 60, Total: 1000, HTTPIdle: 5 * time.Second, PlainPerIP: 8, FirstWait: 2 * time.Second}
+	DialWait: 10 * time.Second, SpeakWait: 10 * time.Second, ProveWait: 10 * time.Second, MaxWait: time.Hour, PerID: 16, PerIP: 200, PerNet: 250, ListenPerIP: 32, NewRate: 2, NewBurst: 60, Total: 1000, HTTPIdle: 5 * time.Second, PlainPerIP: 8, FirstWait: 2 * time.Second}
 
 // minCost is what a message costs against the rate at least, so tiny
 // messages can't flood.
@@ -208,7 +210,7 @@ func (s *server) listen(w http.ResponseWriter, r *http.Request) {
 func (s *server) prove(p *peer, b *bucket, id string) bool {
 	challenge := make([]byte, 32)
 	rand.Read(challenge)
-	late := time.AfterFunc(s.lim.DialWait, func() { _ = p.ws.Close() })
+	late := time.AfterFunc(s.lim.ProveWait, func() { _ = p.ws.Close() })
 	_ = p.ws.SetWriteDeadline(time.Now().Add(s.lim.Idle))
 	if p.ws.WriteMessage(websocket.BinaryMessage, append([]byte(challengeTag), challenge...)) != nil {
 		return false
@@ -234,7 +236,7 @@ func (s *server) dial(w http.ResponseWriter, r *http.Request) {
 	// first), so a silent dialer can't hold a listener the listener doesn't
 	// know is taken.
 	b := s.prepare(p)
-	silent := time.AfterFunc(s.lim.DialWait, func() { _ = ws.Close() }) // pings don't put it off
+	silent := time.AfterFunc(s.lim.SpeakWait, func() { _ = ws.Close() }) // pings don't put it off
 	first, ok := s.read(p, b)
 	if !silent.Stop() || !ok {
 		return

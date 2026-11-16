@@ -34,7 +34,7 @@ func main() {
 	flag.IntVar(&lim.Rate, "rate", lim.Rate, "bytes a second a connection may send")
 	flag.IntVar(&lim.Burst, "burst", lim.Burst, "bytes a connection may send at once")
 	flag.DurationVar(&lim.Idle, "idle", lim.Idle, "close a connection silent this long")
-	flag.DurationVar(&lim.DialWait, "dial-wait", lim.DialWait, "how long a dialer waits for a listener")
+	flag.DurationVar(&lim.DialWait, "dial-wait", lim.DialWait, "how long a dialer has for its first message and then waits for a listener, and a listener has to prove its key")
 	flag.DurationVar(&lim.MaxWait, "max-wait", lim.MaxWait, "how long a listener may wait for a dialer")
 	flag.IntVar(&lim.PerID, "per-id", lim.PerID, "connections on one id")
 	flag.IntVar(&lim.PerIP, "per-ip", lim.PerIP, "connections from one address (an IPv6 /64), at most half of -total")
@@ -56,6 +56,8 @@ func main() {
 		return
 	}
 
+	// -dial-wait is all three of a meeting's waits, as it has always been.
+	lim.SpeakWait, lim.ProveWait = lim.DialWait, lim.DialWait
 	trusted, err := trustedProxies(*proxies)
 	if err != nil {
 		log.Fatalf("-trusted-proxy: %v", err)
