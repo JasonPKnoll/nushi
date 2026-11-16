@@ -72,7 +72,6 @@ func TestTheListenerCapHoldsADaemon(t *testing.T) {
 // ids given up make way for the daemon's own, which its phones dial.
 func TestTheOwnIDsWaitComesFirst(t *testing.T) {
 	lim := relay.Defaults
-	lim.DialWait = 300 * time.Millisecond
 	lim.ListenPerIP = 4
 	srv := httptest.NewServer(relay.New(lim))
 	t.Cleanup(srv.Close)

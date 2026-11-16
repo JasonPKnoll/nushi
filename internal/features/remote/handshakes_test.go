@@ -104,7 +104,6 @@ func TestReplayedHandshakesAreCapped(t *testing.T) {
 // relay's limit, not the daemon's slots this tests.
 func TestManyOldIDsLeaveTheIDSlots(t *testing.T) {
 	lim := relay.Defaults
-	lim.DialWait = 300 * time.Millisecond
 	lim.ListenPerIP = 0
 	srv := httptest.NewServer(relay.New(lim))
 	t.Cleanup(srv.Close)

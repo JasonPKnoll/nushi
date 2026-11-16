@@ -38,11 +38,12 @@ func echo(c net.Conn) {
 	}()
 }
 
+// startRelay is a relay with its own waits: a phone that dials while the
+// daemon is between two waits (it listens again after each phone) is held
+// until the daemon is back, as at a real relay.
 func startRelay(t *testing.T) string {
 	t.Helper()
-	lim := relay.Defaults
-	lim.DialWait = 300 * time.Millisecond // a phone with no daemon to meet gives up soon
-	srv := httptest.NewServer(relay.New(lim))
+	srv := httptest.NewServer(relay.New(relay.Defaults))
 	t.Cleanup(srv.Close)
 	return "ws" + strings.TrimPrefix(srv.URL, "http")
 }
@@ -152,6 +153,24 @@ func phoneConnect(relayURL, daemonID string, daemonKey []byte, key noise.DHKey) 
 	return noiseconn.Initiate(c, noiseconn.Config{Static: key, Prologue: prologue(daemonID)}, daemonKey)
 }
 
+// unanswered says whether a phone with key that dials id, with psk when
+// it's a pairing's, gets no handshake from a daemon. It hangs up after a
+// moment rather than wait out the relay's DialWait where nothing listens:
+// a daemon that waits there answers at once, and one too slow to only
+// passes this, never fails it.
+func unanswered(relayURL, id string, daemonKey []byte, key noise.DHKey, psk []byte) bool {
+	var dl relay.Dialer
+	c, err := dl.Dial(context.Background(), relayURL, id)
+	if err != nil {
+		return true
+	}
+	defer func() { _ = c.Close() }()
+	hangUp := time.AfterFunc(300*time.Millisecond, func() { _ = c.Close() })
+	defer hangUp.Stop()
+	_, err = noiseconn.Initiate(c, noiseconn.Config{Static: key, Prologue: prologue(id), PSK: psk}, daemonKey)
+	return err != nil
+}
+
 func talks(conn *noiseconn.Conn) bool {
 	if _, err := conn.Write([]byte("ping")); err != nil {
 		return false
@@ -228,8 +247,7 @@ func TestPairThenConnect(t *testing.T) {
 	_ = conn.Close()
 
 	// The same QR code is used up.
-	if c, _, err := phonePair(t, o, newKey(t), o.psk); err == nil {
-		_ = c.Close()
+	if !unanswered(o.relay, o.id, o.key, newKey(t), o.psk) {
 		t.Fatal("a used QR code paired again")
 	}
 
@@ -304,8 +322,7 @@ func TestPairingExpires(t *testing.T) {
 	qr, _, _ := s.StartPairing()
 	waitFor(t, func() bool { return s.Get().Pairing == nil })
 	o := parseQR(t, qr)
-	if c, _, err := phonePair(t, o, newKey(t), o.psk); err == nil {
-		_ = c.Close()
+	if !unanswered(o.relay, o.id, o.key, newKey(t), o.psk) {
 		t.Fatal("an expired QR code paired")
 	}
 }
@@ -333,8 +350,7 @@ func TestUnknownAndRevoked(t *testing.T) {
 		t.Fatal("a revoked device's connection stayed")
 	}
 	waitFor(t, func() bool { return s.Get().State == "connected" })
-	if c, err := phoneConnect(url, id, o.key, phone); err == nil {
-		_ = c.Close()
+	if !unanswered(url, id, o.key, phone, nil) {
 		t.Fatal("a revoked device got an answer")
 	}
 }
@@ -426,8 +442,7 @@ func TestOffClosesEverything(t *testing.T) {
 	if r := s.Get(); r.State != "off" {
 		t.Fatalf("state %q", r.State)
 	}
-	if c, err := phoneConnect(url, id, o.key, phone); err == nil {
-		_ = c.Close()
+	if !unanswered(url, id, o.key, phone, nil) {
 		t.Fatal("connected while off")
 	}
 }
@@ -437,7 +452,6 @@ func TestOffClosesEverything(t *testing.T) {
 func TestWaitsAgain(t *testing.T) {
 	lim := relay.Defaults
 	lim.MaxWait = 200 * time.Millisecond
-	lim.DialWait = 3 * time.Second
 	srv := httptest.NewUnstartedServer(relay.New(lim))
 	tl := &tracked{Listener: srv.Listener}
 	srv.Listener = tl
@@ -467,10 +481,8 @@ func TestRelayRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lim := relay.Defaults
-	lim.DialWait = 3 * time.Second
 	tl := &tracked{Listener: ln}
-	hs := &http.Server{Handler: relay.New(lim), ReadHeaderTimeout: time.Second}
+	hs := &http.Server{Handler: relay.New(relay.Defaults), ReadHeaderTimeout: time.Second}
 	go func() { _ = hs.Serve(tl) }()
 	t.Cleanup(func() { _ = hs.Close(); tl.kill() })
 	url := "ws://" + ln.Addr().String()
@@ -574,8 +586,7 @@ func TestOneHandshakePerPairing(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool { return s.Get().Pairing == nil })
-	if c, _, err := phonePair(t, o, newKey(t), o.psk); err == nil {
-		_ = c.Close()
+	if !unanswered(o.relay, o.id, o.key, newKey(t), o.psk) {
 		t.Fatal("a second handshake on one pairing")
 	}
 }
@@ -633,13 +644,7 @@ func TestRevokeMovesTheID(t *testing.T) {
 	}
 	_ = conn.Close()
 	// b has moved: nothing waits at the old id any more.
-	waitFor(t, func() bool {
-		c, err := phoneConnect(url, old, o.key, b)
-		if err == nil {
-			_ = c.Close()
-		}
-		return err != nil
-	})
+	waitFor(t, func() bool { return unanswered(url, old, o.key, b, nil) })
 	// A pairing after it gives the new key.
 	qr, _, err := s.StartPairing()
 	if err != nil || !bytes.Equal(parseQR(t, qr).key, key) {
