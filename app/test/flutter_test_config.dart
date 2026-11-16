@@ -39,9 +39,10 @@ import 'harness.dart';
 /// app's prefs as at launch, nothing the app holds in memory while it runs
 /// (`run_state.dart`'s: agents, caches, drafts, groups opened…), no pull
 /// request read, review comments, clones or theme files known, no image
-/// decoded; the Mac's native edge (on every host), no speller, a fake
-/// install, so nothing starts or stops a daemon, a fake file manager, so
-/// nothing opens on the desktop, and a phone paired with a Mac.
+/// decoded, the shared clock of what loops at its start; the Mac's native
+/// edge (on every host), no speller, a fake install, so nothing starts or
+/// stops a daemon, a fake file manager, so nothing opens on the desktop,
+/// and a phone paired with a Mac.
 /// The test process's data folder goes when its tests end; on Linux it
 /// holds the process's `XDG_CONFIG_HOME` too, where enchant makes its
 /// folder, so no test writes in the user's.
@@ -98,6 +99,9 @@ void startAfresh() {
   forgetJiraView();
   forgetGitHubView();
   unawaited(themeFiles.forget());
+  // What loops starts at its rest, not where the test before left the
+  // shared clock.
+  pulseClock.rewind();
   // No image another test decoded: one in the cache is drawn in a
   // widget's first frame, one that isn't only once its decode ends, so
   // a picture would depend on the tests before it. (A test that never

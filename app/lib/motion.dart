@@ -140,6 +140,11 @@ class _Pulse extends ChangeNotifier {
   /// Whether it ticks: something listens and Nushi is in front.
   bool get running => _timer != null;
 
+  /// The clock back at its start: a test's loops don't begin where the
+  /// test before left them.
+  @visibleForTesting
+  void rewind() => _now = Duration.zero;
+
   /// Where in a loop of [period] the clock is, from 0 to 1; 0, the loop's
   /// rest, while it doesn't run.
   double phase(Duration period) => running
