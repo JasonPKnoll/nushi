@@ -1,12 +1,14 @@
 // Command icongen draws Nushi's icon, "the still lake": broken rings with
 // agents riding them and one light at the centre. It writes the Icon Composer
 // icon (macOS 26 and later), the PNG icon set older macOS uses, the Linux
-// app's hicolor icons, and the bare mark. Run it from the repository root: make icons. The app's mark
+// app's hicolor icons, the Windows app's .ico, and the bare mark. Run it from the repository root: make icons. The app's mark
 // (app/lib/mark.dart) draws the same rings.
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -32,6 +34,12 @@ const (
 	hicolor   = "app/linux/packaging/icons/hicolor"
 	linuxIcon = "com.nushihq.Nushi"
 )
+
+// The Windows app's icon (ADR 0124), which its runner's Runner.rc embeds:
+// the same art at a Windows icon's sizes, each the detail drawn for it.
+const windowsIcon = "app/windows/runner/resources/app_icon.ico"
+
+var icoSizes = []int{16, 24, 32, 48, 64, 128, 256}
 
 // Drawn on a 100-unit grid, centre (50, 50).
 type ring struct {
@@ -108,6 +116,26 @@ func main() {
 			}
 		}
 	}
+
+	// Windows's: one detail's art at each size, read back for the .ico.
+	var images [][]byte
+	for _, px := range icoSizes {
+		d := 0
+		switch {
+		case px <= 32:
+			d = 2
+		case px <= 64:
+			d = 1
+		}
+		out := filepath.Join(tmp, fmt.Sprintf("ico%d.png", px))
+		png(filepath.Join(tmp, fmt.Sprintf("icon%d.svg", d)), px, out)
+		b, err := os.ReadFile(out)
+		check(err)
+		images = append(images, b)
+	}
+	b, err = ico(icoSizes, images)
+	check(err)
+	write(windowsIcon, string(b))
 
 	// The web app's (ADR 0054): full-bleed squares, which the phone rounds
 	// itself (the art is well inside a maskable icon's safe circle), and
@@ -223,6 +251,33 @@ func png(src string, px int, out string) {
 	if b, err := cmd.CombinedOutput(); err != nil {
 		log.Fatalf("sips: %v\n%s", err, b) //nolint:revive // the tool's own fatal
 	}
+}
+
+// ico packs square PNG images of the given sizes into a Windows icon file:
+// its header, a directory entry for each image, then the images.
+func ico(sizes []int, images [][]byte) ([]byte, error) {
+	if len(sizes) != len(images) {
+		return nil, fmt.Errorf("%d sizes for %d images", len(sizes), len(images))
+	}
+	le := binary.LittleEndian
+	var head, body bytes.Buffer
+	head.Write(le.AppendUint16(nil, 0)) // reserved
+	head.Write(le.AppendUint16(nil, 1)) // an icon
+	head.Write(le.AppendUint16(nil, uint16(len(sizes))))
+	offset := 6 + 16*len(sizes)
+	for i, px := range sizes {
+		if px < 1 || px > 256 {
+			return nil, fmt.Errorf("an icon is 1 to 256 px, not %d", px)
+		}
+		side := byte(px % 256) // 256 is written 0
+		head.Write([]byte{side, side, 0, 0})
+		head.Write(le.AppendUint16(nil, 1))  // planes
+		head.Write(le.AppendUint16(nil, 32)) // bits a pixel
+		head.Write(le.AppendUint32(nil, uint32(len(images[i]))))
+		head.Write(le.AppendUint32(nil, uint32(offset+body.Len())))
+		body.Write(images[i])
+	}
+	return append(head.Bytes(), body.Bytes()...), nil
 }
 
 func mark(color string) string {
