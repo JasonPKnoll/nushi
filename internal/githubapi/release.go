@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -30,6 +32,35 @@ type Releases struct {
 	mu     sync.Mutex
 	latest asked[string]
 	tags   asked[[]string]
+}
+
+// freshKey marks a context whose questions want GitHub's answer as it
+// stands now ([Fresh]).
+type freshKey struct{}
+
+// Fresh marks ctx's questions to Releases as ones that want GitHub's answer
+// as it stands now, not a cached one: someone asked for it (Check for
+// updates). Right after a release is published GitHub's caches, the
+// releases feed's above all, can still answer without it for minutes, and
+// a 304 to the last answer's ETag can be such an answer; a fresh question
+// sends no ETag and a query no cache has seen. Each costs one of the
+// address's 60 an hour, so only a person's asking is fresh.
+func Fresh(ctx context.Context) context.Context { return context.WithValue(ctx, freshKey{}, true) }
+
+// wantsFresh says whether ctx was marked [Fresh].
+func wantsFresh(ctx context.Context) bool { return ctx.Value(freshKey{}) != nil }
+
+// uncached is u with a query no cache has seen ("_=<now>") when ctx wants
+// a fresh answer, else u.
+func uncached(ctx context.Context, u string, now time.Time) string {
+	if !wantsFresh(ctx) {
+		return u
+	}
+	sep := "?"
+	if strings.Contains(u, "?") {
+		sep = "&"
+	}
+	return u + sep + "_=" + strconv.FormatInt(now.UnixNano(), 10)
 }
 
 // asked is what GitHub last gave to one question, with its ETag.
@@ -100,14 +131,14 @@ func (r *Releases) get(ctx context.Context, path string, etag *string, out any) 
 	if base == "" {
 		base, _ = endpoints("github.com")
 	}
-	u := base + "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(name) + path
+	u := uncached(ctx, base+"/repos/"+url.PathEscape(owner)+"/"+url.PathEscape(name)+path, r.clock())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		return false, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-Github-Api-Version", Version)
-	if *etag != "" {
+	if *etag != "" && !wantsFresh(ctx) {
 		req.Header.Set("If-None-Match", *etag)
 	}
 	resp, err := (&http.Client{Transport: r.Transport, Timeout: 30 * time.Second}).Do(req)

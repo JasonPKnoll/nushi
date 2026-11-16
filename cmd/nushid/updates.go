@@ -28,7 +28,7 @@ func startUpdates(st *store.Store, publish func(model.Event), environ func() []s
 	s := updates.New(releases.Latest, st, api.Release, "https://github.com/"+nushiRepo, publish)
 	exe, _ := os.Executable() // "": not a cask's app, so nothing to upgrade
 	brew := homebrew.New(environ, exe, home)
-	s.Tags, s.Beta, s.Brew = releases.Tags, brew.Beta, brew
+	s.Tags, s.Beta, s.Brew, s.Fresh = releases.Tags, brew.Beta, brew, githubapi.Fresh
 	go s.Run(context.Background()) // as long as the daemon
 	return s
 }

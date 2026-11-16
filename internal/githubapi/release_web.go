@@ -178,7 +178,7 @@ func (r *Releases) page(ctx context.Context, path, accept string) (resp *http.Re
 	if err != nil {
 		return nil, nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, repo.String()+path, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uncached(ctx, repo.String()+path, r.clock()), http.NoBody)
 	if err != nil {
 		return nil, nil, err
 	}
