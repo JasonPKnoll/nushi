@@ -53,17 +53,22 @@ type ChatRecord struct {
 	// from, if it was.
 	GitHub *ChatGitHub `json:",omitempty"`
 	// Pulls are the chat's pull requests other than the one it was started
-	// from (GitHub), in the order linked (ADR 0117): found by its branch's
-	// head, opened by a tool call of the chat, or linked by hand; at most
-	// MaxPulls with GitHub's. Pull is the first of them, still written for
-	// a release before Pulls (ADR 0108); a record without Pulls takes it as
-	// its first. NoPulls are the ones unlinked by hand (node ids, or Key
+	// from (GitHub), in the order linked (ADR 0117): found by the head of
+	// a branch it pushed, opened by a tool call of the chat, or linked by
+	// hand; at most MaxPulls with GitHub's. Pull is the first of them,
+	// still written for a release before Pulls (ADR 0108); a record
+	// without Pulls takes it as its first. NoPulls are the ones unlinked by hand (node ids, or Key
 	// for one without), never found or opened again; NoPull is the number
 	// a release before Pulls kept for that.
 	Pulls   []ChatGitHub `json:",omitempty"`
 	NoPulls []string     `json:",omitempty"`
 	Pull    *ChatGitHub  `json:",omitempty"`
 	NoPull  int          `json:",omitempty"`
+	// Pushed are the branches a completed tool call of the chat pushed
+	// (git push, gh pr create, create_pull_request): the folder's branch
+	// then, oldest first, at most MaxPushed. Only such a branch's pull
+	// request is found by its head (ADR 0059's amendment of 2026-11-16).
+	Pushed []string `json:",omitempty"`
 	// Ultracode is the chat's Ultracode option (its agent's standing
 	// multi-agent workflows), off by default.
 	Ultracode bool `json:",omitempty"`
@@ -103,6 +108,14 @@ type ChatRecord struct {
 
 // MaxPulls is how many pull requests a chat holds at most (ADR 0117).
 const MaxPulls = 10
+
+// MaxPushed is how many pushed branches a chat remembers (Pushed).
+const MaxPushed = 20
+
+// PushedBranch says a tool call of the chat pushed branch.
+func (s ChatRecord) PushedBranch(branch string) bool {
+	return branch != "" && slices.Contains(s.Pushed, branch)
+}
 
 // PullLink is the chat's primary pull request: the one it was started
 // from, else its first; nil when it has none.
