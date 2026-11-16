@@ -961,7 +961,8 @@ type NushiServiceClient interface {
 	RestoreGitHubBranch(context.Context, *connect.Request[v1.RestoreGitHubBranchRequest]) (*connect.Response[v1.RestoreGitHubBranchResponse], error)
 	// A chat's pull request: the one it was started from, else the one whose
 	// head is its folder's branch, looked for on GitHub (and linked when
-	// found), with the folder's repository and branch. API 81.
+	// found; from API 119 only for a branch the chat pushed), with the
+	// folder's repository and branch. API 81.
 	FindChatPull(context.Context, *connect.Request[v1.FindChatPullRequest]) (*connect.Response[v1.FindChatPullResponse], error)
 	// Links a pull request picked by hand to a chat, or unlinks its own.
 	// API 81.
@@ -3330,7 +3331,8 @@ type NushiServiceHandler interface {
 	RestoreGitHubBranch(context.Context, *connect.Request[v1.RestoreGitHubBranchRequest]) (*connect.Response[v1.RestoreGitHubBranchResponse], error)
 	// A chat's pull request: the one it was started from, else the one whose
 	// head is its folder's branch, looked for on GitHub (and linked when
-	// found), with the folder's repository and branch. API 81.
+	// found; from API 119 only for a branch the chat pushed), with the
+	// folder's repository and branch. API 81.
 	FindChatPull(context.Context, *connect.Request[v1.FindChatPullRequest]) (*connect.Response[v1.FindChatPullResponse], error)
 	// Links a pull request picked by hand to a chat, or unlinks its own.
 	// API 81.

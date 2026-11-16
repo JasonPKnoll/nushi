@@ -16,14 +16,34 @@ import 'harness.dart';
 // typed; GitHub is asked for the one picked, which is linked to the chat.
 
 /// The dialog open on chat c, in the test repository; GetGitHubPull fails
-/// while [fails].
+/// while [fails]; FindChatPull suggests [branch]'s pull request #4 when
+/// given.
 Future<(FakeDaemon, Daemon)> _open(
   WidgetTester tester, {
   bool fails = false,
+  String? branch,
 }) async {
   viewport(tester, const Size(900, 700));
   final fake = FakeDaemon([chat('c', 'claude', 'Add Sub and Neg')])
     ..answer = (input) => switch (input) {
+      FindChatPullRequest(suggest: true) when branch != null =>
+        FindChatPullResponse(
+          host: 'github.com',
+          repo: testRepo,
+          branch: branch,
+          branchPull: GitHubLink(
+            host: 'github.com',
+            repo: testRepo,
+            number: 4,
+            pull: true,
+          ),
+        ),
+      GetGitHubItemsRequest(:final refs) => GetGitHubItemsResponse(
+        items: [
+          for (final r in refs)
+            if (r.number == 4) item(4, 'Add Sub and Neg'),
+        ],
+      ),
       ListGitHubInboxRequest() => ListGitHubInboxResponse(
         mine: [
           item(4, 'Add Sub and Neg'),
@@ -112,6 +132,44 @@ void main() {
     expect(find.textContaining('GitHub is unreachable'), findsOne);
     expect(find.text('Link'), findsOne); // not Linking… any more
     expect(_linked(fake), isNull);
+    await closeView(tester, d);
+  });
+
+  // The owner's report: a new chat took the pull request its folder's
+  // branch already had. The chat links it by itself only once it pushed
+  // the branch; until then the dialog offers it first.
+  testWidgets('the branch’s pull request is offered first, once, and '
+      'linked when picked', (tester) async {
+    final (fake, d) = await _open(tester, branch: 'subtract');
+    expect(fake.calls.whereType<FindChatPullRequest>().single.suggest, isTrue);
+    expect(
+      find.text('The pull request of subtract', findRichText: true),
+      findsOne,
+    );
+    expect(find.text('#4'), findsOne); // the inbox's too, shown once
+    final top = tester.getTopLeft(find.text('#4')).dy;
+    expect(top, lessThan(tester.getTopLeft(find.text('#6')).dy));
+    expect(
+      top,
+      greaterThan(
+        tester
+            .getTopLeft(
+              find.text('The pull request of subtract', findRichText: true),
+            )
+            .dy,
+      ),
+    );
+    await tester.tap(find.text('Add Sub and Neg'));
+    await tester.pumpAndSettle();
+    expect(_linked(fake)!.number, 4);
+    await closeView(tester, d);
+  });
+
+  testWidgets('no pull request on the branch: nothing offered above the '
+      'list', (tester) async {
+    final (_, d) = await _open(tester);
+    expect(find.textContaining('The pull request of'), findsNothing);
+    expect(find.text('#4'), findsOne);
     await closeView(tester, d);
   });
 }

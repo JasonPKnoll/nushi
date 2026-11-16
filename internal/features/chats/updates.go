@@ -164,6 +164,7 @@ func (c *chat) updateLocked(n *acp.SessionNotification, from *child) { //nolint:
 		c.passedOnLocked(*it)
 		if t.Status == "completed" || t.Status == "failed" {
 			c.openedPullLocked(*it)
+			c.pushedLocked(*it)
 			c.stoppedLocked(*it)
 			c.copyLocked(false)
 			if it.Parent != "" {

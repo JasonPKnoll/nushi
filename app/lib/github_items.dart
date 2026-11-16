@@ -212,15 +212,21 @@ class GitHubItems extends ChangeNotifier {
     _timers[a.host] ??= Timer(gather, () => unawaited(_ask(a.host)));
   }
 
-  /// Asks for [refs] now and waits for the answer (a chat's rows).
-  Future<void> ask(Iterable<GitHubAddress> refs, {bool quiet = true}) async {
+  /// Asks for [refs] now and waits for the answer (a chat's rows: of
+  /// [chat], whose found pull requests opened outside its life the daemon
+  /// then drops; ADR 0059's amendment).
+  Future<void> ask(
+    Iterable<GitHubAddress> refs, {
+    bool quiet = true,
+    String chat = '',
+  }) async {
     final byHost = <String, List<GitHubAddress>>{};
     for (final a in refs) {
       byHost.putIfAbsent(a.host, () => []).add(a);
     }
     await Future.wait([
       for (final MapEntry(key: host, value: list) in byHost.entries)
-        _call(host, list, quiet: quiet),
+        _call(host, list, quiet: quiet, chat: chat),
     ]);
   }
 
@@ -237,6 +243,7 @@ class GitHubItems extends ChangeNotifier {
     String host,
     List<GitHubAddress> list, {
     required bool quiet,
+    String chat = '',
   }) async {
     if (list.isEmpty || daemon.daemonApi < githubItemsApi) return;
     for (final a in list) {
@@ -248,6 +255,7 @@ class GitHubItems extends ChangeNotifier {
         GetGitHubItemsRequest(
           refs: [for (final a in list) a.ref],
           quiet: quiet,
+          chatId: chat,
         ),
       );
       final now = clock();

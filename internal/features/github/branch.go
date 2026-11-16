@@ -15,11 +15,12 @@ import (
 // BranchPull is a folder's branch on GitHub: the repository it's a clone
 // of (Host empty when none is on a host Nushi can reach), the branch
 // checked out, whether that's the repository's default branch, and the
-// pull request whose head it is (nil when none).
+// pull request whose head it is (nil when none) and when it was opened.
 type BranchPull struct {
 	Host, Repo, Branch string
 	Default            bool
 	Pull               *model.ChatGitHub
+	Created            time.Time
 }
 
 // headsFresh is how long a branch's pull requests are taken as current
@@ -40,8 +41,10 @@ type headsCache struct {
 // to first; three at most), with the head owned by the repository the
 // branch is pushed to (a fork's pull request is on its parent). An open
 // one wins, else the newest. The default branch, a detached HEAD and a
-// folder whose remotes aren't on a host signed in to aren't looked up.
-func (s *Service) FindPull(ctx context.Context, folder string, poll bool) (BranchPull, error) {
+// folder whose remotes aren't on a host signed in to aren't looked up, nor
+// a branch look refuses (nil looks up every one): GitHub isn't asked, and
+// the rest is said.
+func (s *Service) FindPull(ctx context.Context, folder string, poll bool, look func(branch string) bool) (BranchPull, error) {
 	branch, pushed := s.Head(ctx, folder)
 	if branch == "" {
 		return BranchPull{}, nil
@@ -86,7 +89,7 @@ func (s *Service) FindPull(ctx context.Context, folder string, poll bool) (Branc
 		_, short, found := strings.Cut(def, "/") // origin/main
 		out.Default = branch == def || found && branch == short
 	}
-	if out.Default {
+	if out.Default || look != nil && !look(branch) {
 		return out, nil
 	}
 	owner, _, _ := strings.Cut(repos[0].name, "/") // the head's: the repository pushed to
@@ -103,6 +106,7 @@ func (s *Service) FindPull(ctx context.Context, folder string, poll bool) (Branc
 		if p, ok := pick(pulls); ok {
 			out.Repo = r.name
 			out.Pull = &model.ChatGitHub{Host: r.host, Repo: r.name, Number: p.Number, Pull: true, ID: p.ID, Branch: branch}
+			out.Created = p.Created
 			return out, nil
 		}
 	}
