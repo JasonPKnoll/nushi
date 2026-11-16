@@ -6,6 +6,7 @@ import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_states.dart';
+import 'package:nushi/theme/theme.dart';
 
 import 'fake_daemon.dart';
 import 'github_fixture.dart' show item, pull;
@@ -56,6 +57,22 @@ void main() {
     expect(find.byTooltip('#2: checks running'), findsOneWidget);
     expect(find.byType(PullDot), findsNWidgets(3));
     expect(find.byTooltip('#3: checks passed'), findsNothing);
+    final t = NushiTheme.of(tester.element(find.byType(PullDot).first)).t;
+    Color dot(String tip) =>
+        (tester
+                    .widget<CustomPaint>(
+                      find.descendant(
+                        of: find.byTooltip(tip),
+                        matching: find.byWidgetPredicate(
+                          (w) => w is CustomPaint && w.painter is ChecksMark,
+                        ),
+                      ),
+                    )
+                    .painter!
+                as ChecksMark)
+            .color;
+    expect(dot('#1: checks failing'), t.crashed);
+    expect(dot('#2: checks running'), t.needs);
     // Each minute, quietly.
     await tester.pump(const Duration(minutes: 1));
     expect(fake.calls.whereType<GetGitHubStatesRequest>().last.quiet, isTrue);
@@ -141,27 +158,35 @@ void main() {
     await closeView(tester, d);
   });
 
-  testWidgets('the chip asks again each minute, a merged pull request every '
-      '15', (tester) async {
-    final fake = FakeDaemon(_chats())
-      ..answer = (input) => switch (input) {
-        GetGitHubPullRequest() => GetGitHubPullResponse(
-          pull: pull()
-            ..item.id = 'PR_3'
-            ..item.state = 'merged',
-        ),
-        _ => _states(input),
-      };
-    final d = await fake.connect(tester);
-    await tester.pumpWidget(themed(PullChip(d, d.chats['c']!, onOpen: (_) {})));
-    await tester.pumpAndSettle();
-    int asked() => fake.calls.whereType<GetGitHubPullRequest>().length;
-    expect(asked(), 1);
-    await tester.pump(pullWidgetPoll);
-    expect(asked(), 1);
-    await tester.pump(pullDonePoll - pullWidgetPoll);
-    await tester.pump();
-    expect(asked(), 2);
-    await closeView(tester, d);
-  });
+  for (final (state, every) in [
+    ('open', pullWidgetPoll),
+    ('merged', pullDonePoll),
+  ]) {
+    testWidgets('the chip asks again each minute, a merged pull request '
+        'every 15 ($state)', (tester) async {
+      expect(pullDonePoll, greaterThan(pullWidgetPoll));
+      final fake = FakeDaemon(_chats())
+        ..answer = (input) => switch (input) {
+          GetGitHubPullRequest() => GetGitHubPullResponse(
+            pull: pull()
+              ..item.id = 'PR_3'
+              ..item.state = state,
+          ),
+          _ => _states(input),
+        };
+      final d = await fake.connect(tester);
+      await tester.pumpWidget(
+        themed(PullChip(d, d.chats['c']!, onOpen: (_) {})),
+      );
+      await tester.pumpAndSettle();
+      int asked() => fake.calls.whereType<GetGitHubPullRequest>().length;
+      expect(asked(), 1);
+      await tester.pump(every - const Duration(seconds: 1));
+      expect(asked(), 1);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(asked(), 2);
+      await closeView(tester, d);
+    });
+  }
 }
