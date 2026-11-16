@@ -21,15 +21,21 @@ import 'harness.dart';
 
 final _windows = TargetPlatformVariant.only(TargetPlatform.windows);
 
-const _ctrlShift = [
+const _ctrlShift = <LogicalKeyboardKey>[
   LogicalKeyboardKey.controlLeft,
   LogicalKeyboardKey.shiftLeft,
 ];
 
 /// AltGr as Windows sends it: Control first, then right Alt.
-const _altGr = [LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.altRight];
+const _altGr = <LogicalKeyboardKey>[
+  LogicalKeyboardKey.controlLeft,
+  LogicalKeyboardKey.altRight,
+];
 
-const _ctrlAlt = [LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.altLeft];
+const _ctrlAlt = <LogicalKeyboardKey>[
+  LogicalKeyboardKey.controlLeft,
+  LogicalKeyboardKey.altLeft,
+];
 
 /// The app on Windows on two chats, a shown.
 Future<Daemon> _app(WidgetTester tester) async {
