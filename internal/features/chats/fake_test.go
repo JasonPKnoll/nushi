@@ -126,15 +126,16 @@ type fakeAgent struct {
 	listPage int
 	listed1  []acp.ListSessionsRequest // the list requests it had
 
-	mu           sync.Mutex
-	gate         chan struct{} // when set, a prompt's turn runs until it is closed
-	cancelled    bool
-	ignoreCancel bool          // a cancel doesn't end the turn
-	sendGate     chan struct{} // when set, writing a prompt waits until it is closed
-	steerGate    chan struct{} // when set, steering waits until it is closed
-	deleteGate   chan struct{} // when set, deleting a session waits until it is closed
-	loadGate     chan struct{} // when set, session/load waits until it is closed
-	forkGate     chan struct{} // when set, session/fork waits until it is closed
+	mu            sync.Mutex
+	gate          chan struct{} // when set, a prompt's turn runs until it is closed
+	cancelled     bool
+	ignoreCancel  bool          // a cancel doesn't end the turn
+	sendGate      chan struct{} // when set, writing a prompt waits until it is closed
+	steerGate     chan struct{} // when set, steering waits until it is closed
+	deleteGate    chan struct{} // when set, deleting a session waits until it is closed
+	silentDeletes int           // it never answers this many deletes, the first ones
+	loadGate      chan struct{} // when set, session/load waits until it is closed
+	forkGate      chan struct{} // when set, session/fork waits until it is closed
 	// stopGate, when set, keeps a stopped process running until it is
 	// closed (it takes its time ending its sessions); a kill (Close) ends
 	// it at once, unless unkillable.
@@ -492,6 +493,13 @@ func (f *fakeAgent) DeleteSession(ctx context.Context, req *acp.DeleteSessionReq
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.silentDeletes > 0 {
+		f.silentDeletes--
+		f.mu.Unlock()
+		<-ctx.Done()
+		f.mu.Lock()
+		return nil, ctx.Err()
+	}
 	f.deleted = append(f.deleted, req.SessionID)
 	if f.deleteErr != nil {
 		return nil, f.deleteErr

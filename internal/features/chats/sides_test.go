@@ -121,18 +121,12 @@ func TestClosingASideChatGivesUpOnASilentDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agent.deleteGate = make(chan struct{}) // doesn't answer the first delete
-	closed := make(chan error)
-	go func() { closed <- svc.CloseSide(side) }()
-	select {
-	case err := <-closed:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("CloseSide waits on the agent's delete")
+	agent.mu.Lock()
+	agent.silentDeletes = 1 // the second goes through
+	agent.mu.Unlock()
+	if err := svc.CloseSide(side); err != nil { // one that waits on the delete hangs the test
+		t.Fatal(err)
 	}
-	close(agent.deleteGate) // the second goes through
 	c := svc.chats[id]
 	eventually(t, c, func() bool { return !slices.Contains(c.record.Throwaway, side) })
 }
