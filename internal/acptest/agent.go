@@ -437,17 +437,7 @@ func (a *Agent) prompt(session string, blocks []string) string { //nolint:gocogn
 			"_meta": claudeCode(map[string]any{"toolName": "Agent"})})
 		a.say(session, "The subagent is done.")
 	case strings.Contains(text, "workflow"):
-		claudeCode := func(fields map[string]any) map[string]any { return map[string]any{"claudeCode": fields} }
-		a.update(session, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "wf1", "title": "Workflow", "kind": "other", "status": "pending",
-			"rawInput": map[string]any{}, "_meta": claudeCode(map[string]any{"toolName": "Workflow"})})
-		a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "wf1", "_meta": claudeCode(map[string]any{"toolName": "Workflow",
-			"toolResponse": map[string]any{"status": "async_launched", "taskId": "w9u1xb6ik", "taskType": "local_workflow", "workflowName": "two-phases",
-				"runId": "wf_769a004c-2aa", "summary": "Ask four helpers in two phases"}})})
-		a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "wf1", "status": "completed",
-			"content": []map[string]any{{"type": "content", "content": map[string]any{"type": "text",
-				"text": "Workflow launched in background. Task ID: w9u1xb6ik\nSummary: Ask four helpers in two phases\nRun ID: wf_769a004c-2aa\n"}}},
-			"_meta": claudeCode(map[string]any{"toolName": "Workflow"})})
-		a.say(session, "The workflow runs in the background.")
+		a.workflow(session)
 	case strings.Contains(text, "screenshot"):
 		a.update(session, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "t3", "title": "Take a screenshot", "status": "in_progress"})
 		a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "t3", "status": "completed",
@@ -512,4 +502,20 @@ func (a *Agent) prompt(session string, blocks []string) string { //nolint:gocogn
 		a.say(session, text)
 	}
 	return "end_turn"
+}
+
+// workflow sends the Workflow call of the "workflow" parity recording,
+// which launched run wf_769a004c-2aa in the background, then a message.
+func (a *Agent) workflow(session string) {
+	claudeCode := func(fields map[string]any) map[string]any { return map[string]any{"claudeCode": fields} }
+	a.update(session, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "wf1", "title": "Workflow", "kind": "other", "status": "pending",
+		"rawInput": map[string]any{}, "_meta": claudeCode(map[string]any{"toolName": "Workflow"})})
+	a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "wf1", "_meta": claudeCode(map[string]any{"toolName": "Workflow",
+		"toolResponse": map[string]any{"status": "async_launched", "taskId": "w9u1xb6ik", "taskType": "local_workflow", "workflowName": "two-phases",
+			"runId": "wf_769a004c-2aa", "summary": "Ask four helpers in two phases"}})})
+	a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "wf1", "status": "completed",
+		"content": []map[string]any{{"type": "content", "content": map[string]any{"type": "text",
+			"text": "Workflow launched in background. Task ID: w9u1xb6ik\nSummary: Ask four helpers in two phases\nRun ID: wf_769a004c-2aa\n"}}},
+		"_meta": claudeCode(map[string]any{"toolName": "Workflow"})})
+	a.say(session, "The workflow runs in the background.")
 }
