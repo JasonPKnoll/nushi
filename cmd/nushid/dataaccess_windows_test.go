@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -71,5 +72,80 @@ func TestOwnDataFolderRefusesALink(t *testing.T) {
 	}
 	if err := ownDataFolder(link); err == nil {
 		t.Fatal("a link was taken as the data folder")
+	}
+}
+
+// setDACL gives path a DACL of entries, protected from what its folder
+// gives it or not.
+func setDACL(t *testing.T, path string, protected bool, entries ...windows.EXPLICIT_ACCESS) {
+	t.Helper()
+	acl, err := windows.ACLFromEntries(entries, nil)
+	testcheck.NoErr(t, err)
+	info := windows.SECURITY_INFORMATION(windows.DACL_SECURITY_INFORMATION | windows.UNPROTECTED_DACL_SECURITY_INFORMATION)
+	if protected {
+		info = windows.DACL_SECURITY_INFORMATION | windows.PROTECTED_DACL_SECURITY_INFORMATION
+	}
+	testcheck.NoErr(t, windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, info, nil, nil, acl, nil))
+}
+
+func currentUser(t *testing.T) *windows.SID {
+	t.Helper()
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	testcheck.NoErr(t, err)
+	return user.User.Sid
+}
+
+// What another account could have left in the folder while it was open,
+// and kept control of, stops the start, and goes on stopping it until
+// it's removed: a subfolder whose DACL is protected from the folder's,
+// and a file with an ACE of its own for everyone.
+func TestOwnDataFolderRefusesWhatItsDACLMissed(t *testing.T) {
+	everyone, err := windows.CreateWellKnownSid(windows.WinWorldSid)
+	testcheck.NoErr(t, err)
+	for _, tc := range []struct {
+		name  string
+		plant func(t *testing.T, path string)
+	}{
+		{"agents", func(t *testing.T, path string) {
+			testcheck.NoErr(t, os.Mkdir(path, 0o700))
+			setDACL(t, path, true, fullAccess(currentUser(t), windows.TRUSTEE_IS_USER))
+		}},
+		{"servers.json", func(t *testing.T, path string) {
+			testcheck.Write(t, path, "{}")
+			setDACL(t, path, false, fullAccess(everyone, windows.TRUSTEE_IS_WELL_KNOWN_GROUP))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "nd")
+			testcheck.NoErr(t, os.MkdirAll(dir, 0o700))
+			planted := filepath.Join(dir, tc.name)
+			tc.plant(t, planted)
+			for range 2 {
+				if err := ownDataFolder(dir); err == nil || !strings.Contains(err.Error(), planted) {
+					t.Fatalf("ownDataFolder = %v, want a refusal naming %s", err, planted)
+				}
+			}
+			testcheck.NoErr(t, os.RemoveAll(planted))
+			testcheck.NoErr(t, ownDataFolder(dir))
+			if _, err := os.Stat(filepath.Join(dir, checkedFile)); err != nil {
+				t.Errorf("no %s after a clean check: %v", checkedFile, err)
+			}
+		})
+	}
+}
+
+// An entry another account owns stops the start, where the test may give
+// one to SYSTEM (an administrator's, with the privilege to restore files).
+func TestOwnDataFolderRefusesAnotherAccountsEntry(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "nd")
+	testcheck.NoErr(t, os.MkdirAll(filepath.Join(dir, "agents"), 0o700))
+	system, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
+	testcheck.NoErr(t, err)
+	agents := filepath.Join(dir, "agents")
+	if err := windows.SetNamedSecurityInfo(agents, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION, system, nil, nil, nil); err != nil {
+		t.Skipf("can't give the test's folder to SYSTEM: %v", err)
+	}
+	if err := ownDataFolder(dir); err == nil || !strings.Contains(err.Error(), agents) {
+		t.Fatalf("ownDataFolder = %v, want a refusal naming %s", err, agents)
 	}
 }
