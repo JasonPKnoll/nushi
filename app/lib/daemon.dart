@@ -333,6 +333,16 @@ class Daemon extends ChangeNotifier {
   /// timers (`GitHubItems`'s).
   void whenDisposed(VoidCallback f) => _disposers.add(f);
 
+  /// Ends the events subscription: the next ping that answers subscribes
+  /// again. A call cancelled before its response began goes on waiting for
+  /// it, and fails when its channel is dropped ([DaemonLink.relink], then
+  /// the phone's reset): into the cancel's future, the only place left, so
+  /// that failure of a call nobody listens to any more is taken here.
+  void _unsubscribe() {
+    _events?.cancel().ignore();
+    _events = null;
+  }
+
   @override
   void dispose() {
     for (final f in _disposers) {
@@ -340,7 +350,7 @@ class Daemon extends ChangeNotifier {
     }
     _timer?.cancel();
     _loadRetry?.cancel();
-    unawaited(_events?.cancel());
+    _unsubscribe();
     if (!remote) unawaited(_transport.close());
     super.dispose();
   }

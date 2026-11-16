@@ -7,8 +7,6 @@
 @TestOn('browser')
 library;
 
-import 'dart:async';
-
 import 'package:async/async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
@@ -25,119 +23,102 @@ Future<void> _until(bool Function() ok) async {
   throw StateError('waited too long');
 }
 
-/// A zone whose calls' failures after their connection ended are expected.
-final Zone _dying = Zone.current.fork(
-  specification: ZoneSpecification(
-    handleUncaughtError: (self, parent, zone, error, stack) {
-      if (!'$error'.contains('forcefully terminated')) {
-        parent.handleUncaughtError(zone, error, stack);
-      }
-    },
-  ),
-);
-
 void main() {
-  // Links end on the way (as when the page goes): what was in flight on
-  // them fails then, in _dying.
-  test(
-    'pair, chat, answer, subscribe, come back, forget',
-    () => _dying.run(() async {
-      final mac = spawnHybridUri(
-        'mac_side.dart',
-        message: web.window.location.origin,
-      );
-      final from = StreamQueue(mac.stream);
-      Future<Map<String, Object?>> next() async {
-        final m = (await from.next as Map).cast<String, Object?>();
-        if (m['error'] case final e?) fail('the Mac side: $e');
-        return m;
-      }
+  test('pair, chat, answer, subscribe, come back, forget', () async {
+    final mac = spawnHybridUri(
+      'mac_side.dart',
+      message: web.window.location.origin,
+    );
+    final from = StreamQueue(mac.stream);
+    Future<Map<String, Object?>> next() async {
+      final m = (await from.next as Map).cast<String, Object?>();
+      if (m['error'] case final e?) fail('the Mac side: $e');
+      return m;
+    }
 
-      final setup = await next();
-      final platform = PhonePlatform();
-      await platform.clear();
-      final phone = Phone(platform, sameRelay: false);
-      await phone.start();
-      expect(phone.paired, isNull);
+    final setup = await next();
+    final platform = PhonePlatform();
+    await platform.clear();
+    final phone = Phone(platform, sameRelay: false);
+    await phone.start();
+    expect(phone.paired, isNull);
 
-      // Pairing: the code on the phone is the one the Mac allows.
-      final paired = phone.pair(setup['link']! as String, 'Test browser');
-      await _until(() => phone.pairing != null);
-      mac.sink.add({'do': 'confirm', 'code': phone.pairing!});
-      expect((await next())['allowed'], isTrue);
-      await paired;
-      final daemon = phone.daemon!;
-      await _until(() => daemon.connected);
+    // Pairing: the code on the phone is the one the Mac allows.
+    final paired = phone.pair(setup['link']! as String, 'Test browser');
+    await _until(() => phone.pairing != null);
+    mac.sink.add({'do': 'confirm', 'code': phone.pairing!});
+    expect((await next())['allowed'], isTrue);
+    await paired;
+    final daemon = phone.daemon!;
+    await _until(() => daemon.connected);
 
-      // A chat, a prompt, a permission card answered.
-      await daemon.startChat(
-        setup['folder']! as String,
-        setup['agent']! as String,
-      );
-      final chat = daemon.selected!;
-      await daemon.client.sendPrompt(
-        SendPromptRequest(chatId: chat.id, text: 'permission please'),
-      );
-      await _until(() => chat.waiting);
-      final card = chat.items.lastWhere(
-        (i) => i.kind == ItemKind.ITEM_KIND_PERMISSION,
-      );
-      await daemon.client.answerPermission(
-        AnswerPermissionRequest(
-          chatId: chat.id,
-          itemId: card.id,
-          optionId: 'allow',
-        ),
-      );
-      await _until(
-        () => chat.items.any((i) => i.text.contains('Permission: selected')),
-      );
+    // A chat, a prompt, a permission card answered.
+    await daemon.startChat(
+      setup['folder']! as String,
+      setup['agent']! as String,
+    );
+    final chat = daemon.selected!;
+    await daemon.client.sendPrompt(
+      SendPromptRequest(chatId: chat.id, text: 'permission please'),
+    );
+    await _until(() => chat.waiting);
+    final card = chat.items.lastWhere(
+      (i) => i.kind == ItemKind.ITEM_KIND_PERMISSION,
+    );
+    await daemon.client.answerPermission(
+      AnswerPermissionRequest(
+        chatId: chat.id,
+        itemId: card.id,
+        optionId: 'allow',
+      ),
+    );
+    await _until(
+      () => chat.items.any((i) => i.text.contains('Permission: selected')),
+    );
 
-      // Notifications: the browser's subscription, kept with the device;
-      // one off the allowlist is refused.
-      await expectLater(
-        daemon.client.setPushSubscription(
-          SetPushSubscriptionRequest(
-            endpoint: 'https://evil.example.com/push',
-            p256dh: _p256,
-            auth: List.filled(16, 1),
-          ),
-        ),
-        throwsA(anything),
-      );
-      await daemon.client.setPushSubscription(
+    // Notifications: the browser's subscription, kept with the device;
+    // one off the allowlist is refused.
+    await expectLater(
+      daemon.client.setPushSubscription(
         SetPushSubscriptionRequest(
-          endpoint: 'https://web.push.apple.com/QGuQyav',
+          endpoint: 'https://evil.example.com/push',
           p256dh: _p256,
           auth: List.filled(16, 1),
         ),
-      );
-      await daemon.client.setDeviceView(SetDeviceViewRequest(chatId: chat.id));
-      mac.sink.add({'do': 'devices'});
-      final devices = await next();
-      expect(devices['file'], contains('"kind": "web"'));
-      expect(devices['file'], contains('web.push.apple.com'));
-      expect(devices['remote'], contains('"push":true'));
+      ),
+      throwsA(anything),
+    );
+    await daemon.client.setPushSubscription(
+      SetPushSubscriptionRequest(
+        endpoint: 'https://web.push.apple.com/QGuQyav',
+        p256dh: _p256,
+        auth: List.filled(16, 1),
+      ),
+    );
+    await daemon.client.setDeviceView(SetDeviceViewRequest(chatId: chat.id));
+    mac.sink.add({'do': 'devices'});
+    final devices = await next();
+    expect(devices['file'], contains('"kind": "web"'));
+    expect(devices['file'], contains('web.push.apple.com'));
+    expect(devices['remote'], contains('"push":true'));
 
-      // The app comes back: its key and pairing from IndexedDB.
-      await phone.close();
-      final again = Phone(PhonePlatform(), sameRelay: false);
-      await again.start();
-      expect(again.paired?.id, phone.paired!.id);
-      await _until(() => again.daemon!.connected);
-      await _until(() => again.daemon!.chats.containsKey(chat.id));
+    // The app comes back: its key and pairing from IndexedDB.
+    await phone.close();
+    final again = Phone(PhonePlatform(), sameRelay: false);
+    await again.start();
+    expect(again.paired?.id, phone.paired!.id);
+    await _until(() => again.daemon!.connected);
+    await _until(() => again.daemon!.chats.containsKey(chat.id));
 
-      // Forget this Mac: nothing kept.
-      await again.forget();
-      final empty = Phone(PhonePlatform());
-      await empty.start();
-      expect(empty.paired, isNull);
+    // Forget this Mac: nothing kept.
+    await again.forget();
+    final empty = Phone(PhonePlatform());
+    await empty.start();
+    expect(empty.paired, isNull);
 
-      mac.sink.add({'do': 'done'});
-      await next();
-    }),
-    timeout: const Timeout(Duration(minutes: 4)),
-  );
+    mac.sink.add({'do': 'done'});
+    await next();
+  }, timeout: const Timeout(Duration(minutes: 4)));
 }
 
 // RFC 8291's browser key: a P-256 point.

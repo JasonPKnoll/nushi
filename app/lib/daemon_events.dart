@@ -116,8 +116,7 @@ extension DaemonEvents on Daemon {
       }
       chatsListed = true;
     } on Object {
-      unawaited(_events?.cancel());
-      _events = null; // the next ping subscribes again
+      _unsubscribe(); // the next ping subscribes again
       return;
     } finally {
       final held = _held ?? [];

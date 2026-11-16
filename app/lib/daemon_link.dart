@@ -147,10 +147,7 @@ extension DaemonLink on Daemon {
   /// The link to the daemon was dropped (the phone's, after a ping went
   /// unanswered): the events subscribe again with the next ping that
   /// answers, and what shows is fetched again.
-  void relink() {
-    unawaited(_events?.cancel());
-    _events = null;
-  }
+  void relink() => _unsubscribe();
 
   /// Stops the running daemon (it stops its agents) and starts the bundled
   /// one; chats reopen through session/load as they are opened. One at a

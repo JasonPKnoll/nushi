@@ -43,6 +43,7 @@ void main() {
   late Daemon daemon;
   late Link link;
   late String chat;
+  var resets = 0; // the channels the link has dropped
 
   setUpAll(() async {
     rig = await startRig('npl');
@@ -72,8 +73,14 @@ void main() {
     final paired = await pairing;
     transport = paired.$2;
     daemon = Daemon(transport: _proto(transport), remote: true);
-    link = Link(daemon, reset: transport.reset, live: () => transport.live)
-      ..start();
+    link = Link(
+      daemon,
+      reset: () {
+        resets++;
+        return transport.reset();
+      },
+      live: () => transport.live,
+    )..start();
     await until(() => daemon.connected);
 
     chat = (await mac.startChat(
@@ -136,10 +143,17 @@ void main() {
     addTearDown(() => Link.away = const Duration(seconds: 30));
     link.visible(shown: false);
     await prompt('while hidden');
-    final calls = transport;
+    final before = resets;
     link.visible(shown: true);
-    await until(() => daemon.connected && shows('while hidden'));
-    expect(identical(calls, transport), isTrue);
+    // Dropped before anything was asked on it, not after a ping failed.
+    expect(resets, before + 1);
+    expect(transport.live, isFalse);
+    await until(() => transport.live);
+    // And the events come on the new channel.
+    await prompt('back again');
+    await until(() => shows('while hidden') && shows('back again'));
+    expect(daemon.connected, isTrue);
+    expect(link.failures, 0);
   });
 
   test('the relay restarts: the Mac and the phone come back', () async {
