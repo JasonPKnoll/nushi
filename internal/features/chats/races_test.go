@@ -196,6 +196,8 @@ func TestAMessageTooLargeIsRefused(t *testing.T) {
 	}
 }
 
+// A chat whose record can't be deleted stays, no longer going, with what
+// its agent said while it stopped (a title) kept and saved.
 func TestAFailedDeleteLeavesTheChatAsItWas(t *testing.T) {
 	svc, agent, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
 	sessions := svc.sessions.(*memSessions)
@@ -212,10 +214,16 @@ func TestAFailedDeleteLeavesTheChatAsItWas(t *testing.T) {
 	if err := <-deleted; err == nil {
 		t.Fatal("Delete worked")
 	}
+	if _, err := svc.stored(c.id); err != nil {
+		t.Errorf("the chat went: %v", err)
+	}
+	c.mu.Lock()
+	halting, title := c.halting, c.record.Title
+	c.mu.Unlock()
 	sessions.mu.Lock()
 	defer sessions.mu.Unlock()
-	if slices.ContainsFunc(sessions.saved, func(s model.ChatRecord) bool { return s.Archived }) || c.halting {
-		t.Errorf("after a failed delete: halting %v, saved %+v", c.halting, sessions.saved)
+	if halting || title != "Renamed" || len(sessions.saved) == 0 || sessions.saved[len(sessions.saved)-1].Title != "Renamed" {
+		t.Errorf("after a failed delete: halting %v, title %q, saved %+v", halting, title, sessions.saved)
 	}
 }
 
