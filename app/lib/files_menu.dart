@@ -9,7 +9,6 @@ import 'package:nushi/folder_tree.dart';
 import 'package:nushi/keys.dart';
 import 'package:nushi/menu.dart';
 import 'package:nushi/open_file.dart';
-import 'package:nushi/settings.dart';
 import 'package:nushi/view_options.dart';
 
 /// The Files pane's ⋯ (ADR 0123), Claude desktop's rows in its order and
@@ -17,11 +16,14 @@ import 'package:nushi/view_options.dart';
 /// folders, then how a source shows. Each option's row reads and flips its
 /// one pref ([viewToggles]). [folded] are the second row's file actions
 /// where it has no room for them, last after a line, so Claude's rows keep
-/// their places.
+/// their places. [treeShows] and [treeOut] are the second row's: the tree's
+/// rows say what the pane shows, not only the pref.
 List<MenuEntry> filesMenu(
   BuildContext context,
   ChatState chat,
   Daemon daemon, {
+  bool treeShows = false,
+  bool treeOut = false,
   List<MenuEntry> folded = const [],
 }) {
   final tree = daemon.daemonApi >= filesApi;
@@ -34,15 +36,15 @@ List<MenuEntry> filesMenu(
     MenuEntry.divider,
     MenuEntry(
       'Show file tree',
-      checked: tree && filesTree.value,
+      checked: treeShows,
       shortcut: keyLabel(fileTreeKey),
-      onPick: tree ? () => toggleFileTree(chat) : null,
+      onPick: tree && !treeOut ? () => toggleFileTree(chat) : null,
     ),
     _choice(treeSideChoice, on: tree),
     MenuEntry.divider,
     MenuEntry(
       'Collapse all folders',
-      onPick: canCollapseFolders(chat, daemon)
+      onPick: treeShows && canCollapseFolders(chat, daemon)
           ? folderTreeOf(chat).collapseAll
           : null,
     ),

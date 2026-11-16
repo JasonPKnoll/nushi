@@ -32,12 +32,22 @@ class FilesBar extends StatelessWidget {
     required this.daemon,
     required this.shown,
     super.key,
+    this.treeShows = false,
+    this.treeOut = false,
     this.start = 0,
   });
 
   final ChatState chat;
   final Daemon daemon;
   final ShownFile? shown;
+
+  /// Whether the tree shows with room in the pane: the tree's button is lit
+  /// from it, not only from the pref (a squeezed pane can leave it none).
+  final bool treeShows;
+
+  /// Whether the tree is on but squeezed out of the pane: there's no tree
+  /// to hide or show, so its button and Collapse are unavailable.
+  final bool treeOut;
   final double start;
 
   /// Its height, the hairline under it included.
@@ -216,7 +226,7 @@ class FilesBar extends StatelessWidget {
     required List<MenuEntry> folded,
   }) {
     final tree = daemon.daemonApi >= filesApi;
-    final on = tree && filesTree.value;
+    final on = treeShows;
     const pad = (PaneEndButtons.box - _icon) / 2;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -228,7 +238,7 @@ class FilesBar extends StatelessWidget {
             size: _icon,
             padding: pad,
             color: t.text,
-            onTap: canCollapseFolders(chat, daemon)
+            onTap: on && canCollapseFolders(chat, daemon)
                 ? folderTreeOf(chat).collapseAll
                 : null,
           ),
@@ -243,7 +253,7 @@ class FilesBar extends StatelessWidget {
             padding: pad,
             color: t.text,
             lit: on,
-            onTap: tree ? () => toggleFileTree(chat) : null,
+            onTap: tree && !treeOut ? () => toggleFileTree(chat) : null,
           ),
         // Under it, ending under its right edge, as Claude's does.
         TrailingMenus(
@@ -255,7 +265,14 @@ class FilesBar extends StatelessWidget {
             color: t.text,
             filter: false,
             heldOpen: true,
-            entries: filesMenu(context, chat, daemon, folded: folded),
+            entries: filesMenu(
+              context,
+              chat,
+              daemon,
+              treeShows: treeShows,
+              treeOut: treeOut,
+              folded: folded,
+            ),
           ),
         ),
       ],

@@ -213,6 +213,8 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
                       chat: _chat,
                       daemon: widget.daemon,
                       shown: shown,
+                      treeShows: named,
+                      treeOut: tree && !named,
                       start: tree && !right
                           ? (_treeDragged ??
                                     paneWidth('filesTree', filesTreeInitial))

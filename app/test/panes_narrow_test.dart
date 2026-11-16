@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/browser_pane.dart';
+import 'package:nushi/controls.dart';
 import 'package:nushi/file_view.dart';
+import 'package:nushi/files_bar.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/files_tree.dart';
+import 'package:nushi/folder_tree.dart';
 import 'package:nushi/settings.dart' show filesTree;
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/subagent_pane.dart';
@@ -162,5 +165,60 @@ void main() {
     expect(find.textContaining('Go to a file with ⌘P'), findsOneWidget);
     expect(_overflows(tester), isEmpty);
     await closeView(tester, e);
+  }, variant: _mac);
+
+  testWidgets('squeezed out, the tree has no lit button: it says Show, '
+      "it and Collapse can't be had, and the choice is kept", (tester) async {
+    browserFakes();
+    _settledRowsOnly();
+    final (d, _) = await panesApp(
+      tester,
+      width: 720,
+      open: _with(browser: true),
+    );
+    // A folder open, so only the squeeze keeps Collapse from it.
+    folderTreeOf(d.chats['c']!).setOpen('auth', open: true);
+    await tester.pumpAndSettle();
+    expect(_treeRoom(tester), 0);
+    Finder inBar(Finder f) => find.descendant(
+      of: find.descendant(
+        of: find.byType(FilesPane),
+        matching: find.byType(FilesBar),
+      ),
+      matching: f,
+    );
+    IconTap button(LineIcon icon) => tester.widget<IconTap>(
+      inBar(find.byWidgetPredicate((w) => w is IconTap && w.line == icon)),
+    );
+    final tree = button(LineIcon.fileTree);
+    expect(tree.lit, isFalse);
+    expect(tree.tooltip, withKey('Show file tree', '⇧⌘Y'));
+    expect(tree.onTap, isNull);
+    expect(button(LineIcon.collapseAll).onTap, isNull);
+
+    await tester.tap(inBar(find.byTooltip('More')));
+    await tester.pumpAndSettle();
+    MenuItemButton row(String label) => tester.widget<MenuItemButton>(
+      find.ancestor(
+        of: find.text(label),
+        matching: find.byType(MenuItemButton),
+      ),
+    );
+    expect(row('Show file tree').onPressed, isNull);
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Show file tree'),
+          matching: find.byType(MenuItemButton),
+        ),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsNothing,
+    );
+    expect(row('Collapse all folders').onPressed, isNull);
+    expect(filesTree.value, isTrue, reason: 'the choice is kept');
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    await closeView(tester, d);
   }, variant: _mac);
 }
