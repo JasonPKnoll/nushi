@@ -1,6 +1,7 @@
 package procgroup
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -121,6 +122,115 @@ func (g *Group) Kill() error {
 	_ = windows.CloseHandle(g.job) // kills anything that joined since
 	g.job = 0
 	return err
+}
+
+// letGo closes the job without killing what is in it: what the command
+// left running once it exited lives on, as a Unix group's does once its
+// leader has. Were the limit's removal refused, closing the job kills
+// them, as a cancel would.
+func (g *Group) letGo() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.job == 0 {
+		return
+	}
+	info := &windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{} // no JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	_, _ = windows.SetInformationJobObject(g.job, windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(info)), uint32(unsafe.Sizeof(*info))) //nolint:gosec // the system's own struct, kept alive below
+	runtime.KeepAlive(info)
+	_ = windows.CloseHandle(g.job)
+	g.job = 0
+}
+
+// bind sets up Bound's cmd to join a job as it starts, as Start's does
+// (hold), and gives what its context's end does: kill the job, or, before
+// the command has joined it or without one, its tree (Kill). Go's exec
+// runs nothing of the caller's between starting the process and the
+// caller's Wait but the copy of its input, which it starts at once: so
+// bind has that copy join the job before its first read (joining). A
+// command given no input reads none as before (at its end at once, from
+// a pipe, not NUL); one whose input is a file (a StdinPipe taken before
+// Bound) is handed it with no copy, and has no job. The command is in the
+// job a moment after it starts, as Start's is. Once it has exited, the
+// job is let go of (letGo): kill-on-close then only ends what it left
+// running if the daemon dies while it runs.
+func bind(cmd *exec.Cmd) func() error {
+	b := &bound{cmd: cmd}
+	switch in := cmd.Stdin.(type) {
+	case nil:
+		cmd.Stdin = &joining{b: b}
+	case *os.File:
+	default:
+		cmd.Stdin = &joining{b: b, in: in}
+	}
+	return b.kill
+}
+
+// bound is a command Bound set up, and its job once it has joined one.
+type bound struct {
+	cmd  *exec.Cmd
+	mu   sync.Mutex
+	g    *Group // the job it joined (hold); nil until then
+	done bool   // killed or exited: there is no job left to join
+}
+
+// join puts the command, which has started, in a job of its own, and
+// watches for its exit to let the job go. Nothing is done once the
+// command was killed or Wait has let go of its process (it has exited).
+func (b *bound) join() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.done || b.cmd.Process == nil {
+		return
+	}
+	var exit windows.Handle // the process's, to wait on, which Wait may close meanwhile
+	self := windows.CurrentProcess()
+	if b.cmd.Process.WithHandle(func(h uintptr) {
+		_ = windows.DuplicateHandle(self, windows.Handle(h), self, &exit, windows.SYNCHRONIZE, false, 0)
+	}) != nil || exit == 0 {
+		return
+	}
+	b.g = hold(b.cmd.Process)
+	go b.watch(exit)
+}
+
+// watch waits for the command's exit, then lets its job go.
+func (b *bound) watch(exit windows.Handle) {
+	_, _ = windows.WaitForSingleObject(exit, windows.INFINITE)
+	_ = windows.CloseHandle(exit)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.done = true
+	b.g.letGo()
+}
+
+// kill ends the command's job, or its tree before it has joined one or
+// without one.
+func (b *bound) kill() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.done = true
+	if b.g != nil {
+		return b.g.Kill()
+	}
+	return Kill(b.cmd.Process)
+}
+
+// joining is a bound command's input: the first read, made by exec's
+// copy once the command has started, has it join its job; then it reads
+// in, or is at its end when there is none.
+type joining struct {
+	b    *bound
+	once sync.Once
+	in   io.Reader
+}
+
+func (j *joining) Read(p []byte) (int, error) {
+	j.once.Do(j.b.join)
+	if j.in == nil {
+		return 0, io.EOF
+	}
+	return j.in.Read(p)
 }
 
 // killJob is a job object whose processes are killed when it is closed.

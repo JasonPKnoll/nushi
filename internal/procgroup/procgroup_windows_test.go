@@ -1,11 +1,15 @@
 package procgroup
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -133,5 +137,135 @@ func TestTerminateAfterTheExitIsDone(t *testing.T) {
 	}))
 	if !errors.Is(err, os.ErrProcessDone) {
 		t.Fatalf("terminate = %v, want os.ErrProcessDone", err)
+	}
+}
+
+// TestHelperProcess is the program the Bound tests run, as
+// NUSHI_PROCGROUP_HELPER says: "orphan" starts a ping, writes its pid and
+// exits, leaving it; "parent" runs an orphan helper, writes "orphaned"
+// once it has exited, then waits 100 s; "echo" copies its input to its
+// stderr (its stdout ends with the test's PASS).
+func TestHelperProcess(t *testing.T) {
+	switch os.Getenv("NUSHI_PROCGROUP_HELPER") {
+	case "orphan":
+		ping := exec.Command("ping", "-n", "100", "127.0.0.1")
+		testcheck.NoErr(t, ping.Start())
+		_, _ = fmt.Fprintln(os.Stdout, ping.Process.Pid)
+	case "parent":
+		orphan := helper(context.Background(), "orphan")
+		orphan.Stdout = os.Stdout
+		testcheck.NoErr(t, orphan.Run())
+		_, _ = fmt.Fprintln(os.Stdout, "orphaned")
+		time.Sleep(100 * time.Second)
+	case "echo":
+		_, _ = io.Copy(os.Stderr, os.Stdin)
+	default:
+		t.Skip("run by the other tests")
+	}
+}
+
+// helper is this test binary run as the helper named mode.
+func helper(ctx context.Context, mode string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHelperProcess$")
+	cmd.Env = append(os.Environ(), "NUSHI_PROCGROUP_HELPER="+mode)
+	return cmd
+}
+
+// orphanPing reads the pid of the ping an orphan helper started from r,
+// as a handle that keeps the pid its; the ping is killed when t ends.
+func orphanPing(t *testing.T, r *bufio.Reader) windows.Handle {
+	t.Helper()
+	line, err := r.ReadString('\n')
+	testcheck.NoErr(t, err)
+	pid, err := strconv.ParseUint(strings.TrimSpace(line), 10, 32)
+	testcheck.NoErr(t, err)
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE, false, uint32(pid))
+	testcheck.NoErr(t, err)
+	t.Cleanup(func() {
+		_ = windows.TerminateProcess(h, 1)
+		_ = windows.CloseHandle(h)
+	})
+	return h
+}
+
+// A run whose context ends kills what the command started though its
+// parent ended first, which taskkill's tree doesn't find: the command's
+// job does.
+func TestBoundKillsAnOrphan(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cmd := helper(ctx, "parent")
+	out, err := cmd.StdoutPipe()
+	testcheck.NoErr(t, err)
+	Bound(cmd)
+	testcheck.NoErr(t, cmd.Start())
+	r := bufio.NewReader(out)
+	ping := orphanPing(t, r)
+	for { // the orphan helper's PASS, then the parent's word that it has exited
+		line, err := r.ReadString('\n')
+		testcheck.NoErr(t, err)
+		if strings.TrimSpace(line) == "orphaned" {
+			break
+		}
+	}
+	cancel()
+	if err := cmd.Wait(); err == nil {
+		t.Error("the run didn't fail")
+	}
+	if !gone(ping, 5*time.Second) {
+		t.Error("the orphaned ping outlived the run")
+	}
+}
+
+// What a command left running once it exited by itself lives on, as on
+// Unix: its job is let go of, not closed on it.
+func TestBoundLeavesWhatAnExitLeft(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cmd := helper(ctx, "orphan")
+	out, err := cmd.StdoutPipe()
+	testcheck.NoErr(t, err)
+	Bound(cmd)
+	testcheck.NoErr(t, cmd.Start())
+	ping := orphanPing(t, bufio.NewReader(out))
+	testcheck.NoErr(t, cmd.Wait())
+	cancel()
+	if gone(ping, time.Second) {
+		t.Error("the ping ended with the command")
+	}
+}
+
+// A bound command reads the input it was given, and none (at its end at
+// once) when it was given none; one whose StdinPipe was taken before
+// Bound reads from that.
+func TestBoundInput(t *testing.T) {
+	echo := func(cmd *exec.Cmd) string { // what the echo helper read
+		t.Helper()
+		var read bytes.Buffer
+		cmd.Stderr = &read
+		testcheck.NoErr(t, cmd.Run())
+		return read.String()
+	}
+	cmd := helper(context.Background(), "echo")
+	cmd.Stdin = strings.NewReader("given")
+	Bound(cmd)
+	if got := echo(cmd); got != "given" {
+		t.Errorf("read %q", got)
+	}
+	cmd = helper(context.Background(), "echo")
+	Bound(cmd)
+	if got := echo(cmd); got != "" {
+		t.Errorf("given none: read %q", got)
+	}
+	cmd = helper(context.Background(), "echo")
+	in, err := cmd.StdinPipe()
+	testcheck.NoErr(t, err)
+	Bound(cmd)
+	go func() {
+		_, _ = io.WriteString(in, "piped")
+		_ = in.Close()
+	}()
+	if got := echo(cmd); got != "piped" {
+		t.Errorf("piped: read %q", got)
 	}
 }
