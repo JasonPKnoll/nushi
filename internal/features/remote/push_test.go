@@ -366,17 +366,20 @@ func TestFreshKeyDropsSubscriptions(t *testing.T) {
 	}
 }
 
-// Not in a bubble: the file's time is the real clock's.
+// The store writes a file whole, as a new file put in the old one's
+// place, so a write leaves a different file at the path: no clock needed.
 func TestSameSubscriptionWritesNothing(t *testing.T) {
 	s, _, device, dir := pushing(t)
 	path := filepath.Join(dir, "devices.json")
-	before, _ := os.Stat(path)
-	time.Sleep(20 * time.Millisecond)
+	before, err := os.Stat(path)
+	testcheck.NoErr(t, err)
 	d := s.Get().Devices[0].Push
 	if err := s.SetPush(device, &webpush.Subscription{Endpoint: d.Endpoint, P256DH: d.P256DH, Auth: d.Auth}); err != nil {
 		t.Fatal(err)
 	}
-	if after, _ := os.Stat(path); !after.ModTime().Equal(before.ModTime()) {
+	after, err := os.Stat(path)
+	testcheck.NoErr(t, err)
+	if !os.SameFile(before, after) {
 		t.Error("rewrote devices.json for the same subscription")
 	}
 }
