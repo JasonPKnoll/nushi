@@ -1,7 +1,7 @@
 # What make check runs, as parallel jobs (one job of 12 minutes before, until 2026-10-27). macOS for what needs it, in four
 # jobs (the account runs five macOS jobs at once, and a release or another repository's CI needs one too): the
 # daemon (proc_info, sandbox-exec, launchd, the keychain's cgo), so Go's lint and tests side by side, with the window's
-# placement maths (swiftc); and the app's test files that need a Mac, in two shards: those with goldens, drawn with
+# placement maths (swiftc); and the app's test files that need a Mac, in three shards: those with goldens, drawn with
 # macOS's text rendering (on Linux a third of them differ by 1-4%), and those reading the Mac's own fonts. Linux for the
 # rest: the protos' and Dart's lint, the Dart packages' tests, the web app's end-to-end test (nushid with Chrome), and
 # the daemon on Linux (ADR 0101): every Go package's tests, and its lint, build and vet without cgo for Linux and
@@ -188,10 +188,12 @@ jobs:
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
     timeout-minutes: 15
+    # Three shards, not two: a slow macOS host runs these files three to four times slower than a fast one (2026-11-16:
+    # 104 s and 448 s for the same weight in one run), and the run waits for the slowest shard.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     # Three test files at once: the runner has three cores, and flutter test takes half of them (one).
     env:
       SET: macos

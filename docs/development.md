@@ -84,7 +84,7 @@ The same goes for Claude's library, `github.com/afrase/claude-acp-go` (`go work 
 
 CI (`.github/workflows/ci.yml`) runs the same parts as `make check`, as parallel jobs, in about 5–6 minutes when it runs them all (ADR 0129):
 
-- on macOS: Go's lint and tests side by side (`make -j2`) with the window's placement maths, and the app's test files that need a Mac (those with goldens, and the Mac's fonts) in two shards (`make test-app SET=macos SHARD=1/2`);
+- on macOS: Go's lint and tests side by side (`make -j2`) with the window's placement maths, and the app's test files that need a Mac (those with goldens, and the Mac's fonts) in three shards (`make test-app SET=macos SHARD=1/3`);
 - on Linux: the protos' and Dart's lint (with `tools/native-edge`), the Dart packages' tests, the web app's end-to-end test in Chrome (`make test-web`), every Go package's tests (`make test-go`, with bubblewrap from apt for npm's sandbox and AppArmor's rule on unprivileged user namespaces off) and `go mod tidy -diff`, and beside them `make lint-linux` and `make lint-windows` (ADR 0101, 0124);
 - on Windows: the daemon built, and the Windows tests listed under Windows below (ADR 0124);
 - the Linux app (ADR 0104): every other app test file, in three shards (`make test-app SET=linux SHARD=1/3`; a golden there fails), and on each architecture (Ubuntu 22.04, amd64 and arm64) its package built as a release builds it (`tools/release.sh 0.0.0-ci linux`, glibc 2.34 at most), installed into a throwaway home and started on a virtual display until it connects to the daemon it started (`tools/linux-smoke.sh`, whose screenshot is the job's artifact), and on amd64 the runner's channels (`tools/linux-channels.sh`).
