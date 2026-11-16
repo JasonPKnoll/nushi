@@ -51,8 +51,8 @@ void main() {
       expect(c.browser.shown.value, two);
     });
 
-    test('closing one shows the next; Close takes them all and leaves the '
-        'files', () {
+    test('closing one shows the next; closing the pane keeps them, the '
+        'last one closed ends them, and the files stay', () {
       final c = state()..openInFiles('a.md');
       final one = c.openBrowserTab('http://localhost:3000');
       final two = c.openBrowserTab('http://localhost:5173');
@@ -61,8 +61,14 @@ void main() {
         ..browser.close(one);
       expect(c.browser.shown.value, two);
       expect(c.browserNames, ['http://localhost:5173']);
+      // The pane's × (or a subagent's pane in its place): the tabs stay.
       c.browser.shown.value = null;
+      expect(c.browserNames, ['http://localhost:5173']);
+      c.showOrHideBrowser();
+      expect(c.browser.shown.value, two);
+      c.browser.close(two);
       expect(c.browser.tabs.value, isEmpty);
+      expect(c.browser.shown.value, isNull);
       expect(c.fileNames, ['a.md']);
       expect(c.shownFile, 'a.md');
     });
@@ -91,7 +97,7 @@ void main() {
       // The file's tab stays.
       expect(c.browserShown, isFalse);
       expect(c.shownFile, 'a.md');
-      expect(c.browser.tabs.value, isEmpty);
+      expect(c.browser.tabs.value, [one, two]);
       c.showOrHideBrowser();
       expect(c.browser.shown.value, same(one));
       expect(c.browser.tabs.value, [one, two]);
@@ -103,11 +109,11 @@ void main() {
       final one = c.openBrowserTab('http://localhost:3000');
       c.showOrHideBrowser();
       expect(c.browser.shown.value, isNull);
-      expect(c.browser.tabs.value, isEmpty);
+      expect(c.browser.tabs.value, [one]);
       final fresh = c.openBrowserTab();
       expect(c.browser.tabs.value, [one, fresh]);
       expect(c.browser.shown.value, same(fresh));
-      // Nothing left put away: hiding and showing again keeps the two.
+      // Hiding and showing again keeps the two, the last shown showing.
       c
         ..showOrHideBrowser()
         ..showOrHideBrowser();

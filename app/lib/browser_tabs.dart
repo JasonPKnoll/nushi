@@ -7,12 +7,14 @@ import 'package:nushi/preview_entry.dart';
 
 /// A chat's browser tabs (ADR 0094): their tabs in the order opened and the
 /// one that shows in the browser pane, in the app's memory. However the
-/// pane closes ([shown] set to null), its tabs go with it; hidden with the
-/// globe ([hide]) they're put away to come back.
+/// pane closes ([shown] set to null: its ×, the globe, a subagent's pane in
+/// its place), its tabs stay, at their addresses, and come back as it shows
+/// again; only the page that showed was loaded, and it goes with the pane.
+/// Closing the last tab ([close]) is what ends them.
 final class BrowserTabs {
   new() {
     shown.addListener(() {
-      if (shown.value == null) tabs.value = const [];
+      if (shown.value case final tab?) _last = tab;
     });
   }
 
@@ -22,15 +24,13 @@ final class BrowserTabs {
   /// The tab the browser pane shows; null while it's closed.
   final shown = ValueNotifier<BrowserTab?>(null);
 
-  /// The tabs [hide] put away, and the one that showed: back as the browser
-  /// shows again.
-  ({List<BrowserTab> tabs, BrowserTab shown})? _hidden;
+  /// The tab that showed last: the one [show] brings back.
+  BrowserTab? _last;
 
   /// Opens a new tab last, at [address] ('' for a new tab's page), and shows
   /// it. Browser tabs are never matched up: each open is its own.
   BrowserTab open([String address = '']) {
     final tab = BrowserTab(address);
-    _restore();
     _show(tab);
     return tab;
   }
@@ -72,11 +72,11 @@ final class BrowserTabs {
     tab.view?.retry();
   }
 
-  /// Shows the tabs [hide] put away, the one that showed, else the last
-  /// tab opened, or a new one if it has none.
+  /// Shows the tab that showed last, else the last tab opened, or a new
+  /// one if it has none.
   void show() {
     if (shown.value != null) return;
-    final last = _restore() ?? tabs.value.lastOrNull;
+    final last = tabs.value.contains(_last) ? _last : tabs.value.lastOrNull;
     if (last == null) {
       open();
     } else {
@@ -84,24 +84,8 @@ final class BrowserTabs {
     }
   }
 
-  /// Puts the tabs away, at their addresses, for [show] to bring back; the
-  /// pane closes.
-  void hide() {
-    if (shown.value case final at?) {
-      _hidden = (tabs: tabs.value, shown: at);
-      shown.value = null;
-    }
-  }
-
-  /// Adds the tabs [hide] put away back after the open ones, and gives the
-  /// one that showed; null with none put away.
-  BrowserTab? _restore() {
-    final hidden = _hidden;
-    if (hidden == null) return null;
-    _hidden = null;
-    tabs.value = [...tabs.value, ...hidden.tabs];
-    return hidden.shown;
-  }
+  /// Closes the pane; its tabs stay for [show] to bring back.
+  void hide() => shown.value = null;
 
   /// Shows [tab], one of the tabs, adding it last if it isn't.
   void showTab(BrowserTab tab) => _show(tab);
@@ -118,6 +102,7 @@ final class BrowserTabs {
     if (at < 0) return;
     final rest = [...tabs.value]..removeAt(at);
     if (rest.isEmpty) {
+      tabs.value = const [];
       shown.value = null;
       return;
     }
