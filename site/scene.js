@@ -6,8 +6,8 @@
 //
 // Depth of field, on one canvas with no filters: everything is drawn with a soft edge as wide as its own blur.
 // A ring arc is one shape whose soft edge widens continuously along it with depth, so nothing steps or travels
-// along a line; a planet or the sun is a disc whose rim fades over its blur. Rings are drawn first and are cut
-// under their planets, so a line never crosses a planet.
+// along a line; a planet or the sun is a disc whose rim fades over its blur. Rings are drawn first, so a planet
+// always sits on its line, never behind it.
 // The cursor tilts the camera at once, and planets lean toward a nearby cursor and spring back. Scrolling fast
 // winds the rings a little. Nothing turns on its own: the loop runs only while something is still moving, then
 // stops, so an idle page costs nothing. One still frame under Reduce Motion. Plain canvas, no library.
@@ -284,19 +284,6 @@
     g.globalAlpha = 1;
   }
 
-  // Whether a ring is cut at this angle (degrees) for a planet sitting there; the gaps close as it flattens
-  // into the mark.
-  function cut(gR, deg) {
-    const k = 1 - Math.min(1, cam.flat * 2);
-    if (k <= 0) return false;
-    for (const p of PLANETS) {
-      if (RINGS[p.ring] !== gR) continue;
-      const d = Math.abs(((deg - p.a - gR.turn) % 360 + 540) % 360 - 180);
-      if (d < (((p.size * 0.75) / gR.r) / D2R) * k) return true;
-    }
-    return false;
-  }
-
   const bodies = [];
   let shownDim = -1;
   function draw() {
@@ -325,17 +312,10 @@
     // Rings: slate-mist when seen in 3D, mist once it's the flat mark.
     const t = 0.36 + 0.64 * flat;
     const col = `rgb(${mix(47, 238, t)},${mix(74, 241, t)},${mix(87, 245, t)})`;
-    const STEP = 2;
     for (const gR of RINGS) {
       for (let a = 0; a < 4; a++) {
-        const a0 = gR.from + a * 90 + gR.turn, a1 = a0 + gR.span;
-        let from = null;
-        for (let b = a0; b < a1 + STEP; b += STEP) {
-          const end = b >= a1, gap = !end && cut(gR, b + STEP / 2);
-          if (!end && !gap) { if (from === null) from = b; continue; }
-          if (from !== null) run(gR, from, Math.min(b, a1), from === a0, end, col);
-          from = null;
-        }
+        const a0 = gR.from + a * 90 + gR.turn;
+        run(gR, a0, a0 + gR.span, true, true, col);
       }
     }
 
