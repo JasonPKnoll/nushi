@@ -93,15 +93,16 @@ class ChatHeader extends StatelessWidget {
     // short rather than overflow. Where all of it fits with room over, the
     // row opens up to the bar's gaps (ADR 0072). Narrower still, the least
     // needed parts fold, so the chat's menu (⋯) stays at the row's end: the
-    // browser's button into ⋯ (the palette and the pane's + open tabs too),
-    // the model, the agent's name (its mark stays), the details button while
+    // model, the agent's name (its mark stays), the details button while
     // the panel can't show, the state's word (its dot stays, and its
-    // tooltip says it), the tabs into a menu field, then the terminal's,
-    // the files' and the details' buttons into ⋯; last, beside a pane
-    // dragged wide, the Jira and GitHub chips, the agent's mark and the
-    // tabs' field (into ⋯), so the title keeps 80. Changes counts the review
-    // comments not sent yet (a small pill more); a hidden side chat's chip,
-    // the Jira key and the GitHub chip take their own room. The row's own
+    // tooltip says it), the tabs into a menu field; beside a pane dragged
+    // wide, the Jira and GitHub chips, the agent's mark and the tabs' field
+    // (into ⋯); last, so the title keeps 80, the terminal's, Files',
+    // the browser's and the details' buttons into ⋯, all together, so
+    // opening a pane never takes one of its neighbours away. Changes
+    // counts the review comments not sent yet (a small pill more); a
+    // hidden side chat's chip, the Jira key and the GitHub chip take their
+    // own room. The row's own
     // words were measured in the bundled font: a picked one that sets them
     // wider (ADR 0114) takes that much more, so the row folds sooner
     // rather than run past its end.
@@ -437,10 +438,8 @@ class ChatHeader extends StatelessWidget {
                           FilesButton(chat: chat),
                           if (roomy) const SizedBox(width: NushiTheme.iconGap),
                         ],
-                        if (!folds.browser) ...[
-                          BrowserButton(chat: chat),
-                          if (roomy) const SizedBox(width: NushiTheme.iconGap),
-                        ],
+                        BrowserButton(chat: chat),
+                        if (roomy) const SizedBox(width: NushiTheme.iconGap),
                       ],
                       if (!folds.buttons && !folds.panel) ...[
                         IconTap.line(
@@ -478,14 +477,14 @@ class ChatHeader extends StatelessWidget {
                               ),
                             MenuEntry.divider,
                           ],
-                          if (folds.links) ...[
-                            ..._linkEntries(tabs: !folds.tabsInMore),
-                            MenuEntry.divider,
-                          ],
-                          if (folds.browser && !folds.buttons) ...[
-                            _browserEntry,
-                            MenuEntry.divider,
-                          ],
+                          // Only a pull request's link, with the tabs here
+                          // too, adds nothing: no empty section.
+                          if (folds.links)
+                            if (_linkEntries(tabs: !folds.tabsInMore)
+                                case final links when links.isNotEmpty) ...[
+                              ...links,
+                              MenuEntry.divider,
+                            ],
                           if (folds.buttons) ...[
                             if (!chat.archived)
                               MenuEntry(
@@ -558,7 +557,6 @@ class ChatHeader extends StatelessWidget {
     return max(1, set(theme) / set(NushiTheme(theme.t)));
   }
 
-  /// The browser's button as a row of ⋯, once it folds there.
   /// The Jira key and the GitHub chips, folded into ⋯; the pull request's
   /// only while the tabs aren't there too ([tabs]), whose Pull request is
   /// the same.
@@ -580,6 +578,7 @@ class ChatHeader extends StatelessWidget {
       ),
   ];
 
+  /// The browser's button as a row of ⋯, once the buttons fold there.
   MenuEntry get _browserEntry => MenuEntry(
     BrowserButton.tooltip(shown: chat.browserShown),
     line: LineIcon.globe,
@@ -624,6 +623,9 @@ const headerTitleLeast = 80.0;
 /// (12), the field and its gap (54) and ⋯ (32).
 const headerFolded = 176.0;
 
+/// What the tabs' field takes with Chat in it, and its gap ([headerFolded]).
+const double _fieldRoom = 54;
+
 /// What folding the agent's mark frees: the mark and its gap to the dot.
 const double _markRoom = 18 + 8;
 
@@ -663,7 +665,6 @@ const headerGaps = 70.0;
 /// what those add (`gaps`).
 typedef HeaderFolds = ({
   bool roomy,
-  bool browser,
   bool model,
   bool name,
   bool word,
@@ -721,10 +722,8 @@ HeaderFolds headerFolds(
   final need = headerRow + more + headerTitleLeast + (model ? 50 : 0);
   var saved = 0.0;
   final folds = <String>{};
-  // Each part and about how much folding it frees. The browser's button
-  // goes first: what the header had before it then folds where it did.
+  // Each part and about how much folding it frees.
   for (final (part, points) in [
-    ('browser', button),
     if (model) ('model', 50.0),
     // What the row counts for each: the agent's name and its gap, the
     // longest state's pill less its dot, the segments less a menu field.
@@ -732,10 +731,6 @@ HeaderFolds headerFolds(
     if (!panel) ('panel', button),
     ('word', 106.0),
     ('tabs', (pull ? 160.0 : 72.0) + (comments ? 16 : 0)),
-    ('buttons', (panel ? 2 : 1) * button + (files ? button : 0)),
-    // Last, in a header as narrow as beside a pane dragged wide (ADR 0123):
-    // the Jira key and the GitHub chips, into ⋯ too.
-    if (jira + github > 0) ('links', jira + github),
   ]) {
     if (width + saved >= need) break;
     folds.add(part);
@@ -745,7 +740,13 @@ HeaderFolds headerFolds(
   // of the row is measured ([headerFolded]), with the widest of the tabs'
   // names in their field, so a switch of tab never folds more or less.
   // The agent's mark goes first (the state's dot says whose it is), then
-  // the tabs' field, into ⋯ (ADR 0123).
+  // the tabs' field, into ⋯ (ADR 0123), then the pane buttons, all of
+  // them together: they toggle what's open beside the chat, so opening a
+  // pane (which narrows the chat) mustn't take one away, and one alone
+  // gone (the browser's, as it was) reads as a bug. Last, in a header as
+  // narrow as beside a pane dragged wide, the Jira key and the GitHub
+  // chips, into ⋯ too.
+  final buttons = (panel ? 3 : 2) * button + (files ? button : 0);
   if (width + saved < need) {
     final label =
         (pull
@@ -759,17 +760,31 @@ HeaderFolds headerFolds(
         headerFolded -
         label -
         (side ? SideChip.width + 8 : 0) -
-        (wider - 1) * (_tabWords.chat + label);
+        (wider - 1) * (_tabWords.chat + label) -
+        buttons -
+        jira -
+        github;
     if (left < headerTitleLeast) {
       folds.add('mark');
       left += _markRoom;
     }
-    if (left < headerTitleLeast) folds.add('tabsInMore');
+    if (left < headerTitleLeast) {
+      folds.add('tabsInMore');
+      left += _fieldRoom + label + (wider - 1) * (_tabWords.chat + label);
+    }
+    if (left < headerTitleLeast) {
+      folds.add('buttons');
+      saved += buttons;
+      left += buttons;
+    }
+    if (left < headerTitleLeast && jira + github > 0) {
+      folds.add('links');
+      saved += jira + github;
+    }
   }
   final roomy = width >= need + gaps;
   return (
     roomy: roomy,
-    browser: folds.contains('browser'),
     model: folds.contains('model'),
     name: folds.contains('name'),
     word: folds.contains('word'),

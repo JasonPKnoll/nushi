@@ -226,7 +226,7 @@ void main() {
       ),
     );
     // Where the terminal's is a button, so is the files'.
-    for (var width = 320.0; width <= 1200; width += 10) {
+    for (var width = 240.0; width <= 1200; width += 10) {
       await pump(width);
       expect(
         _button.evaluate().length,
@@ -234,7 +234,8 @@ void main() {
         reason: '$width wide',
       );
     }
-    await pump(330);
+    // The pane buttons fold last of all, only to keep the title's least.
+    await pump(260);
     expect(_button, findsNothing);
     await tester.tap(find.byTooltip('Chat menu'));
     await tester.pumpAndSettle();

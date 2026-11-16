@@ -331,9 +331,9 @@ void main() {
 
     test('the bar’s gaps never fold anything', () {
       // Where each case first folds without them: 524 for the row, 80 for
-      // the title, the browser's button 32, then what the case adds (the
-      // Pull request segment 106, a model 50, the Files button 32); each
-      // button's gap 2.
+      // the title, the browser's button 32 (it folds with the others),
+      // then what the case adds (the Pull request segment 106, a model 50,
+      // the Files button 32); each button's gap 2.
       for (final (pull, model, files, first) in [
         (false, false, false, 636.0),
         (true, false, false, 742.0),
@@ -381,7 +381,7 @@ void main() {
         final first = 636 - (headerName - name);
         expect(at(first).any, isFalse);
         expect(at(first - 1).any, isTrue);
-        expect(at(first - 1).browser, isTrue);
+        expect(at(first - 1).name, isTrue);
       }
       // Folding the name frees what it takes.
       final folds = headerFolds(
@@ -724,7 +724,7 @@ void main() {
               body: Align(
                 alignment: Alignment.topLeft,
                 child: SizedBox(
-                  width: 330,
+                  width: 250,
                   child: ChatHeader(
                     c,
                     d,
