@@ -198,6 +198,60 @@ Future<void> untilReal(
   }
 }
 
+/// The window narrowed from [from] to [to] (each [height] high), [check]
+/// run at each width laid out, as a point at a time would, at a fraction
+/// of the layouts: every [step]th width, then every width between two
+/// whose widget tree differs (a part folded, a pane gone), where the
+/// layout jumps rather than glides. Those are walked in an app [reopen]
+/// builds again at [from], so every width is still reached narrowing.
+/// Between two that agree the layout only glides, so what goes wrong
+/// there (an overflow, a part under another) shows at the narrower one.
+Future<void> narrowing(
+  WidgetTester tester, {
+  required double from,
+  required double to,
+  required void Function(double width) check,
+  required Future<void> Function() reopen,
+  double height = 900,
+  double step = 8,
+}) async {
+  Future<int> at(double w) async {
+    viewport(tester, Size(w, height));
+    await tester.pump();
+    check(w);
+    return _treeShape(tester);
+  }
+
+  final jumps = <(double, double)>[];
+  var wider = from;
+  var shape = await at(from);
+  while (wider > to) {
+    final w = wider - step < to ? to : wider - step;
+    final next = await at(w);
+    if (next != shape && wider - w > 1) jumps.add((wider, w));
+    (wider, shape) = (w, next);
+  }
+  if (jumps.isEmpty) return;
+  await reopen();
+  for (final (a, b) in jumps) {
+    for (var w = a - 1; w > b; w--) {
+      await at(w);
+    }
+  }
+}
+
+/// The widget tree's shape: each element's widget type, in order.
+int _treeShape(WidgetTester tester) {
+  var hash = 0;
+  void visit(Element e) {
+    hash = Object.hash(hash, e.widget.runtimeType);
+    e.visitChildren(visit);
+  }
+
+  tester.binding.rootElement!.visitChildren(visit);
+  return hash;
+}
+
 /// A chat's file tabs, as each names its file, and its browser tabs, by
 /// address.
 extension TabNames on ChatState {
