@@ -330,13 +330,15 @@ void main() {
     fake.serverLog('a');
     await _openLogs(tester);
     final term = _terminal(tester);
+    // Its queries' answers go nowhere: it has no onOutput. One put on it
+    // here hears what it would answer.
+    expect(term.onOutput, isNull);
     final answers = <String>[];
     term.onOutput = answers.add;
     // Focused, as after a click into it: the view's own clipboard handler
     // would write then.
     await tester.tap(find.byType(TerminalView));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
-    term.onOutput = null;
     await _write(
       tester,
       fake,
@@ -356,7 +358,7 @@ void main() {
     expect(platform.where((m) => m.startsWith('Clipboard')), isEmpty);
     expect(platform.where((m) => m.contains('Title')), isEmpty);
     expect(answers, isEmpty);
-    expect(_terminal(tester).onOutput, isNull);
+    term.onOutput = null;
     await closeView(tester, d);
   }, variant: macOnly);
 
