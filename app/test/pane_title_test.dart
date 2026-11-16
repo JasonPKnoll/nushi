@@ -69,26 +69,20 @@ void main() {
   });
 
   testWidgets('the side chat and Files narrowed alike in a narrow window, '
-      'stepped a point at a time: their rows keep every button inside the '
-      'pane, and nothing overflows', (tester) async {
+      'checked as a point at a time would: their rows keep every button '
+      'inside the pane, and nothing overflows', (tester) async {
     // The side chat, Files and the preview need 800; a window of 720 with
     // the sidebar shown leaves the chat 452.
-    final (d, _) = await panesApp(
-      tester,
-      width: 1080,
-      sidebar: true,
-      open: (
-        side: true,
-        files: true,
-        subagent: false,
-        command: false,
-        previews: 1,
-        browser: 0,
-      ),
+    const open = (
+      side: true,
+      files: true,
+      subagent: false,
+      command: false,
+      previews: 1,
+      browser: 0,
     );
-    for (var w = 1080.0; w >= 720; w -= 1) {
-      viewport(tester, Size(w, 900));
-      await tester.pump();
+    var (d, _) = await panesApp(tester, width: 1080, sidebar: true, open: open);
+    void check(double w) {
       expect(tester.takeException(), isNull, reason: 'at $w');
       for (final (pane, tips) in [
         (SideChat, ['Keep as chat', 'End the side chat']),
@@ -116,6 +110,17 @@ void main() {
         }
       }
     }
+
+    await narrowing(
+      tester,
+      from: 1080,
+      to: 720,
+      check: check,
+      reopen: () async {
+        await closeView(tester, d);
+        (d, _) = await panesApp(tester, width: 1080, sidebar: true, open: open);
+      },
+    );
     await tester.pumpAndSettle();
     await render(tester, find.byType(NushiApp), 'pane_title_720_sidebar');
     await closeView(tester, d);
