@@ -284,15 +284,17 @@ test-packages:
 # (ADR 0128): SET=macos the files that need a Mac (goldens), SET=linux the
 # rest, all of them by default; SHARD=i/n the ith of n shards split by
 # app/test/timings.tsv, as CI's jobs run them. Each shard's files go
-# slowest first, so none is left running at the end. FLUTTER_TEST_FLAGS
-# adds flags (CI's --concurrency). A tool that fails stops it: flutter
+# slowest first, so none is left running at the end. NUSHI_TEST_SET
+# tells the tests their set: a golden in the Linux set's fails
+# (flutter_test_config.dart). FLUTTER_TEST_FLAGS adds flags (CI's
+# --concurrency). A tool that fails stops it: flutter
 # test given no file would run them all.
 APP_SET = $(or $(SET),all)
 APP_SHARD = $(or $(SHARD),1/1)
 test-app:
 	@files=$$(go run ./tools/test-shards -set '$(APP_SET)' -shard '$(APP_SHARD)') || exit 2; \
 	echo "flutter test $(FLUTTER_TEST_FLAGS): $$(echo "$$files" | wc -l | tr -d ' ') files, set $(APP_SET), shard $(APP_SHARD)"; \
-	cd app && flutter test $(FLUTTER_TEST_FLAGS) $$files
+	cd app && NUSHI_TEST_SET='$(APP_SET)' flutter test $(FLUTTER_TEST_FLAGS) $$files
 
 # app/test/timings.tsv anew from the test times the last make check-app
 # wrote, when the suite's times have changed (test-shards -check says when
