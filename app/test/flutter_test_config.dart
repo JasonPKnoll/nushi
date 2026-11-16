@@ -61,6 +61,9 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     throw StateError('re_editor had asked its platform already');
   }
   debugDefaultTargetPlatformOverride = null;
+  // A tap or a drag that lands on nothing, or on another widget, fails its
+  // test: one that misses checks nothing after it.
+  WidgetController.hitTestWarningShouldBeFatal = true;
   final local = goldenFileComparator;
   if (Platform.environment['NUSHI_TEST_SET'] == 'linux') {
     goldenFileComparator = _NotInSet();

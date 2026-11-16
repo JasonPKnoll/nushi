@@ -235,9 +235,11 @@ void main() {
     expect(find.byTooltip('Queue\u2002⏎'), findsNothing);
     expect(find.byTooltip('Stop and send\u2002⌘⏎'), findsNothing);
 
-    await tester.tap(find.byTooltip('Edit'));
-    await tester.tap(find.byTooltip('Send now: stop the turn and send it'));
-    await tester.pump();
+    // The queued message's pills take no click.
+    for (final pill in ['Edit', 'Send now: stop the turn and send it']) {
+      expect(find.byTooltip(pill), findsOne);
+      expect(find.byTooltip(pill).hitTestable(), findsNothing);
+    }
     expect(b.fake.calls.whereType<UnqueueRequest>(), isEmpty);
     expect(b.sent, isEmpty);
 

@@ -196,10 +196,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('  outside'), findsOneWidget);
-    await tester.tap(find.text('1 failing')); // the light: to the checks
+    // The light is in the header, scrolled out above: back in sight, a
+    // click on it goes to the checks.
+    expect(find.byType(GitHubChecks), findsNothing);
+    await tester.ensureVisible(find.text('1 failing'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Checks · 1 failing'));
+    await tester.tap(find.text('1 failing'));
     await tester.pumpAndSettle();
+    expect(find.byType(GitHubChecks).hitTestable(), findsOneWidget);
     await tester.tap(find.textContaining('on-demand', findRichText: true).last);
     await tester.pumpAndSettle();
     expect(fake.calls.whereType<GetGitHubJobLogRequest>().single.job, Int64(8));

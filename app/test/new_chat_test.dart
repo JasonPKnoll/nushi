@@ -419,7 +419,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(fake.opened.single.sessionId, 'c2');
     d.dispose();
-  });
+    // On the Mac: as a phone (a test's platform unless it says), the
+    // filter's caret has a handle under it, over the first row, which
+    // took the click meant for Busy.
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('the arrows keep the selected session in view', (tester) async {
     final (fake, d) = await _sidebar(tester);
