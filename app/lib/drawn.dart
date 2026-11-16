@@ -124,7 +124,9 @@ bool sparksFor(Duration turnLasted) =>
 /// A subagent's or background command's mark by its [state]: nothing while
 /// it runs (its words shine instead), a check that draws itself as it
 /// finishes while shown (whole when it had finished before, or with Reduce
-/// Motion), a stop mark once stopped, a red mark once it failed.
+/// Motion), a stop mark once stopped, a red mark once it failed. Any other
+/// state (a workflow that ended unseen) keeps the mark's square empty, so a
+/// row's words end where every other row's do.
 class TaskMark extends StatefulWidget {
   const new(this.state, {super.key});
 
@@ -174,7 +176,7 @@ class _TaskMarkState extends State<TaskMark> with ClockRun {
         color: t.textMuted,
       ),
       'failed' => Icon(Icons.error_outline, size: size, color: t.crashed),
-      _ => const SizedBox.shrink(),
+      _ => const SizedBox.square(dimension: size),
     };
   }
 }
