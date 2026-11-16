@@ -60,7 +60,10 @@ func TestImagesAsReferences(t *testing.T) {
 	must(phone.c.SendPrompt(ctx, connect.NewRequest(&nushiv1.SendPromptRequest{ChatId: id, Text: "look",
 		Images: []*nushiv1.ImageData{{MimeType: "image/png", Data: big}, {MimeType: "image/png", Data: small}}})))
 	mac.waitFor("the reply", turnEnded(id))
-	for stream.Receive() {
+	for {
+		if !stream.Receive() {
+			t.Fatalf("the phone's events ended before the message with its images: %v", stream.Err())
+		}
 		if it := stream.Msg().GetItem().GetItem(); it != nil && len(it.Images) == 2 {
 			checkRefs(t, "an event", it.Images, big, small)
 			break
