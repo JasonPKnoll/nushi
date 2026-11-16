@@ -3,6 +3,8 @@ package procgroup
 import (
 	"bytes"
 	"context"
+	"errors"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -113,5 +115,23 @@ func TestOwnStartsAGroup(t *testing.T) {
 	Own(cmd)
 	if f := cmd.SysProcAttr.CreationFlags; f != windows.CREATE_NO_WINDOW|windows.CREATE_NEW_PROCESS_GROUP {
 		t.Errorf("creation flags %#x", f)
+	}
+}
+
+// Killing a process that exited once taskkill had failed (it exited while
+// taskkill started) is os.ErrProcessDone, not TerminateProcess's refusal.
+func TestTerminateAfterTheExitIsDone(t *testing.T) {
+	cmd := exec.Command("cmd.exe", "/c", "exit")
+	testcheck.NoErr(t, cmd.Start())
+	defer func() { _ = cmd.Wait() }()
+	var err error
+	testcheck.NoErr(t, cmd.Process.WithHandle(func(h uintptr) {
+		err = errors.New("cmd.exe /c exit didn't exit")
+		if gone(windows.Handle(h), 10*time.Second) {
+			err = terminate(windows.Handle(h))
+		}
+	}))
+	if !errors.Is(err, os.ErrProcessDone) {
+		t.Fatalf("terminate = %v, want os.ErrProcessDone", err)
 	}
 }

@@ -48,14 +48,39 @@ func Kill(p *os.Process) error {
 
 // killTree kills the tree of pid, whose handle is h, unless it has exited.
 func killTree(h windows.Handle, pid int) error {
-	if ev, err := windows.WaitForSingleObject(h, 0); err == nil && ev == windows.WAIT_OBJECT_0 {
+	if exited(h) {
 		return os.ErrProcessDone
 	}
 	kill := exec.Command(taskkill(), "/T", "/F", "/PID", strconv.Itoa(pid)) //nolint:gosec,noctx // the system's own taskkill, a pid; it doesn't wait on anything
 	if kill.Run() != nil {
-		return windows.TerminateProcess(h, 1) // taskkill missing or refused: at least the process itself
+		return terminate(h)
 	}
 	return nil
+}
+
+// terminate kills h's process alone, once taskkill has failed: it's
+// missing or was refused, or the process exited while taskkill started,
+// which it then doesn't find. TerminateProcess is refused for access on a
+// process that has exited (its handle held), so that answer is checked
+// again: the exit is os.ErrProcessDone, as Kill gives for one, not an
+// error a cancelled command's Wait would report in place of its context's.
+func terminate(h windows.Handle) error {
+	if exited(h) {
+		return os.ErrProcessDone
+	}
+	if err := windows.TerminateProcess(h, 1); err != nil {
+		if exited(h) {
+			return os.ErrProcessDone
+		}
+		return err
+	}
+	return nil
+}
+
+// exited says h's process has exited.
+func exited(h windows.Handle) bool {
+	ev, err := windows.WaitForSingleObject(h, 0)
+	return err == nil && ev == windows.WAIT_OBJECT_0
 }
 
 // Group is a command Start started, in a job object, which the processes
