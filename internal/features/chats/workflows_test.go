@@ -153,7 +153,7 @@ func launch(c *chat) {
 			Meta: map[string]any{"claudeCode": map[string]any{"toolName": "Workflow"}}}},
 		{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: wfCall, Meta: resp}},
 		{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: wfCall, Status: "completed", Content: text}},
-		{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2}}, // the turn's end: it came outside one of Nushi's
+		{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2, Cost: &acp.Cost{Amount: 0.1, Currency: "USD"}}}, // the turn's end: it came outside one of Nushi's
 	} {
 		_ = c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(c.sid), Update: u})
 	}
@@ -466,7 +466,7 @@ func TestAnOwnTurnPokesTheWorkflow(t *testing.T) {
 	f.waitStatus(t, func(st model.Status) bool { return st.OwnTurn })
 	eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.State == "done" })
 	_ = f.c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(f.c.sid), Update: acp.SessionUpdate{
-		SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2}}})
+		SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2, Cost: &acp.Cost{Amount: 0.1, Currency: "USD"}}}})
 	f.waitStatus(t, func(st model.Status) bool { return !st.OwnTurn })
 }
 

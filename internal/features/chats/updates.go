@@ -46,7 +46,7 @@ func (c *chat) updateLocked(n *acp.SessionNotification, from *child) { //nolint:
 			c.noticeLocked("own_turn", "On its own, after a background task")
 		}
 		if !c.ownTurn {
-			c.ownTurn = true // until its usage_update, which ends a turn
+			c.ownTurn = true // until the usage_update that ends the turn
 			c.statusChangedLocked()
 			c.pokeWorkflowsLocked() // a workflow's end starts one (Claude's task-notification)
 		}
@@ -112,15 +112,21 @@ func (c *chat) updateLocked(n *acp.SessionNotification, from *child) { //nolint:
 			c.configChangedLocked()
 		}
 	case "usage_update":
-		own := c.ownTurn
-		if own {
-			c.lookRelatedLocked()
-		}
-		c.ownTurn, c.ownNoted = false, false
-		if own {
-			defer c.statusChangedLocked() // once its usage is in
-		}
 		u := u.UsageUpdate
+		// The agent's own turn ends with its result's usage_update, the one
+		// with the cost: Claude sends one without after each model call
+		// in the turn too (claude-acp-go's contextUsed). An agent without a
+		// Transcript ends it with any.
+		if ends := c.kind.transcript == nil || u.Cost != nil; ends {
+			own := c.ownTurn
+			if own {
+				c.lookRelatedLocked()
+			}
+			c.ownTurn, c.ownNoted = false, false
+			if own {
+				defer c.statusChangedLocked() // once its usage is in
+			}
+		}
 		if c.kind.transcript != nil && !c.started.IsZero() && !c.stopped && c.kind.transcript.TurnDone(u) {
 			switch {
 			case c.steered > 0: // the result of the work a steered message cut short: the turn goes on
