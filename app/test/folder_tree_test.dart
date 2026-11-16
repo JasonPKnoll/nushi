@@ -6,7 +6,6 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
-import 'package:nushi/daemon.dart';
 import 'package:nushi/file_filter.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
@@ -15,40 +14,39 @@ import 'package:nushi/settings.dart';
 import 'fake_daemon.dart';
 import 'harness.dart';
 
-/// Makes a tree for a chat no one else holds, and shows it in a pane that
-/// then closes.
-WeakReference<FolderTree> _shown(Daemon daemon) {
-  final tree = folderTreeOf(ChatState('c', '/tmp/c'))..attach(daemon);
-  return WeakReference(tree..detach());
-}
-
 void main() {
-  testWidgets('a chat whose Files pane was opened is freed with its tree', (
-    tester,
-  ) async {
-    var watched = 0;
+  // The tree hangs on its chat alone (an Expando), so it goes with the
+  // chat once nothing else holds it: what could is the daemon's stream of
+  // the listing and the pref a shown tree follows.
+  testWidgets('a chat whose Files pane was opened is freed with its tree: '
+      'closed, neither the listing nor the pref holds it', (tester) async {
+    final watches = <StreamController<WatchChatFolderResponse>>[];
     final fake = FakeDaemon([])
       ..streams = (input) {
         if (input is! WatchChatFolderRequest) return null;
-        watched++;
-        return StreamController<WatchChatFolderResponse>().stream;
+        watches.add(StreamController<WatchChatFolderResponse>());
+        return watches.last.stream;
       };
     final d = await fake.connect(tester);
-    final tree = _shown(d);
+    final chat = ChatState('c', '/tmp/c');
+    final tree = folderTreeOf(chat)..attach(d);
     await tester.pump();
-    expect(watched, 1); // the pane listed it
-    // Garbage until the VM collects, which it does when it will: up to
-    // 20 s, though it takes a few ms; a held tree never goes.
-    await tester.runAsync(() async {
-      for (var i = 0; i < 4000 && tree.target != null; i++) {
-        final garbage = [
-          for (var j = 0; j < 1000; j++) List<int>.filled(100, j),
-        ];
-        expect(garbage, isNotEmpty);
-        await Future<void>.delayed(const Duration(milliseconds: 5));
-      }
-    });
-    expect(tree.target, isNull);
+    expect(watches.single.hasListener, isTrue); // the pane listed it
+    expect(folderTreeOf(chat), same(tree));
+    final told = tree.revision;
+    filesIgnored.value = !filesIgnored.value;
+    await tester.pump();
+    expect(tree.revision, greaterThan(told), reason: 'shown, it follows');
+    expect(watches, hasLength(2), reason: 'and lists again');
+
+    tree.detach();
+    await tester.pump();
+    expect(watches.every((w) => !w.hasListener), isTrue);
+    final closed = tree.revision;
+    filesIgnored.value = !filesIgnored.value;
+    await tester.pump();
+    expect(tree.revision, closed);
+    expect(watches, hasLength(2));
     await closeView(tester, d);
   });
 
