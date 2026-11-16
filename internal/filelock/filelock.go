@@ -39,7 +39,7 @@ func Lock(path string, wait time.Duration) (unlock func(), err error) {
 	for deadline := time.Now().Add(wait); ; {
 		err = tryLock(f)
 		if err == nil {
-			return func() { _ = f.Close() }, nil // closing lets the lock go
+			return func() { release(f) }, nil
 		}
 		if !errors.Is(err, errBusy) || time.Now().After(deadline) {
 			_ = f.Close() // the lock's error is the one to return

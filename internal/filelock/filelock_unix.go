@@ -25,3 +25,7 @@ func tryLock(f *os.File) error {
 	}
 	return err
 }
+
+// release lets f's lock go, by closing f: flock(2)'s lock goes with the
+// last descriptor of its open file.
+func release(f *os.File) { _ = f.Close() }

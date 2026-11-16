@@ -25,3 +25,13 @@ func tryLock(f *os.File) error {
 	}
 	return err
 }
+
+// release unlocks f, then closes it. Closing alone lets the lock go when
+// the system gets to it, which Microsoft says depends on its load (and
+// says to unlock first), so Ante trying the lock just after could find it
+// still held.
+func release(f *os.File) {
+	var ol windows.Overlapped
+	_ = windows.UnlockFileEx(windows.Handle(f.Fd()), 0, math.MaxUint32, math.MaxUint32, &ol) // closing lets it go anyway
+	_ = f.Close()
+}
