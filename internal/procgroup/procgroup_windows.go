@@ -124,12 +124,6 @@ func taskkill() string {
 	return filepath.Join(root, "System32", "taskkill.exe")
 }
 
-// Session has cmd start with no console window: the daemon has no
-// console of its own to share, and a console program started without one
-// would open a window of its own.
-func Session(cmd *exec.Cmd) {
-	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-	cmd.SysProcAttr.CreationFlags |= windows.CREATE_NO_WINDOW
-}
+// Session does nothing: Windows has no Unix session or terminal to keep
+// from cmd, and the daemon's console already has no window (hideConsole).
+func Session(*exec.Cmd) {}
