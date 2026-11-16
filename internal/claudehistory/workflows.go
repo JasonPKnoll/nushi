@@ -31,7 +31,7 @@ import (
 // their shape before they name a file.
 
 // agentStat is how often the transcripts of a run's running agents are
-// looked at, for when the run last did anything.
+// looked at, for when the run last did anything (Runs.agentStat in tests).
 const agentStat = 5 * time.Second
 
 var (
@@ -43,13 +43,14 @@ var (
 // takes only what its journal added since the last (Local.Workflows). A
 // nil Runs reads each run whole every time.
 type Runs struct {
-	mu   sync.Mutex
-	runs map[string]*run
-	used []string // keys, the most recently used last
+	mu        sync.Mutex
+	runs      map[string]*run
+	used      []string      // keys, the most recently used last
+	agentStat time.Duration // how often a run's running agents are looked at
 }
 
 // NewRuns returns an empty Runs.
-func NewRuns() *Runs { return &Runs{runs: map[string]*run{}} }
+func NewRuns() *Runs { return &Runs{runs: map[string]*run{}, agentStat: agentStat} }
 
 // maxRuns is how many runs Runs keeps: the ones being followed, and the
 // last few looked at.
@@ -57,7 +58,7 @@ const maxRuns = 64
 
 func (r *Runs) get(key string) *run {
 	if r == nil {
-		return &run{}
+		return &run{agentStat: agentStat}
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -69,7 +70,7 @@ func (r *Runs) get(key string) *run {
 		delete(r.runs, r.used[0])
 		r.used = r.used[1:]
 	}
-	r.runs[key] = &run{}
+	r.runs[key] = &run{agentStat: r.agentStat}
 	r.used = append(r.used, key)
 	return r.runs[key]
 }
@@ -84,7 +85,9 @@ type run struct {
 	statted time.Time
 	tooBig  bool
 	started time.Time // the script's time, when nothing else says
-	steps   map[string]steps
+	// agentStat is how often the running agents' transcripts are looked at.
+	agentStat time.Duration
+	steps     map[string]steps
 }
 
 // steps are an agent's transcript as items, as read at its size and time.
@@ -175,7 +178,7 @@ func (r *run) readJournal(root *os.Root, runID string) error {
 			r.tooBig = true
 		}
 	}
-	if r.snap == nil && time.Since(r.statted) >= agentStat {
+	if r.snap == nil && time.Since(r.statted) >= r.agentStat {
 		r.statted = time.Now()
 		for _, row := range r.j.rows {
 			if row.State == "running" && agentID.MatchString(row.AgentID) {

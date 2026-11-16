@@ -126,6 +126,39 @@ func TestRunningWorkflow(t *testing.T) {
 	}
 }
 
+// Active is when the run last wrote: its journal, or the transcript of an
+// agent that runs, looked at every agentStat; a done agent's transcript
+// doesn't count. The follower stalls and ends runs by it.
+func TestWorkflowActive(t *testing.T) {
+	l, id, folder, session := fakeRun(t, launchedLine+startA+startB+resultA, "")
+	l.Workflows.agentStat = time.Hour
+	dir := filepath.Join(session, "subagents", "workflows", "wf_abc")
+	journal := time.Now().Add(-2 * time.Hour).Truncate(time.Second)
+	testcheck.NoErr(t, os.Chtimes(filepath.Join(dir, "journal.jsonl"), journal, journal))
+	w := model.Workflow{RunID: "wf_abc", TaskID: "t1"}
+	got, err := l.ReadWorkflow(id, folder, w)
+	testcheck.NoErr(t, err)
+	if !got.Active.Equal(journal) {
+		t.Fatalf("the journal's time: %v, want %v", got.Active, journal)
+	}
+	running, done := journal.Add(time.Hour), time.Now().Truncate(time.Second)
+	testcheck.Write(t, filepath.Join(dir, "agent-a2.jsonl"), "{}\n")
+	testcheck.NoErr(t, os.Chtimes(filepath.Join(dir, "agent-a2.jsonl"), running, running))
+	testcheck.Write(t, filepath.Join(dir, "agent-a1.jsonl"), "{}\n")
+	testcheck.NoErr(t, os.Chtimes(filepath.Join(dir, "agent-a1.jsonl"), done, done))
+	if got, _ := l.ReadWorkflow(id, folder, w); !got.Active.Equal(journal) {
+		t.Errorf("looked at before agentStat: %v", got.Active)
+	}
+	l.Workflows.mu.Lock()
+	for _, r := range l.Workflows.runs {
+		r.agentStat = 0
+	}
+	l.Workflows.mu.Unlock()
+	if got, _ := l.ReadWorkflow(id, folder, w); !got.Active.Equal(running) {
+		t.Errorf("a running agent's write: %v, want %v", got.Active, running)
+	}
+}
+
 // Nothing of the run yet is fs.ErrNotExist; a bad id names no file.
 func TestNoWorkflowFiles(t *testing.T) {
 	l, id, folder, _ := fakeRun(t, "", "")
