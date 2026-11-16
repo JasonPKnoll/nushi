@@ -7,6 +7,7 @@ import 'package:nushi/commit_box.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/diff_box.dart';
+import 'package:nushi/drawn.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/related_worktrees.dart';
 import 'package:nushi/review.dart';
@@ -486,13 +487,34 @@ void main() {
         ahead: 2,
       );
       chatState.items.add(_subagent('x', 'running'));
-      chatState.related.take([a]);
+      chatState.related.take([a, _worktree('b', state: 'removed')]);
       var opened = 0;
       await showWidget(tester, onOpen: () => opened++);
+      Finder row(String name) =>
+          find.ancestor(of: find.text(name), matching: find.byType(Tap));
       expect(find.text('a'), findsOne);
+      // Its subagent's mark, running; the other has none.
+      final mark = find.descendant(
+        of: row('a'),
+        matching: find.byType(TaskMark),
+      );
+      expect(tester.widget<TaskMark>(mark).state, 'running');
+      expect(
+        find.descendant(of: row('b'), matching: find.byType(TaskMark)),
+        findsNothing,
+      );
       expect(
         find.text('+12 −3 · 4 files · 2 ahead', findRichText: true),
         findsOne,
+      );
+      // How each ended: nothing while it's there.
+      expect(
+        find.descendant(of: row('b'), matching: find.text('removed')),
+        findsOne,
+      );
+      expect(
+        find.descendant(of: row('a'), matching: find.text('removed')),
+        findsNothing,
       );
       await tester.tap(find.text('a'));
       expect(opened, 1);
