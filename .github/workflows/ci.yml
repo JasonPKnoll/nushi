@@ -1,21 +1,21 @@
 # What make check runs, as parallel jobs (one job of 12 minutes before, until 2026-10-27). macOS for what needs it, in four
 # jobs (the account runs five macOS jobs at once, and a release or another repository's CI needs one too): the
 # daemon (proc_info, sandbox-exec, launchd, the keychain's cgo), so Go's tests, and its lint with the window's placement
-# maths (swiftc), each a job; and the app's tests in two shards of test files (its goldens are drawn with macOS's text
-# rendering: on Linux a third of them differ by 1-4%; its end-to-end tests run nushid). Linux for the rest: the
-# protos' and Dart's lint, the Dart packages' tests, the web app's end-to-end test (nushid with Chrome), and the daemon on Linux (ADR 0101): every Go package's tests,
-# lint, build and vet without cgo; and the Linux app (ADR 0104): its tests in two shards (goldens are compared on macOS
-# only), and its package built on each architecture as the release builds it (tools/release.sh's linux part, on the
-# oldest Ubuntu it supports, for the glibc it needs), installed and started on a virtual display (tools/linux-smoke.sh),
-# with the runner's channels tested for real on amd64 (tools/linux-channels.sh). The ACP library,
+# maths (swiftc), each a job; and the app's test files that need a Mac, in two shards: those with goldens, drawn with
+# macOS's text rendering (on Linux a third of them differ by 1-4%), and those reading the Mac's own fonts. Linux for the
+# rest: the protos' and Dart's lint, the Dart packages' tests, the web app's end-to-end test (nushid with Chrome), and
+# the daemon on Linux (ADR 0101): every Go package's tests, and its lint, build and vet without cgo for Linux and
+# Windows; and the Linux app (ADR 0104): every other app test file, in three shards, and its package built on each
+# architecture as the release builds it (tools/release.sh's linux part, on the oldest Ubuntu it supports, for the glibc
+# it needs), installed and started on a virtual display (tools/linux-smoke.sh), with the runner's channels tested for
+# real on amd64 (tools/linux-channels.sh). tools/test-shards says which app test files are whose and splits each set by
+# app/test/timings.tsv, slowest first (ADR 0128); a shard's count is its matrix's, nowhere else. The ACP library,
 # github.com/afrase/acp-go, has its own CI. Actions are pinned by commit.
 #
-# Each job's timeout is two to three times its longest recent run with warm caches (2026-10-29: Go 4.4 minutes, the
-# app's shards 6.2, the web 7.1, Linux's 2 at most), room for a cold cache's downloads and builds: a hung test ends
-# there, not at GitHub's six hours on a scarce macOS runner. Linux's Go job runs every package's tests from 2026-11-08
-# (a minute in an x86 VM with the build cached, unmeasured on CI yet): 25 until it has run there. The Linux app's jobs
-# (from 2026-11-09) are unmeasured too: 25 for its tests, 30 for its package (a cold Flutter build), until they have
-# run.
+# Each job's timeout is two to three times its longest recent run with warm caches (2026-11-16: Go's tests on macOS 4.1
+# minutes, the web 2.4 on Linux, Linux's Go 3), room for a cold cache's downloads and builds: a hung test ends there, not
+# at GitHub's six hours on a scarce macOS runner. The app's shards (5-6 minutes when they ran every file by name) keep
+# 15. Windows' and the Linux package's (a cold Flutter build) are as they were.
 name: CI
 
 on:
@@ -160,8 +160,8 @@ jobs:
           cache: true
       - run: make test-packages
 
-  app:
-    name: App tests (macOS, ${{ matrix.shard }}/2)
+  goldens:
+    name: App goldens (macOS, ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: macos-latest
     timeout-minutes: 15
     strategy:
@@ -170,20 +170,19 @@ jobs:
         shard: [1, 2]
     # Three test files at once: the runner has three cores, and flutter test takes half of them (one).
     env:
-      SHARD: ${{ matrix.shard }}/2
+      SET: macos
+      SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
       FLUTTER_TEST_FLAGS: --concurrency 3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      # The end-to-end tests build nushid, nushi-relay and the fake agent.
+      # Go only for tools/test-shards, so no cache to fetch: no file of this set builds Go (test-shards -check).
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      # Built here in each job that shares this Go cache, so whichever saves it first (a shard whose tests build
-      # nothing, say) leaves them in it.
-      - run: go build ./cmd/nushid ./cmd/nushi-relay ./internal/acptest/fakeagent
+          cache: false
       # The SDK cached without what the tests never use (below): 0.9 GB to fetch, not 2.1.
       - id: flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -336,23 +335,24 @@ jobs:
           go test -run TestOwnDataFolder ./cmd/nushid
 
   linux-app:
-    name: App tests (Linux, ${{ matrix.shard }}/2)
+    name: App tests (Linux, ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
-    # Four test files at once: the runner has four cores.
+        shard: [1, 2, 3]
+    # Four test files at once: the runner has four cores. A golden in this set fails (make test-app).
     env:
-      SHARD: ${{ matrix.shard }}/2
+      SET: linux
+      SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
       FLUTTER_TEST_FLAGS: --concurrency 4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      # The end-to-end tests build nushid, nushi-relay and the fake agent, as on macOS.
+      # The end-to-end tests build nushid, nushi-relay and the fake agent.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod

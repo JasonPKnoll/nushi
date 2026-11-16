@@ -83,10 +83,10 @@ The same goes for Claude's library, `github.com/afrase/claude-acp-go` (`go work 
 
 CI (`.github/workflows/ci.yml`) runs the same parts as `make check`, as parallel jobs, in under 3 minutes (the Linux app's package longer, a Flutter release build on each architecture):
 
-- on macOS: Go's lint and tests and the window's placement maths, and the app's tests in two shards (`make test-app SHARD=1/2`: the first half of the files by time, `tools/test-shards`);
+- on macOS: Go's tests, Go's lint with the window's placement maths, and the app's test files that need a Mac (those with goldens, and the Mac's fonts) in two shards (`make test-app SET=macos SHARD=1/2`);
 - on Linux: the protos' and Dart's lint (with `tools/native-edge`), the Dart packages' tests, every Go package's tests (`make test-go`, with bubblewrap from apt for npm's sandbox and AppArmor's rule on unprivileged user namespaces off), `make lint-linux`, `make lint-windows` and `go mod tidy -diff` (ADR 0101, 0124);
 - on Windows: the daemon built, and the Windows tests listed under Windows below (ADR 0124);
-- the Linux app (ADR 0104): its tests in two shards (goldens skipped), and on each architecture (Ubuntu 22.04, amd64 and arm64) its package built as a release builds it (`tools/release.sh 0.0.0-ci linux`, glibc 2.34 at most), installed into a throwaway home and started on a virtual display until it connects to the daemon it started (`tools/linux-smoke.sh`, whose screenshot is the job's artifact), and on amd64 the runner's channels (`tools/linux-channels.sh`).
+- the Linux app (ADR 0104): every other app test file, in three shards (`make test-app SET=linux SHARD=1/3`; a golden there fails), and on each architecture (Ubuntu 22.04, amd64 and arm64) its package built as a release builds it (`tools/release.sh 0.0.0-ci linux`, glibc 2.34 at most), installed into a throwaway home and started on a virtual display until it connects to the daemon it started (`tools/linux-smoke.sh`, whose screenshot is the job's artifact), and on amd64 the runner's channels (`tools/linux-channels.sh`).
 
 ### The daemon's tests on Linux
 
