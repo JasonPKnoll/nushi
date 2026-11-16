@@ -340,19 +340,22 @@ void main() {
   // is above), to look at.
   for (final theme in builtInThemes) {
     for (final b in Brightness.values) {
-      testWidgets('render: the panel in ${theme.name}, ${b.name}', (
-        tester,
-      ) async {
-        colorTheme.value = theme.id;
-        final (d, _) = await railApp(
-          tester,
-          size: const Size(1200, 1000),
-          brightness: b,
-          context: fullContext,
-        );
-        await render(tester, railPanel, 'details_rail_${theme.id}_${b.name}');
-        await closeView(tester, d);
-      }, variant: macOnly);
+      testWidgets(
+        'render: the panel in ${theme.name}, ${b.name}',
+        (tester) async {
+          colorTheme.value = theme.id;
+          final (d, _) = await railApp(
+            tester,
+            size: const Size(1200, 1000),
+            brightness: b,
+            context: fullContext,
+          );
+          await render(tester, railPanel, 'details_rail_${theme.id}_${b.name}');
+          await closeView(tester, d);
+        },
+        variant: macOnly,
+        skip: rendersDir == null,
+      );
     }
   }
 
