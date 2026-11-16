@@ -204,6 +204,17 @@ void main() {
           pulls: [_link(221)],
         );
         expect(find.byType(LivePullCard), findsOneWidget);
+        // Under the call that opened it.
+        expect(
+          tester.getTopLeft(find.byType(LivePullCard)).dy,
+          greaterThan(
+            tester
+                .getBottomLeft(
+                  find.textContaining('gh pr create', findRichText: true).first,
+                )
+                .dy,
+          ),
+        );
         expect(find.text('Open'), findsOneWidget);
         expect(find.text('1 check running'), findsNothing);
         expect(find.text('Checks running'), findsOneWidget);
@@ -217,6 +228,15 @@ void main() {
         await tester.tap(find.byType(LivePullCard));
         await tester.pumpAndSettle();
         expect(find.byType(GitHubPullPane), findsOneWidget);
+        // Back on the chat it stays; another chat, and back: gone.
+        d.chats['c']!.tab.value = ChatTab.chat;
+        await tester.pumpAndSettle();
+        expect(find.byType(LivePullCard), findsOneWidget);
+        d.select('d');
+        await tester.pumpAndSettle();
+        d.select('c');
+        await tester.pumpAndSettle();
+        expect(find.byType(LivePullCard), findsNothing);
         await closeView(tester, d);
       }, variant: _mac);
     }
