@@ -84,7 +84,8 @@ func TestNoSleepWithoutLoad(t *testing.T) {
 // lost, and activity puts it off. Each check is a doze of its own, with
 // the chat idle for good but for what's checked; the service's loop is
 // set going only at the end (its sleep time is never until then), so no
-// check races it.
+// check races it. The check right after an event takes an hour's sleep
+// time: a short one could pass before the doze on a slow machine.
 func TestAutoSleep(t *testing.T) {
 	const after = 30 * time.Millisecond
 	agent := &fakeAgent{}
@@ -149,7 +150,7 @@ func TestAutoSleep(t *testing.T) {
 	c.active = time.Time{}
 	c.usageChangedLocked()
 	c.mu.Unlock()
-	if svc.doze(c, after); !awake() {
+	if svc.doze(c, time.Hour); !awake() { // an hour, as the event is only just past
 		t.Fatal("slept right after an event")
 	}
 	testcheck.NoErr(t, prefs.SetSleepAfter(after))
@@ -221,7 +222,7 @@ func TestWakingWaitsForTheOldAgent(t *testing.T) {
 	answered := []string{"user:one", "agent:ok", "user:two", "agent:ok"}
 
 	t.Run("in time", func(t *testing.T) {
-		_, agent, c, gate := asleep(t, time.Second, false)
+		_, agent, c, gate := asleep(t, time.Hour, false) // it's never killed, however slow the test
 		eventually(t, c, func() bool { return c.busy })
 		time.Sleep(50 * time.Millisecond) // a negative window: the reopen waits
 		check(t, agent, 1, 0)
