@@ -22,8 +22,9 @@
 //
 // One that waits ("/hang", "wait", a slow compact) says so on the Store's
 // Waiting once it does, so a test stops or steers it when it runs, not
-// after a sleep that may lose the race. As Pi's, abort answers once the
-// run settled, and a prompt is refused until then.
+// after a sleep that may lose the race. As Pi's, commands are taken in
+// the order they are read, abort answers once the run settled (after its
+// agent_settled), and a prompt is refused until then.
 package pitest
 
 import (
@@ -113,6 +114,18 @@ func (st *Store) Serve(r io.Reader, w io.Writer, cwd string, args []string) {
 			}
 			continue
 		}
+		if cmd["type"] == "prompt" && (p.st.Read != nil || p.st.PromptLag > 0) {
+			go func() { // it sets up first: what pi reads next may be taken before it
+				if p.st.Read != nil {
+					p.st.Read <- cmd["message"].(string)
+				}
+				time.Sleep(p.st.PromptLag)
+				p.mu.Lock()
+				p.command(cmd)
+			}()
+			continue
+		}
+		p.mu.Lock() // pi takes each command in the order it reads it
 		go p.command(cmd)
 	}
 }
@@ -167,14 +180,10 @@ func (p *Program) respond(cmd map[string]any, data any, err string) {
 	p.emit(r)
 }
 
+// command handles one command, with p.mu held: Serve takes it in the
+// order pi reads its commands, as Pi starts each as it reads it (a
+// prompt with a PromptLag sets up first). One that waits lets it go.
 func (p *Program) command(cmd map[string]any) {
-	if cmd["type"] == "prompt" {
-		if p.st.Read != nil {
-			p.st.Read <- cmd["message"].(string)
-		}
-		time.Sleep(p.st.PromptLag)
-	}
-	p.mu.Lock()
 	defer p.mu.Unlock()
 	switch cmd["type"] {
 	case "get_state":
@@ -350,10 +359,10 @@ func (p *Program) run(text string) {
 		p.append(m)
 		p.mu.Unlock()
 	}
-	settle := func(abort bool) {
+	settle := func(abort bool) { // at once: an abort or a prompt finds the run running, or settled and said so
 		p.mu.Lock()
+		defer p.mu.Unlock()
 		p.running = false
-		p.mu.Unlock()
 		p.emit(map[string]any{"type": "agent_end"})
 		p.emit(map[string]any{"type": "agent_settled", "aborted": abort})
 		close(settled)
