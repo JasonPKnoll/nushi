@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:connectrpc/connect.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
@@ -118,6 +120,40 @@ Future<void> _open(WidgetTester tester, String branch) async {
   await tester.pumpAndSettle();
 }
 
+/// The open menu's own surface, cut from the window's picture: its panel
+/// alone.
+Future<ui.Image> _menuImage(WidgetTester tester) {
+  final panel = tester.getRect(
+    find
+        .ancestor(
+          of: find.byType(MenuItemButton).first,
+          matching: find.byType(Material),
+        )
+        .first,
+  );
+  var boundary = tester.renderObject(find.byType(MaterialApp));
+  while (!boundary.isRepaintBoundary) {
+    boundary = boundary.parent!;
+  }
+  final layer = boundary.debugLayer! as OffsetLayer;
+  final ratio = tester.view.devicePixelRatio;
+  final around = panel;
+  // The window's own layer is in physical pixels; a box's, in points.
+  return boundary is RenderBox
+      ? layer.toImage(
+          boundary.globalToLocal(around.topLeft) & around.size,
+          pixelRatio: ratio,
+        )
+      : layer.toImage(
+          Rect.fromLTRB(
+            around.left * ratio,
+            around.top * ratio,
+            around.right * ratio,
+            around.bottom * ratio,
+          ),
+        );
+}
+
 /// A menu row by its label (its detail follows it in the same text).
 Finder _row(String label) => find.ancestor(
   of: find.textContaining(RegExp('^${RegExp.escape(label)}(\\s|\$)')),
@@ -188,16 +224,21 @@ void main() {
     }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
   }
 
-  testWidgets('golden, the Branch menu open, dark', (tester) async {
-    final d = await _panel(tester, _fake(), _chat());
-    await _open(tester, 'main');
-    expect(tester.takeException(), isNull);
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/branch_menu_dark.png'),
-    );
-    d.dispose();
-  });
+  for (final (name, tokens) in [
+    ('dark', Tokens.dark),
+    ('light', Tokens.light),
+  ]) {
+    testWidgets('golden, the Branch menu open, $name', (tester) async {
+      final d = await _panel(tester, _fake(), _chat(), tokens: tokens);
+      await _open(tester, 'main');
+      expect(tester.takeException(), isNull);
+      await expectLater(
+        _menuImage(tester),
+        matchesGoldenFile('goldens/branch_menu_$name.png'),
+      );
+      d.dispose();
+    });
+  }
 
   testWidgets('the menu: branches newest first, the current one checked, '
       'another worktree’s marked, then New branch…', (tester) async {
@@ -403,16 +444,21 @@ void main() {
     d.dispose();
   });
 
-  testWidgets('golden, the Worktree menu open, light', (tester) async {
-    final d = await _panel(tester, _fake(), _chat(), tokens: Tokens.light);
-    await _open(tester, 'None');
-    expect(tester.takeException(), isNull);
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/worktree_menu_light.png'),
-    );
-    d.dispose();
-  });
+  for (final (name, tokens) in [
+    ('dark', Tokens.dark),
+    ('light', Tokens.light),
+  ]) {
+    testWidgets('golden, the Worktree menu open, $name', (tester) async {
+      final d = await _panel(tester, _fake(), _chat(), tokens: tokens);
+      await _open(tester, 'None');
+      expect(tester.takeException(), isNull);
+      await expectLater(
+        _menuImage(tester),
+        matchesGoldenFile('goldens/worktree_menu_$name.png'),
+      );
+      d.dispose();
+    });
+  }
 
   testWidgets('the Worktree row mid-turn: its value as it is, the rows '
       'unavailable under why', (tester) async {
