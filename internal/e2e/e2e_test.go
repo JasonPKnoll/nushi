@@ -350,10 +350,16 @@ func (a *app) get(id string) *nushiv1.GetChatResponse {
 	return must(a.c.GetChat(a.t.Context(), connect.NewRequest(&nushiv1.GetChatRequest{ChatId: id})))
 }
 
-// say sends text to chat id and waits for the turn to end.
+// say sends text to chat id and waits for the turn to end: for its own
+// message in the stream first, as an earlier turn's end may still wait
+// there, unread by this app.
 func (a *app) say(id, text string) {
 	a.t.Helper()
 	a.send(id, text)
+	a.waitFor("the message "+text, func(e *nushiv1.EventsResponse) bool {
+		it := e.GetItem().GetItem()
+		return e.ChatId == id && it.GetKind() == nushiv1.ItemKind_ITEM_KIND_USER_MESSAGE && it.GetText() == text
+	})
 	a.waitFor("the reply to "+text, turnEnded(id))
 }
 
