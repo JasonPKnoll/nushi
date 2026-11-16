@@ -554,15 +554,54 @@ func TestARewoundWorkflowIsLetGo(t *testing.T) {
 	eventually(t, f.c, func() bool { return len(f.c.following) == 0 })
 }
 
-// Stop asks Claude to stop the run by its task's id, after the turn.
+// Stop asks Claude to stop the run by its task's id, after the turn; a
+// stalled run (nothing says it ended) can be stopped too.
 func TestStoppingAWorkflow(t *testing.T) {
-	f := workflowChat(t, Timing{}, runningAs)
-	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
-	testcheck.NoErr(t, f.svc.StopTask(t.Context(), f.c.id, wfCall))
-	eventually(t, f.c, func() bool { return !f.c.busy })
-	if prompts, _ := f.agent.texts(); len(prompts) != 1 || prompts[0] != claudeHarness.StopTask("w9u1xb6ik") {
-		t.Errorf("asked %q", prompts)
+	for _, stalled := range []bool{false, true} {
+		f := workflowChat(t, Timing{WorkflowPoll: time.Hour}, runningAs)
+		f.files.waitReads(t, 1)
+		eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.State == "running" })
+		f.c.mu.Lock()
+		f.c.itemLocked(wfCall).Workflow.Stalled = stalled
+		f.c.mu.Unlock()
+		testcheck.NoErr(t, f.svc.StopTask(t.Context(), f.c.id, wfCall))
+		eventually(t, f.c, func() bool { return !f.c.busy })
+		if prompts, _ := f.agent.texts(); len(prompts) != 1 || prompts[0] != claudeHarness.StopTask("w9u1xb6ik") {
+			t.Errorf("stalled %v: asked %q", stalled, prompts)
+		}
 	}
+}
+
+// Claude's TaskStop of the run's task has it read at once: its snapshot,
+// written as it stops, ends it without waiting for a poll.
+func TestATaskStopPokesTheWorkflow(t *testing.T) {
+	f := workflowChat(t, Timing{WorkflowPoll: time.Hour}, runningAs)
+	f.files.waitReads(t, 1)
+	f.c.mu.Lock()
+	f.c.ownTurn = true // in a turn of its own already: its start pokes too
+	f.c.mu.Unlock()
+	f.files.set(endedAs("stopped", "killed"))
+	stop := map[string]any{"claudeCode": map[string]any{"toolName": "TaskStop"}}
+	for _, u := range []acp.SessionUpdate{
+		{SessionUpdate: "tool_call", ToolCall: &acp.ToolCall{ToolCallID: "toolu_stop", Title: "TaskStop", Kind: "other", Status: "pending", Meta: stop,
+			RawInput: json.RawMessage(`{"task_id":"w9u1xb6ik"}`)}},
+		{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: "toolu_stop", Status: "completed", Meta: stop}},
+	} {
+		_ = f.c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(f.c.sid), Update: u})
+	}
+	eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.State == "stopped" })
+}
+
+// The agent's process ending has its runs read at once.
+func TestAnAgentQuittingPokesTheWorkflow(t *testing.T) {
+	f := workflowChat(t, Timing{WorkflowPoll: time.Hour, WorkflowGrace: time.Hour}, runningAs)
+	f.files.waitReads(t, 1)
+	for len(f.files.reads) > 0 {
+		<-f.files.reads
+	}
+	f.agent.quit()
+	f.files.waitReads(t, 1)
+	eventually(t, f.c, func() bool { fl := f.c.following[wfCall]; return fl != nil && !fl.gone.IsZero() })
 }
 
 // GetWorkflow's and GetWorkflowAgent's answers: the run, its agents, an
