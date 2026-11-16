@@ -10,6 +10,7 @@ import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/items.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/theme/theme.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -96,14 +97,20 @@ void main() {
   testWidgets('hiding and showing the sidebar rebuilds no row and next to '
       'nothing while it slides', (tester) async {
     final d = await app(tester);
+    // The transcript's first row, which the slide moves.
+    double row() => tester.getTopLeft(find.byType(ItemView).first).dx;
+    final shown = row();
     _expectQuiet(
       await _frames(tester, () => sidebarHidden.value = true),
       'hide',
     );
+    final hidden = row();
+    expect(hidden, lessThan(shown), reason: 'the sidebar went');
     _expectQuiet(
       await _frames(tester, () => sidebarHidden.value = false),
       'show',
     );
+    expect(row(), shown, reason: 'the sidebar came back');
     await closeView(tester, d);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
@@ -117,11 +124,17 @@ void main() {
       ('Nord', () => colorTheme.value = 'nord'),
     ]) {
       final frames = await _frames(tester, change);
+      // It's there on the first frame, which repaints the texts.
+      expect(frames.first.texts, greaterThan(0), reason: what);
       for (final (i, f) in frames.indexed.skip(1)) {
         expect(f.rows, 0, reason: '$what: rows rebuilt on frame $i');
         expect(f.texts, 0, reason: '$what: texts rebuilt on frame $i');
       }
     }
+    expect(
+      NushiTheme.of(tester.element(find.byType(ItemView).first)).t,
+      same(builtInTheme('nord')!.dark),
+    );
     await closeView(tester, d);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
@@ -129,6 +142,7 @@ void main() {
     tester,
   ) async {
     final d = await app(tester);
+    expect(find.text('Pinned'), findsNothing);
     final frames = await _frames(
       tester,
       () => fake.emit(EventsResponse(chatId: 'a', chat: a..pin = 1)),
@@ -146,10 +160,9 @@ void main() {
         );
       }
     }
-    expect(
-      frames.skip(1).where((f) => f.builds > _mostPerFrame),
-      hasLength(lessThanOrEqualTo(1)),
-    );
+    // That once: the section is there and the chat is in it.
+    expect(frames.skip(1).where((f) => f.builds > _mostPerFrame), hasLength(1));
+    expect(find.text('Pinned'), findsOne);
     await closeView(tester, d);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }
