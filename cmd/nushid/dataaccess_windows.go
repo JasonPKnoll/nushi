@@ -17,17 +17,26 @@ import (
 // the drive gives Authenticated Users, and any account on the machine
 // could read the token or plant one, and so run anything as the user
 // through the socket. Setting the DACL redoes what the files inside
-// inherit. The start stops when the folder belongs to another account
-// (it could put the access back) or the DACL can't be set; a token
-// another account owns, put there while the folder was open, is removed,
-// so a new one is made.
+// inherit. The start stops when the folder is a link or junction (the
+// DACL would land on what it points to, and whoever made it could point
+// it elsewhere after), belongs to another account (it could put the
+// access back) or the DACL can't be set; a token another account owns,
+// put there while the folder was open, is removed, so a new one is made.
+// The folder is held open as itself meanwhile, not shared for delete, so
+// the one checked is the one given the DACL: it can't be renamed, removed
+// or swapped for a junction in between.
 func ownDataFolder(dir string) error {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
 		return fmt.Errorf("reading who runs the daemon: %w", err)
 	}
 	me := user.User.Sid
-	if err := ownedByMe(dir, me); err != nil {
+	h, err := openFolder(dir)
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(h) //nolint:errcheck // a handle only read through
+	if err := ownedByMe(h, dir, me); err != nil {
 		return err
 	}
 	system, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
@@ -46,7 +55,7 @@ func ownDataFolder(dir string) error {
 		return fmt.Errorf("making the data folder %s yours alone: %w", dir, err)
 	}
 	token := filepath.Join(dir, "token")
-	switch err := ownedByMe(token, me); {
+	switch err := pathOwnedByMe(token, me); {
 	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
 		if err := os.Remove(token); err != nil {
@@ -54,6 +63,47 @@ func ownDataFolder(dir string) error {
 		}
 	}
 	return nil
+}
+
+// openFolder opens the folder at path as itself (a link or junction is
+// opened, not followed) and refuses anything but a plain folder. The
+// handle reads its security, and isn't shared for delete, so the folder
+// stays where it is while it's open.
+func openFolder(path string) (windows.Handle, error) {
+	h, err := openAsItself(path, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE)
+	if err != nil {
+		return 0, fmt.Errorf("opening the data folder %s: %w", path, err)
+	}
+	var info windows.ByHandleFileInformation
+	switch err := windows.GetFileInformationByHandle(h, &info); {
+	case err != nil:
+		err = fmt.Errorf("reading the data folder %s: %w", path, err)
+	case info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0:
+		err = fmt.Errorf("the data folder %s is a link or junction: its target, not it, would be made yours, "+
+			"and whoever made it could point it elsewhere, so Nushi won't start on it", path)
+	case info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0:
+		err = fmt.Errorf("the data folder %s isn't a folder", path)
+	}
+	if err != nil {
+		_ = windows.CloseHandle(h)
+		return 0, err
+	}
+	return h, nil
+}
+
+// openAsItself opens path, a file or a folder, to read its attributes and
+// security, a link or junction as itself, sharing it as share says.
+func openAsItself(path string, share uint32) (windows.Handle, error) {
+	name, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
+	h, err := windows.CreateFile(name, windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES, share, nil,
+		windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if errors.Is(err, windows.ERROR_FILE_NOT_FOUND) || errors.Is(err, windows.ERROR_PATH_NOT_FOUND) {
+		return 0, fs.ErrNotExist
+	}
+	return h, err
 }
 
 // fileAllAccess is FILE_ALL_ACCESS: every right on a file or folder, by
@@ -72,15 +122,26 @@ func fullAccess(sid *windows.SID, kind windows.TRUSTEE_TYPE) windows.EXPLICIT_AC
 	}
 }
 
-// ownedByMe says path's owner is me, or a group this process makes what
-// it creates belong to (an elevated administrator's Administrators); an
-// error saying whose it is otherwise.
-func ownedByMe(path string, me *windows.SID) error {
-	sd, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+// pathOwnedByMe is ownedByMe of what's at path, a link or junction as
+// itself; fs.ErrNotExist when there's nothing.
+func pathOwnedByMe(path string, me *windows.SID) error {
+	h, err := openAsItself(path, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE)
+	if errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	if err != nil {
-		if errors.Is(err, windows.ERROR_FILE_NOT_FOUND) {
-			return fs.ErrNotExist
-		}
+		return fmt.Errorf("reading who owns %s: %w", path, err)
+	}
+	defer windows.CloseHandle(h) //nolint:errcheck // a handle only read through
+	return ownedByMe(h, path, me)
+}
+
+// ownedByMe says the owner of path, open as h, is me, or a group this
+// process makes what it creates belong to (an elevated administrator's
+// Administrators); an error saying whose it is otherwise.
+func ownedByMe(h windows.Handle, path string, me *windows.SID) error {
+	sd, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+	if err != nil {
 		return fmt.Errorf("reading who owns %s: %w", path, err)
 	}
 	owner, _, err := sd.Owner()
