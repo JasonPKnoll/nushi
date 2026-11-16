@@ -26,6 +26,7 @@ type Piped struct {
 	Out io.Reader
 	Pid int
 
+	proc   *os.Process
 	said   lastLine
 	exited chan struct{}
 	err    error // how it exited; set before exited closes
@@ -63,7 +64,7 @@ func Pipe(bin string, args []string, dir string, env []string, stderr io.Writer)
 		return nil, err
 	}
 	out := &stdout{f: r, ended: make(chan struct{})}
-	p.Out, p.Pid = out, cmd.Process.Pid
+	p.Out, p.Pid, p.proc = out, cmd.Process.Pid, cmd.Process
 	go func() {
 		p.err = cmd.Wait()
 		close(p.exited)
@@ -92,9 +93,11 @@ func (s *stdout) Read(b []byte) (int, error) {
 	return n, err
 }
 
-// Kill kills its group (procgroup.Kill) and waits for it to exit.
+// Kill kills its group (procgroup.Kill) and waits for it to exit. Pi and
+// Ante call it on every stop, often after the program has exited: on
+// Windows the kill then does nothing, as the pid may be another's by now.
 func (p *Piped) Kill() {
-	_ = procgroup.Kill(p.Pid) // the group may be gone already
+	_ = procgroup.Kill(p.proc) // the group may be gone already
 	<-p.exited
 }
 
