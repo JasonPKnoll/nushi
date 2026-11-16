@@ -12,8 +12,9 @@ import (
 func (s *server) GetMemory(_ context.Context, req *connect.Request[nushiv1.GetMemoryRequest]) (*connect.Response[nushiv1.GetMemoryResponse], error) {
 	r, err := s.Memory.Report(int(req.Msg.AppPid))
 	if errors.Is(err, errors.ErrUnsupported) {
-		// This OS's processes aren't read (Windows, so far): the app
-		// stops asking, rather than failing every few seconds.
+		// This OS's processes aren't read (one but macOS, Linux and
+		// Windows): the app stops asking, rather than failing every few
+		// seconds.
 		return nil, connect.NewError(connect.CodeUnimplemented, err)
 	}
 	if err != nil {

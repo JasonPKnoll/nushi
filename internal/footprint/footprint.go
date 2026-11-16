@@ -4,7 +4,9 @@
 // call, and the process list is sysctl's kern.proc.all
 // (footprint_darwin.go). On Linux it is each process's proportional set
 // size and swapped-out share, from /proc/<pid>/smaps_rollup, and the
-// process list is /proc's stat files (footprint_linux.go). Another OS
+// process list is /proc's stat files (footprint_linux.go). On Windows it
+// is each process's private bytes (GetProcessMemoryInfo), and the process
+// list is Toolhelp's snapshot (footprint_windows.go, ADR 0131). Another OS
 // reads nothing (footprint_other.go, ADR 0097).
 package footprint
 

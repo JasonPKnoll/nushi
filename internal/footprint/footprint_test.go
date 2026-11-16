@@ -6,14 +6,24 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/afrase/nushi/internal/testcheck"
 )
 
+// TestHelperProcess is the child TestTree starts: it waits five seconds.
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("NUSHI_FOOTPRINT_HELPER") == "" {
+		t.Skip("run by TestTree")
+	}
+	time.Sleep(5 * time.Second)
+}
+
 // This process's footprint reads, a child it started is among its
 // children, and the tree's is more than this process's alone.
 func TestTree(t *testing.T) {
-	child := exec.Command("sleep", "5")
+	child := exec.Command(os.Args[0], "-test.run=^TestHelperProcess$")
+	child.Env = append(os.Environ(), "NUSHI_FOOTPRINT_HELPER=1")
 	if err := child.Start(); err != nil {
 		t.Fatal(err)
 	}
