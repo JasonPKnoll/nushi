@@ -286,8 +286,8 @@ class _Toast {
   late final Widget line;
 }
 
-/// A toast's card: the lifted fill and a hairline, the app's text, said
-/// to VoiceOver as it comes.
+/// A toast's card: the lifted fill, a hairline and the float's shadow,
+/// the app's text, said to VoiceOver as it comes.
 class _ToastCard extends StatelessWidget {
   const new({required this.child, super.key});
 
@@ -297,20 +297,28 @@ class _ToastCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
     final t = theme.t;
-    // A layer of its own: it fades over the app as it comes and goes.
+    // A layer of its own: it fades over the app as it comes and goes. The
+    // float's shadow, as the update card's (floatBox), so it stands off a
+    // view, Settings or a dialog under it.
     return RepaintBoundary(
       child: Semantics(
         container: true,
         liveRegion: true,
-        child: Material(
-          color: t.lifted,
-          shape: RoundedRectangleBorder(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(NushiTheme.card),
-            side: BorderSide(color: t.line),
+            boxShadow: floatShadows(t),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: DefaultTextStyle(style: theme.ui(t.text), child: child),
+          child: Material(
+            color: t.lifted,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(NushiTheme.card),
+              side: BorderSide(color: t.line),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: DefaultTextStyle(style: theme.ui(t.text), child: child),
+            ),
           ),
         ),
       ),
