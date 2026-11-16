@@ -155,15 +155,20 @@ func cmpDuration(a, b time.Duration) time.Duration {
 // launch sends the chat a Workflow call as Claude's agent does: the call,
 // its toolResponse, then its result (docs/facts/claude.md).
 func launch(c *chat) {
+	launchAs(c, wfCall, "w9u1xb6ik", "wf_769a004c-2aa")
+}
+
+// launchAs is launch of the call callID, with its own task and run ids.
+func launchAs(c *chat, callID acp.ToolCallID, task, run string) {
 	text := []acp.ToolCallContent{{Type: "content", Content: &acp.Content{Content: acp.ContentBlock{Type: "text", Text: &acp.TextContent{
-		Text: "Workflow launched in background. Task ID: w9u1xb6ik\nSummary: Ask four helpers\nRun ID: wf_769a004c-2aa\n"}}}}}
+		Text: "Workflow launched in background. Task ID: " + task + "\nSummary: Ask four helpers\nRun ID: " + run + "\n"}}}}}
 	resp := map[string]any{"claudeCode": map[string]any{"toolName": "Workflow", "toolResponse": map[string]any{"status": "async_launched",
-		"taskId": "w9u1xb6ik", "taskType": "local_workflow", "workflowName": "two-phases", "runId": "wf_769a004c-2aa", "summary": "Ask four helpers"}}}
+		"taskId": task, "taskType": "local_workflow", "workflowName": "two-phases", "runId": run, "summary": "Ask four helpers"}}}
 	for _, u := range []acp.SessionUpdate{
-		{SessionUpdate: "tool_call", ToolCall: &acp.ToolCall{ToolCallID: wfCall, Title: "Workflow", Kind: "other", Status: "pending",
+		{SessionUpdate: "tool_call", ToolCall: &acp.ToolCall{ToolCallID: callID, Title: "Workflow", Kind: "other", Status: "pending",
 			Meta: map[string]any{"claudeCode": map[string]any{"toolName": "Workflow"}}}},
-		{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: wfCall, Meta: resp}},
-		{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: wfCall, Status: "completed", Content: text}},
+		{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: callID, Meta: resp}},
+		{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: callID, Status: "completed", Content: text}},
 		{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2, Cost: &acp.Cost{Amount: 0.1, Currency: "USD"}}}, // the turn's end: it came outside one of Nushi's
 	} {
 		_ = c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(c.sid), Update: u})
@@ -239,6 +244,45 @@ func TestARunningWorkflowBeforeTheRecentPage(t *testing.T) {
 	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 0 })
 	if part, err = f.svc.Recent(f.c.id, 1); err != nil || has(part.Running) {
 		t.Errorf("ended: running %+v, %v", part.Running, err)
+	}
+}
+
+// Two runs in a chat count as two, each its own: one ending leaves the
+// other; one stalling leaves the count but stays live (a Move would stop it).
+func TestTwoWorkflowsInAChat(t *testing.T) {
+	const call2, run2 = "toolu_wf2", "wf_2"
+	var mu sync.Mutex
+	ended := map[string]bool{}
+	stalled := false
+	f := workflowChat(t, Timing{WorkflowStalledPoll: 5 * time.Millisecond}, func(w model.Workflow) (model.Workflow, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if ended[w.RunID] {
+			return endedAs("done", "completed")(w)
+		}
+		w, _ = runningAs(w)
+		if w.RunID == run2 && stalled {
+			w.Active = time.Now().Add(-2 * time.Hour)
+		}
+		return w, nil
+	})
+	launchAs(f.c, call2, "t2", run2)
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 2 && st.Background == 2 })
+	mu.Lock()
+	ended["wf_769a004c-2aa"] = true
+	mu.Unlock()
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 && st.Background == 1 })
+	if w := workflowOf(f.c); w.State != "done" {
+		t.Errorf("the one ended: %+v", w)
+	}
+	mu.Lock()
+	stalled = true
+	mu.Unlock()
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 0 && st.Background == 0 })
+	f.c.mu.Lock()
+	defer f.c.mu.Unlock()
+	if w := f.c.itemLocked(call2).Workflow; !w.Stalled || !f.c.workflowLiveLocked() {
+		t.Errorf("the one stalled: %+v, live %v", w, f.c.workflowLiveLocked())
 	}
 }
 
