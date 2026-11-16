@@ -288,27 +288,35 @@ void main() {
     await closeView(tester, d);
   }, variant: _both);
 
-  testWidgets('⌃`: the terminal under the transcript and the rail beside '
-      'the panes, the panes as tall; across all of it over them', (
-    tester,
-  ) async {
-    for (final area in [1600.0, 900.0]) {
+  testWidgets('⌃`: the terminal under the transcript and the rail, beside '
+      'the panes or under them, the panes as tall', (tester) async {
+    // Wide, the preview beside the transcript; narrow, over it (the
+    // transcript runs on under it): each way once.
+    for (final (area, over) in [(1600.0, false), (700.0, true)]) {
       final (d, _) = await panesApp(
         tester,
         width: windowFor(area, sidebar: false),
         open: _open(previews: 1),
       );
       final preview = _r(tester, find.byType(FilesPane));
-      final over = preview.top > _r(tester, find.byType(Pane)).top;
+      final transcript = _r(
+        tester,
+        find.byWidgetPredicate(
+          (w) => w is Transcript && w.items == null && w.chat.id == 'c',
+        ),
+      );
+      expect(transcript.right > preview.left, over);
       await _terminalKey(tester);
       final terminal = _r(tester, find.byType(TerminalPanel));
+      // Under the transcript, beside the panes or under them (ADR 0123);
+      // the panes as tall as before.
       if (over) {
-        expect(terminal.right, _r(tester, find.byType(Pane)).right);
-        expect(_r(tester, find.byType(FilesPane)).bottom, terminal.top);
+        expect(terminal.right, greaterThan(preview.left));
+        expect(terminal.right, lessThan(_r(tester, find.byType(Pane)).right));
       } else {
         expect(terminal.right, preview.left);
-        expect(_r(tester, find.byType(FilesPane)), preview);
       }
+      expect(_r(tester, find.byType(FilesPane)), preview);
       await _terminalKey(tester);
       expect(find.byType(TerminalPanel), findsNothing);
       await closeView(tester, d);
