@@ -115,6 +115,35 @@ void main() {
     ]);
   });
 
+  test('on Windows, Linux’s keys but none with Control and Alt, which is '
+      'AltGr there: the chat’s tabs are Ctrl+Shift+1–3', () {
+    native.conventions = windowsConventions;
+    expect(commandKey, CommandKey.control);
+    expect(
+      [
+        keyLabel(chatTabKey),
+        keyLabel(changesTabKey),
+        keyLabel(pullTabKey),
+        keyLabel(filesKey),
+        keyLabel(previousChatKey),
+        keyLabel(altDigitKey(1)),
+      ],
+      [
+        'Ctrl+Shift+1',
+        'Ctrl+Shift+2',
+        'Ctrl+Shift+3',
+        'Ctrl+Shift+E',
+        'Ctrl+Page Up',
+        'Alt+1',
+      ],
+    );
+    for (final k in [..._appKeys, ..._terminalKeys]) {
+      final a = k is Cmd ? k.single : k as SingleActivator;
+      expect(a.control && a.alt, isFalse, reason: keyLabel(k));
+    }
+    expect(terminalPasses(changesTabKey), isTrue);
+  });
+
   test('Enter and the command key with it, as each platform writes them', () {
     expect((enterLabel, cmdEnterLabel), ('⏎', '⌘⏎'));
     native.conventions = linuxConventions;
@@ -147,6 +176,7 @@ void main() {
   for (final (name, c) in [
     ('Mac', macConventions),
     ('Linux', linuxConventions),
+    ('Windows', windowsConventions),
   ]) {
     test('on $name no two of the app’s keys are the same, nor the '
         'terminal’s own', () {
