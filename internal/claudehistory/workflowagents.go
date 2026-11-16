@@ -3,6 +3,7 @@ package claudehistory
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"path"
 	"path/filepath"
 
@@ -15,21 +16,12 @@ import (
 // started: the snapshot's rows once the run ended, the journal's while it
 // runs (as last read by ReadWorkflow, or now when nothing was).
 func (l Local) WorkflowAgents(sid, folder string, w model.Workflow) ([]model.WorkflowAgent, error) {
-	root, key, err := l.runDir(sid, folder, w)
-	if err != nil {
-		return nil, err
-	}
-	defer root.Close() //nolint:errcheck // read-only
-	r := l.Workflows.get(key)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.snap == nil {
-		r.readSnapshot(root, w)
-	}
-	if err := r.readJournal(root, w.RunID); r.snap == nil && err != nil {
-		return nil, err
-	}
-	return r.agents(), nil
+	var agents []model.WorkflowAgent
+	err := l.readRun(sid, folder, w, func(r *run, _ *os.Root) error {
+		agents = r.agents()
+		return nil
+	})
+	return agents, err
 }
 
 func (r *run) agents() []model.WorkflowAgent {
@@ -48,7 +40,7 @@ func (r *run) agents() []model.WorkflowAgent {
 	}
 	for _, row := range r.j.rows {
 		state := row.State
-		if r.snap != nil && state == "running" {
+		if (r.snap != nil || r.noted() != nil) && state == "running" {
 			state = "stopped" // the run ended without it
 		}
 		out = append(out, model.WorkflowAgent{ID: row.AgentID, Label: label(row.Label, row.AgentID), Phase: label(row.Phase, ""), State: state})
@@ -61,45 +53,40 @@ func (r *run) agents() []model.WorkflowAgent {
 // those. Only an agent the run's journal or snapshot lists is read, so an
 // id never names a file of its own; one it doesn't is fs.ErrNotExist.
 func (l Local) WorkflowAgentItems(sid, folder string, w model.Workflow, id string, limit int) ([]model.Item, int, error) {
-	root, key, err := l.runDir(sid, folder, w)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer root.Close() //nolint:errcheck // read-only
-	r := l.Workflows.get(key)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.snap == nil {
-		r.readSnapshot(root, w)
-	}
-	_ = r.readJournal(root, w.RunID)
-	listed := false
-	for _, a := range r.agents() {
-		listed = listed || a.ID == id && id != ""
-	}
-	if !listed || !agentID.MatchString(id) {
-		return nil, 0, fmt.Errorf("agent %q of workflow %s: %w", id, w.RunID, fs.ErrNotExist)
-	}
-	fi, err := root.Lstat(path.Join("subagents", "workflows", w.RunID, "agent-"+id+".jsonl"))
-	if err != nil {
-		return nil, 0, err
-	}
-	if !fi.Mode().IsRegular() {
-		return nil, 0, fmt.Errorf("agent %q of workflow %s: %w", id, w.RunID, fs.ErrNotExist)
-	}
-	s, ok := r.steps[id]
-	if !ok || s.size != fi.Size() || !s.mod.Equal(fi.ModTime()) {
-		msgs, err := sessions.Store{ConfigDir: filepath.Dir(l.Projects)}.SubagentMessages(sid, folder, id)
+	var items []model.Item
+	err := l.readRun(sid, folder, w, func(r *run, root *os.Root) error {
+		listed := false
+		for _, a := range r.agents() {
+			listed = listed || a.ID == id && id != ""
+		}
+		if !listed || !agentID.MatchString(id) || root == nil {
+			return fmt.Errorf("agent %q of workflow %s: %w", id, w.RunID, fs.ErrNotExist)
+		}
+		fi, err := root.Lstat(path.Join("subagents", "workflows", w.RunID, "agent-"+id+".jsonl"))
 		if err != nil {
-			return nil, 0, err
+			return err
 		}
-		s = steps{size: fi.Size(), mod: fi.ModTime(), items: stepItems("wf/"+id+"/", msgs)}
-		if r.steps == nil {
-			r.steps = map[string]steps{}
+		if !fi.Mode().IsRegular() {
+			return fmt.Errorf("agent %q of workflow %s: %w", id, w.RunID, fs.ErrNotExist)
 		}
-		r.steps[id] = s
+		s, ok := r.steps[id]
+		if !ok || s.size != fi.Size() || !s.mod.Equal(fi.ModTime()) {
+			msgs, err := sessions.Store{ConfigDir: filepath.Dir(l.Projects)}.SubagentMessages(sid, folder, id)
+			if err != nil {
+				return err
+			}
+			s = steps{size: fi.Size(), mod: fi.ModTime(), items: stepItems("wf/"+id+"/", msgs)}
+			if r.steps == nil {
+				r.steps = map[string]steps{}
+			}
+			r.steps[id] = s
+		}
+		items = s.items
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
-	items := s.items
 	earlier := 0
 	if limit > 0 && len(items) > limit {
 		earlier = len(items) - limit

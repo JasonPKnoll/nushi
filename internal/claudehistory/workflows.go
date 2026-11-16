@@ -47,10 +47,15 @@ type Runs struct {
 	runs      map[string]*run
 	used      []string      // keys, the most recently used last
 	agentStat time.Duration // how often a run's running agents are looked at
+	// snapshotWait is how long a run its notification ended waits for
+	// its snapshot.
+	snapshotWait time.Duration
 }
 
 // NewRuns returns an empty Runs.
-func NewRuns() *Runs { return &Runs{runs: map[string]*run{}, agentStat: agentStat} }
+func NewRuns() *Runs {
+	return &Runs{runs: map[string]*run{}, agentStat: agentStat, snapshotWait: snapshotWait}
+}
 
 // maxRuns is how many runs Runs keeps: the ones being followed, and the
 // last few looked at.
@@ -58,7 +63,7 @@ const maxRuns = 64
 
 func (r *Runs) get(key string) *run {
 	if r == nil {
-		return &run{agentStat: agentStat}
+		return &run{agentStat: agentStat} // read once: no wait for a snapshot
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -70,7 +75,7 @@ func (r *Runs) get(key string) *run {
 		delete(r.runs, r.used[0])
 		r.used = r.used[1:]
 	}
-	r.runs[key] = &run{agentStat: r.agentStat}
+	r.runs[key] = &run{agentStat: r.agentStat, snapshotWait: r.snapshotWait}
 	r.used = append(r.used, key)
 	return r.runs[key]
 }
@@ -85,9 +90,12 @@ type run struct {
 	statted time.Time
 	tooBig  bool
 	started time.Time // the script's time, when nothing else says
-	// agentStat is how often the running agents' transcripts are looked at.
-	agentStat time.Duration
-	steps     map[string]steps
+	notes   notes     // the session's transcript, for the run's notification
+	// agentStat is how often the running agents' transcripts are looked
+	// at; snapshotWait how long an end its notification told waits for
+	// the snapshot.
+	agentStat, snapshotWait time.Duration
+	steps                   map[string]steps
 }
 
 // steps are an agent's transcript as items, as read at its size and time.
@@ -97,47 +105,67 @@ type steps struct {
 	items []model.Item
 }
 
-// runDir opens session sid's folder in folder's history, for a run of w's,
-// and the key Runs keeps it by: the run and its task, since a resumed run
-// keeps its run id and gets a new task (Claude 2.1.325), and the snapshot
-// of the run it resumed, another task's, must not end it.
-func (l Local) runDir(sid, folder string, w model.Workflow) (*os.Root, string, error) {
+// runKey is the folder of session sid in folder's history, for a run of
+// w's, and the key Runs keeps the run by: the run and its task, since a
+// resumed run keeps its run id and gets a new task (Claude 2.1.325), and
+// the snapshot of the run it resumed, another task's, must not end it.
+func (l Local) runKey(sid, folder string, w model.Workflow) (dir, key string, err error) {
 	if !sessionID.MatchString(sid) || !claude.ValidRunID(w.RunID) || w.TaskID != "" && !claude.ValidTaskID(w.TaskID) {
-		return nil, "", fmt.Errorf("workflow %q of session %q: %w", w.RunID, sid, fs.ErrNotExist)
+		return "", "", fmt.Errorf("workflow %q of session %q: %w", w.RunID, sid, fs.ErrNotExist)
 	}
-	dir := filepath.Join(historyDir(l.Projects, folder), sid)
-	root, err := os.OpenRoot(dir)
-	if err != nil {
-		return nil, "", err
-	}
-	return root, dir + "\x00" + w.RunID + "\x00" + w.TaskID, nil
+	dir = filepath.Join(historyDir(l.Projects, folder), sid)
+	return dir, dir + "\x00" + w.RunID + "\x00" + w.TaskID, nil
 }
 
-// ReadWorkflow reads the run w names (its RunID and TaskID, and Started,
-// when the daemon saw it start) of session sid in folder: w with what its
-// files say. Its State is "running" until the snapshot is there, then how
-// it ended; Active is when its files last changed. An error matching
-// fs.ErrNotExist says none of its files is there (yet).
-func (l Local) ReadWorkflow(sid, folder string, w model.Workflow) (model.Workflow, error) {
-	root, key, err := l.runDir(sid, folder, w)
+// readRun reads what the run w names added to its files since the last
+// read: the session's transcript for its notification, its snapshot once
+// there, its journal. Locked, it calls read with the run and the session's
+// folder (nil when it isn't there). An error matching fs.ErrNotExist says
+// none of the run's files is there (yet).
+func (l Local) readRun(sid, folder string, w model.Workflow, read func(r *run, root *os.Root) error) error {
+	dir, key, err := l.runKey(sid, folder, w)
 	if err != nil {
-		return w, err
+		return err
 	}
-	defer root.Close() //nolint:errcheck // read-only
 	r := l.Workflows.get(key)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.snap == nil {
+		r.readNotes(filepath.Dir(dir), sid, w.TaskID)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		if r.notes.end != nil {
+			return read(r, nil)
+		}
+		return err
+	}
+	defer root.Close() //nolint:errcheck // read-only
+	if r.snap == nil {
 		r.readSnapshot(root, w)
 	}
-	jerr := r.readJournal(root, w.RunID)
-	if r.snap == nil && jerr != nil {
-		return w, jerr
+	if jerr := r.readJournal(root, w.RunID); jerr != nil && r.snap == nil && r.notes.end == nil {
+		return jerr
 	}
 	if r.started.IsZero() && w.Started.IsZero() {
 		r.started = scriptTime(root, w.RunID)
 	}
-	return r.summary(w), nil
+	return read(r, root)
+}
+
+// ReadWorkflow reads the run w names (its RunID and TaskID, and Started,
+// when the daemon saw it start) of session sid in folder: w with what its
+// files say. Its State is "running" until it ended (Claude's notification
+// of its task, or its snapshot), then how; Active is when its files last
+// changed. An error matching fs.ErrNotExist says none of its files is
+// there (yet).
+func (l Local) ReadWorkflow(sid, folder string, w model.Workflow) (model.Workflow, error) {
+	got := w
+	err := l.readRun(sid, folder, w, func(r *run, _ *os.Root) error {
+		got = r.summary(w)
+		return nil
+	})
+	return got, err
 }
 
 // readSnapshot takes the run's snapshot, once Claude wrote it: one of
@@ -229,6 +257,7 @@ func (r *run) summary(w model.Workflow) model.Workflow {
 		return r.ended(w, *s)
 	}
 	w.State, w.End, w.Ended = "running", "", time.Time{}
+	n := r.noted()
 	at := map[string]int{}
 	for _, row := range r.j.rows {
 		i := phaseOf(&w, at, row.Phase, "")
@@ -244,13 +273,32 @@ func (r *run) summary(w model.Workflow) model.Workflow {
 			count(&w, i, func(p *model.WorkflowPhase) { p.Failed++ })
 		case "stopped": // the run it was in ended before it did
 		default:
+			if n != nil {
+				continue // stopped with the run
+			}
 			w.RunningCount++
 			if len(w.Running) < model.WorkflowRunning {
 				w.Running = append(w.Running, label(row.Label, row.AgentID))
 			}
 		}
 	}
+	if n != nil { // its notification, and no snapshot came
+		w.State, w.End, w.Ended = endState(n.status), n.status, cmp.Or(n.at, n.seen)
+		if w.State == "failed" {
+			w.Summary = clipText(secrets.Mask(n.summary, "…", nil), model.WorkflowSummaryText)
+		}
+	}
 	return w
+}
+
+// noted is the end the run's notification told, once the snapshot had
+// its time to come and didn't; nil while the run runs, or ended with a
+// snapshot.
+func (r *run) noted() *note {
+	if n := r.notes.end; r.snap == nil && n != nil && time.Since(n.seen) >= r.snapshotWait {
+		return n
+	}
+	return nil
 }
 
 // ended is w as the snapshot says the run ended.
