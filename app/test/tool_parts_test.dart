@@ -126,6 +126,34 @@ void main() {
     expect(find.text('Output'), findsOneWidget);
   });
 
+  testWidgets('a command left running: "in the background" in words, '
+      'only its state in a narrow row', (tester) async {
+    final call = Item(
+      id: 'bg',
+      kind: ItemKind.ITEM_KIND_TOOL_CALL,
+      title: 'npm run dev',
+      toolKind: 'execute',
+      status: 'completed',
+      backgroundCommand: BackgroundCommand(id: 'b', state: 'running'),
+    );
+    viewport(tester, const Size(800, 200));
+    await tester.pumpWidget(_rows([call]));
+    expect(find.text('in the background: running'), findsOne);
+    final title = find.textContaining('npm run dev', findRichText: true);
+    final whole = tester.getSize(title.first).width;
+    await render(tester, find.byType(MaterialApp), 'tool_note_wide');
+
+    // The chat's column at its least beside open panes (panes_narrow_test).
+    viewport(tester, const Size(290, 200));
+    await tester.pumpWidget(_rows([call]));
+    expect(tester.takeException(), isNull);
+    expect(find.text('running'), findsOne);
+    expect(find.textContaining('in the background'), findsNothing);
+    await render(tester, find.byType(MaterialApp), 'tool_note_narrow');
+    // The command keeps its room.
+    expect(tester.getSize(title.first).width, whole);
+  });
+
   testWidgets('golden, input only, raw output only, nothing, dark', (
     tester,
   ) async {

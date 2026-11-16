@@ -253,6 +253,10 @@ abstract final class RowRoom {
   /// The narrowest row of one call that has its Preview in its header.
   static const preview = 250.0;
 
+  /// The narrowest row of one call that says a command of its is "in the
+  /// background" in words; narrower, only the command's state.
+  static const note = 340.0;
+
   /// The narrowest run's row that shows its counts in its header.
   static const runCounts = 350.0;
 
@@ -412,14 +416,18 @@ class ToolCallView extends StatelessWidget {
                 ],
                 // The call ends; the command runs on
                 // (background_commands.dart).
-                if (it.hasBackgroundCommand())
+                if (it.hasBackgroundCommand()) ...[
+                  const SizedBox(width: 8),
                   Shine(
                     on: it.backgroundCommand.state == 'running' && !still,
                     child: Text(
-                      'in the background: ${it.backgroundCommand.state}',
+                      box.maxWidth >= RowRoom.note
+                          ? 'in the background: ${it.backgroundCommand.state}'
+                          : it.backgroundCommand.state,
                       style: theme.ui(t.textSecondary, size: 12),
                     ),
                   ),
+                ],
                 if (failed) ...[
                   const SizedBox(width: 8),
                   const _Failed('failed'),

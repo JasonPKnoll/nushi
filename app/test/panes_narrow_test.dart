@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nushi/browser_pane.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/file_view.dart';
 import 'package:nushi/files_bar.dart';
@@ -9,8 +8,6 @@ import 'package:nushi/files_pane.dart';
 import 'package:nushi/files_tree.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/settings.dart' show filesTree;
-import 'package:nushi/side_chat.dart';
-import 'package:nushi/subagent_pane.dart';
 
 import 'browser_fixture.dart' show browserFakes;
 import 'harness.dart';
@@ -18,27 +15,15 @@ import 'panes_app.dart';
 
 // Panes in a narrow window (ADR 0123): under their summed least they lie
 // over the transcript and narrow to fit, each down to the least its rows
-// hold before the others give, so no row of theirs overflows in a window
-// from 600.
+// hold before the others give, so no row overflows in a window from 600:
+// theirs, or the transcript's beside them at its own least.
 
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
 /// Each laid-out row whose children overflow it (a [RenderFlex] says so
 /// in its short description), by where it was made.
 List<String> _overflows(WidgetTester tester) => [
-  for (final e
-      in find
-          .descendant(
-            of: find.byWidgetPredicate(
-              (w) =>
-                  w is SideChat ||
-                  w is FilesPane ||
-                  w is BrowserPane ||
-                  w is SubagentPane,
-            ),
-            matching: find.byWidgetPredicate((w) => w is Flex),
-          )
-          .evaluate())
+  for (final e in find.byWidgetPredicate((w) => w is Flex).evaluate())
     if (e.renderObject case final RenderFlex r
         when r.hasSize && r.toStringShort().contains('OVERFLOWING'))
       '${r.size.width.toStringAsFixed(1)} ${_where(e)}',
