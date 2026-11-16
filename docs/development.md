@@ -81,12 +81,16 @@ The same goes for Claude's library, `github.com/afrase/claude-acp-go` (`go work 
 
 ## CI
 
-CI (`.github/workflows/ci.yml`) runs the same parts as `make check`, as parallel jobs, in under 3 minutes (the Linux app's package longer, a Flutter release build on each architecture):
+CI (`.github/workflows/ci.yml`) runs the same parts as `make check`, as parallel jobs, in about 5–6 minutes when it runs them all (ADR 0128):
 
 - on macOS: Go's tests, Go's lint with the window's placement maths, and the app's test files that need a Mac (those with goldens, and the Mac's fonts) in two shards (`make test-app SET=macos SHARD=1/2`);
-- on Linux: the protos' and Dart's lint (with `tools/native-edge`), the Dart packages' tests, every Go package's tests (`make test-go`, with bubblewrap from apt for npm's sandbox and AppArmor's rule on unprivileged user namespaces off), `make lint-linux`, `make lint-windows` and `go mod tidy -diff` (ADR 0101, 0124);
+- on Linux: the protos' and Dart's lint (with `tools/native-edge`), the Dart packages' tests, the web app's end-to-end test in Chrome (`make test-web`), every Go package's tests (`make test-go`, with bubblewrap from apt for npm's sandbox and AppArmor's rule on unprivileged user namespaces off) and `go mod tidy -diff`, and beside them `make lint-linux` and `make lint-windows` (ADR 0101, 0124);
 - on Windows: the daemon built, and the Windows tests listed under Windows below (ADR 0124);
 - the Linux app (ADR 0104): every other app test file, in three shards (`make test-app SET=linux SHARD=1/3`; a golden there fails), and on each architecture (Ubuntu 22.04, amd64 and arm64) its package built as a release builds it (`tools/release.sh 0.0.0-ci linux`, glibc 2.34 at most), installed into a throwaway home and started on a virtual display until it connects to the daemon it started (`tools/linux-smoke.sh`, whose screenshot is the job's artifact), and on amd64 the runner's channels (`tools/linux-channels.sh`).
+
+**Which app test files run where.** `tools/test-shards` puts each file in one set: the macOS set is every file that calls `matchesGoldenFile(` or reads the Mac (`Platform.isMacOS`, `/System/Library/`), the Linux set the rest. Each set is split into its matrix's count of shards by `app/test/timings.tsv`, slowest file first to the least loaded shard, and each shard starts its slowest files first. A golden belongs in the test file itself, so the tool sees it; one it misses fails its Linux shard. `make lint-dart` runs `test-shards -check`, which fails on a file in the wrong set or a split that drops or repeats one. The table only balances the shards: rewrite it with `make test-timings` after a full local check when `-check` reports more than 30 files missing from it, or when one shard runs more than a quarter longer than its siblings over three runs, and commit it on its own.
+
+**What a change runs.** The changes job (`tools/ci-changes.sh`) reads a pull request's whole branch or a push's own commits. Docs (`docs/`, the root's Markdown, `LICENSE`) run nothing, Go's folders all but the golden shards, the app's and the Dart packages' all but Go's five jobs; anything else (CI, the Makefile, `tools/`, protos), any path it can't place, and any other event run everything. `tools/ci-changes.sh --self-test` checks its table (`make lint`). Main's runs don't cancel each other, so each push's change is tested. The release checks a commit only with a run that skipped no job, or runs CI in full itself.
 
 ### The daemon's tests on Linux
 
