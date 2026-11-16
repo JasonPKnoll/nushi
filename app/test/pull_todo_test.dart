@@ -53,6 +53,12 @@ Both earlier threads are addressed: c0ffee1 adds the address fallback (thread re
 
 claude-opus · $1.12 · 4m 02s''';
 
+/// The bar at the tab's foot, saying [n] cards wait in the box.
+Finder _waiting(int n) => find.text(
+  "$n waiting in the chat's box. They go with your next message.",
+  findRichText: true,
+);
+
 void main() {
   setUpAll(loadFonts);
 
@@ -268,8 +274,8 @@ void main() {
   });
 
   testWidgets('Send, Send picked and Send all put reply cards in the box, '
-      'each saying whose; a toast says what went, the row "In the box ✓" '
-      'until the card goes; the bar counts them', (tester) async {
+      'each saying whose; a toast only when none went, the row "In the box '
+      '✓" until the card goes; the bar counts them', (tester) async {
     final (d, _) = await openPullTab(tester, fixturePull());
     final box = d.chats['c']!.draft.replies;
     Finder toast(String s) =>
@@ -295,10 +301,7 @@ void main() {
     expect(find.text('In the box ✓'), findsOneWidget);
     expect(find.text('Send'), findsNWidgets(5));
     // The bar, at the tab's foot.
-    final bar = find.text(
-      "1 waiting in the chat's box. They go with your next message.",
-      findRichText: true,
-    );
+    final bar = _waiting(1);
     expect(bar, findsOneWidget);
     expect(tester.getRect(bar).top, greaterThan(800));
     // Two picked: rspec and mona's review.
@@ -312,9 +315,11 @@ void main() {
     expect(find.byType(ToastLine), findsNothing);
     expect(find.text('Send 2 picked'), findsNothing); // unpicked once sent
     expect(find.text('In the box ✓'), findsNWidgets(3));
+    expect(_waiting(3), findsOneWidget);
     await tester.tap(find.text('Send all 6 to agent'));
     await tester.pumpAndSettle();
     expect(box.value.length, 6); // the same card once
+    expect(_waiting(6), findsOneWidget);
     expect(find.byType(ToastLine), findsNothing);
     expect(find.text('Send'), findsNothing);
     // All of them there already: only a toast can say so.
