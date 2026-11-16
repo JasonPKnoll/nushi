@@ -317,7 +317,7 @@ class _PhaseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
-    final t = theme.t;
+    final style = theme.ui(theme.t.textSecondary, size: 12, weight: .w600);
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 2),
       child: Tap(
@@ -329,12 +329,20 @@ class _PhaseRow extends StatelessWidget {
             spacing: 6,
             children: [
               Chevron(open: !folded),
+              // A long title is cut, never its count.
               Expanded(
-                child: Text(
-                  '$title $count',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.ui(t.textSecondary, size: 12, weight: .w600),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: style,
+                      ),
+                    ),
+                    Text(' $count', maxLines: 1, style: style),
+                  ],
                 ),
               ),
             ],

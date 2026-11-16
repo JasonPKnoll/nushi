@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:nushi/clock.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/status.dart';
@@ -46,7 +48,9 @@ String phaseProgress(WorkflowPhase p) =>
 
 /// Its state line: while it runs "Review 5/7 · 3 running · 4m 12s"; at its
 /// end "done · 100 agents · 14m 05s" ("failed", "stopped", "ended" when the
-/// agent didn't say how); stalled "no activity for 1h · …".
+/// agent didn't say how); stalled "no activity for 1h · Review 5/7 · 3
+/// running", without its time, which no longer ticks and would be cut
+/// first where the line is short (a phone's).
 String workflowState(Workflow w) {
   final time = workflowTime(w);
   final agents = '${w.agents} agent${w.agents == 1 ? '' : 's'}';
@@ -57,7 +61,7 @@ String workflowState(Workflow w) {
       if (phase != null) phaseProgress(phase),
       if (w.runningCount > 0) '${w.runningCount} running',
       if (phase == null && w.runningCount == 0) 'starting',
-      if (time.isNotEmpty) time,
+      if (time.isNotEmpty && !w.stalled) time,
     ].join(' · ');
   }
   return [
@@ -85,9 +89,13 @@ String phasesLine(Workflow w) => w.phases.map(phaseProgress).join(' · ');
 
 /// Who runs now: "review:security, review:ui +1".
 String runningLine(Workflow w) {
-  final more = w.runningCount - w.running.length;
+  final more = runningMore(w);
   return [w.running.join(', '), if (more > 0) '+$more'].join(' ');
 }
+
+/// How many run beyond the labels the summary holds: the "+1" of
+/// [runningLine].
+int runningMore(Workflow w) => math.max(0, w.runningCount - w.running.length);
 
 /// What it says when it ended otherwise than done: Claude's own word, or
 /// the reason a failed run gave.

@@ -139,9 +139,13 @@ class WorkflowCard extends StatelessWidget {
                     _line(
                       [
                         if (w.phases.isNotEmpty) phasesLine(w),
-                        if (live && w.running.isNotEmpty) runningLine(w),
+                        if (live && w.running.isNotEmpty) w.running.join(', '),
                       ].join('  ·  '),
                       theme.ui(t.textSecondary, size: 12),
+                      // Long labels are cut, never how many more run.
+                      more: live && runningMore(w) > 0
+                          ? '+${runningMore(w)}'
+                          : null,
                     ),
                   if (ended.isNotEmpty)
                     _line(
@@ -157,14 +161,22 @@ class WorkflowCard extends StatelessWidget {
     );
   }
 
-  /// One line, cut at its end; its indent lines up with the name's.
-  Widget _line(String text, TextStyle style) => Padding(
+  /// One line, cut at its end, then [more] whole; its indent lines up
+  /// with the name's.
+  Widget _line(String text, TextStyle style, {String? more}) => Padding(
     padding: const EdgeInsets.only(left: 15 + 8),
-    child: Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: style,
+    child: Row(
+      children: [
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
+        if (more != null) Text(' $more', maxLines: 1, style: style),
+      ],
     ),
   );
 }

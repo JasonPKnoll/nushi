@@ -115,7 +115,7 @@ void main() {
     );
     expect(
       workflowState(workflowCall('running', stalled: true).workflow),
-      startsWith('no activity for 1h · Review 4/7'),
+      'no activity for 1h · Review 4/7 · 3 running',
     );
     expect(
       workflowState(Workflow(state: 'running', started: _ms(Duration.zero))),
@@ -180,6 +180,22 @@ void main() {
     final card = tester.getRect(find.byType(WorkflowCard));
     final chevron = tester.getRect(find.byIcon(Icons.chevron_right));
     expect(chevron.right, greaterThan(card.right - 20));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('long labels and phases are cut, never how many more run', (
+    tester,
+  ) async {
+    final call = workflowCall('running');
+    call.workflow
+      ..phases.add(WorkflowPhase(title: 'Verify-${'x' * 60}', started: 1))
+      ..running.clear()
+      ..running.addAll([for (var i = 0; i < 8; i++) 'review:${'long' * 14}'])
+      ..runningCount = 12;
+    await _pump(tester, call);
+    final card = tester.getRect(find.byType(WorkflowCard));
+    final more = tester.getRect(find.text(' +4'));
+    expect(more.right, lessThanOrEqualTo(card.right - 12));
     expect(tester.takeException(), isNull);
   });
 

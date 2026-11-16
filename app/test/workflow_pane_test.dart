@@ -179,19 +179,44 @@ void main() {
   ) async {
     final fake = workflowFake();
     final d = await _pane(tester, fake, workflowChat());
-    expect(find.text('Map 2/2'), findsOne);
-    expect(find.text('Review 4/7'), findsOne);
-    expect(find.text('No phase 1/1'), findsOne);
+    expect(find.text('Map'), findsOne);
+    expect(find.text(' 4/7'), findsOne);
+    expect(find.text('No phase'), findsOne);
     expect(find.text('review:security'), findsOne);
     expect(
-      tester.getRect(find.text('No phase 1/1')).top,
+      tester.getRect(find.text('No phase')).top,
       greaterThan(tester.getRect(find.text('review:tests')).top),
     );
     // A phase folds its agents.
-    await tester.tap(find.text('Map 2/2'));
+    await tester.tap(find.text('Map'));
     await tester.pump();
     expect(find.text('map:files'), findsNothing);
     expect(_asked<GetWorkflowRequest>(fake), 1);
+    await closeView(tester, d);
+  });
+
+  testWidgets('a long phase title is cut, never its count', (tester) async {
+    final long = 'Review-${'everything-' * 8}';
+    final chat = workflowChat();
+    chat.items.single.workflow.phases[1].title = long;
+    final fake = workflowFake()
+      ..answer = (input) => switch (input) {
+        GetWorkflowRequest() => GetWorkflowResponse(
+          workflow: chat.items.single.workflow,
+          agents: [
+            for (final a in agents)
+              a.deepCopy()..phase = a.phase == 'Review' ? long : a.phase,
+          ],
+        ),
+        _ => null,
+      };
+    final d = await _pane(tester, fake, chat, width: 280);
+    final pane = tester.getRect(find.byType(WorkflowPane));
+    expect(
+      tester.getRect(find.text(' 4/7')).right,
+      lessThanOrEqualTo(pane.right),
+    );
+    expect(tester.takeException(), isNull);
     await closeView(tester, d);
   });
 
@@ -217,7 +242,7 @@ void main() {
         _ => null,
       };
     final d = await _pane(tester, fake, chat);
-    expect(find.text('Review 4/7'), findsOne);
+    expect(find.text(' 4/7'), findsOne);
     expect(phaseProgress(chat.items.single.workflow.phases[1]), 'Review 4/7');
     await closeView(tester, d);
   });
@@ -268,7 +293,7 @@ void main() {
     expect(tester.getRect(find.byTooltip('All agents')), back);
     await tester.tap(find.byTooltip('All agents'));
     await tester.pump();
-    expect(find.text('Review 4/7'), findsOne);
+    expect(find.text(' 4/7'), findsOne);
     await tester.pump(const Duration(seconds: 6));
     expect(_asked<GetWorkflowAgentRequest>(fake), 2);
     await closeView(tester, d);
