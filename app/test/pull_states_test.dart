@@ -9,6 +9,7 @@ import 'package:nushi/pull_states.dart';
 import 'package:nushi/theme/theme.dart';
 
 import 'fake_daemon.dart';
+import 'fake_web_views.dart';
 import 'github_fixture.dart' show item, pull;
 import 'harness.dart';
 
@@ -106,6 +107,13 @@ void main() {
         lessThanOrEqualTo(size.width),
         reason: 'inside the bar',
       );
+      final opened = <Uri>[];
+      fakeWebViews().link = (url) async => opened.add(url);
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      expect(opened, [
+        Uri.parse('https://github.com/afrase/nushi-gh-test/pull/1'),
+      ]);
       await endPhone(tester, phone);
     });
   }
