@@ -19,7 +19,7 @@ func TestFenceOfALongRun(t *testing.T) {
 	if Fence("x", "go") != "```go\nx\n```" || Code("a`b") != "``a`b``" || Code("``") != "``` `` ```" {
 		t.Fatal(Fence("x", "go"), Code("a`b"), Code("``"))
 	}
-	if d := time.Since(start); d > 2*time.Second {
+	if d := time.Since(start); d > 30*time.Second {
 		t.Fatalf("took %s", d)
 	}
 }

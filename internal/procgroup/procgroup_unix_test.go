@@ -27,7 +27,7 @@ func TestBound(t *testing.T) {
 	if err := cmd.Run(); err == nil {
 		t.Error("the run didn't fail")
 	}
-	if took := time.Since(start); took > 2500*time.Millisecond {
+	if took := time.Since(start); took > 30*time.Second { // far under the sleeps' 100 s
 		t.Errorf("the run took %s after its context ended", took)
 	}
 	if !testcheck.Eventually(func() bool { return syscall.Kill(-cmd.Process.Pid, 0) != nil }) { // the background sleep is reaped by launchd

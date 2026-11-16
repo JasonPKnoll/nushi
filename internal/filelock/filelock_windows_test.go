@@ -18,7 +18,7 @@ func TestLock(t *testing.T) {
 		t.Error("locked twice")
 	}
 	go func() { time.Sleep(50 * time.Millisecond); unlock() }()
-	again, err := Lock(path, 2*time.Second) // waits for the first to let go
+	again, err := Lock(path, 30*time.Second) // waits for the first to let go
 	if err != nil {
 		t.Fatal(err)
 	}

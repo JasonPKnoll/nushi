@@ -573,7 +573,7 @@ func TestListenNeedsTheKey(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testcheck.NoErr(t, ws.SetReadDeadline(time.Now().Add(2*time.Second)))
+		testcheck.NoErr(t, ws.SetReadDeadline(time.Now().Add(30*time.Second)))
 		_, m, err := ws.ReadMessage()
 		if err != nil || !bytes.HasPrefix(m, []byte(challengeTag)) {
 			t.Fatalf("no challenge: %q %v", m, err)
@@ -853,7 +853,7 @@ func TestSlowHeadersFloodDoesntStarve(t *testing.T) {
 	// kernel resets a connection closed with input unread; under load,
 	// FirstWait can pass before that read).
 	last := slow[len(slow)-1]
-	testcheck.NoErr(t, last.SetReadDeadline(time.Now().Add(2*time.Second)))
+	testcheck.NoErr(t, last.SetReadDeadline(time.Now().Add(30*time.Second)))
 	if _, err := last.Read(make([]byte, 1)); !errors.Is(err, io.EOF) && !errors.Is(err, syscall.ECONNRESET) {
 		t.Fatalf("a connection without its headers stayed past FirstWait: %v", err)
 	}

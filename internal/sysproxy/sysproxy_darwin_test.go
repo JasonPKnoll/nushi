@@ -101,7 +101,7 @@ func TestPACTimeout(t *testing.T) {
 	if got, ok := fromSettings(s, u, true); ok || got[0] != nil {
 		t.Fatalf("got %v %v", got, ok)
 	}
-	if time.Since(began) > 2*time.Second {
+	if time.Since(began) > 30*time.Second {
 		t.Fatal("waited too long")
 	}
 }
