@@ -1,6 +1,8 @@
-// The hero's background: a disc of linked nodes, like the mark's orbits seen at an angle, turning slowly in 3D.
-// The cursor tilts it and pushes nearby nodes aside, and they spring back; amber sparks run along the links,
-// messages between agents. Plain canvas, no library. Still (one frame) under Reduce Motion, paused off screen.
+// The hero's background: a deep cloud of drifting nodes, linked to their neighbours while they're close, seen
+// through a lens focused on the middle distance: nodes near the camera and far behind blur into soft discs, and
+// only the ones in focus draw links. The cursor moves the camera (near nodes shift more than far ones) and pushes
+// the nodes under it aside; they spring back. Amber sparks run along the links, messages between agents.
+// Plain canvas, no library. One still frame under Reduce Motion; paused off screen.
 (() => {
   const canvas = document.querySelector('.field');
   if (!canvas || !canvas.getContext) return;
@@ -9,49 +11,34 @@
 
   const MIST = '238,241,245';
   const AMBER = '245,165,36';
-  const N = innerWidth < 700 ? 150 : 300;
+  const N = innerWidth < 700 ? 90 : 160;
+  const NEAR = 0.55, FAR = 3.4, FOCUS = 1.5; // depths from the camera
+  const LINK = 0.6;                           // nodes closer than this (in the world) link
 
-  // Nodes on a thin disc, denser toward the middle; a few are amber.
-  const nodes = [];
-  for (let i = 0; i < N; i++) {
-    const r = Math.sqrt(0.2 + Math.random() * 0.8); // an open middle, where the headline sits
-    const a = Math.random() * Math.PI * 2;
-    const g = (Math.random() + Math.random() + Math.random() - 1.5) * 0.06;
-    nodes.push({
-      x: Math.cos(a) * r, y: g, z: Math.sin(a) * r,
-      ox: 0, oy: 0, vx: 0, vy: 0, // the cursor's push, in screen pixels
-      sx: 0, sy: 0, s: 1, d: 0,   // projected place, scale, depth (0 far, 1 near)
-      amber: Math.random() < 0.06,
-    });
-  }
-
-  // Each node links to its 3 nearest, once.
-  const links = [];
-  const seen = new Set();
-  nodes.forEach((n, i) => {
-    nodes
-      .map((m, j) => [j, (n.x - m.x) ** 2 + (n.y - m.y) ** 2 + (n.z - m.z) ** 2])
-      .filter(([j]) => j !== i)
-      .sort((p, q) => p[1] - q[1])
-      .slice(0, 3)
-      .forEach(([j]) => {
-        const key = i < j ? i * N + j : j * N + i;
-        if (!seen.has(key)) { seen.add(key); links.push([i, j]); }
-      });
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const nodes = Array.from({ length: N }, () => {
+    const z = rnd(NEAR, FAR);
+    return {
+      hx: rnd(-1.9, 1.9) * z / 1.6, hy: rnd(-1.1, 1.1) * z / 1.6, z, // spread wider with depth, filling the view
+      ph: rnd(0, 6.3), sp: rnd(0.15, 0.4),                       // its own slow drift
+      x: 0, y: 0, ox: 0, oy: 0, vx: 0, vy: 0,                    // where it is; the cursor's push and its speed
+      sx: 0, sy: 0, blur: 0, focus: 1,
+      amber: Math.random() < 0.07,
+    };
   });
 
-  let w = 0, h = 0, dpr = 1;
+  let w = 0, h = 0, F = 1;
   function size() {
-    dpr = Math.min(devicePixelRatio || 1, 2);
+    const dpr = Math.min(devicePixelRatio || 1, 2);
     const box = canvas.getBoundingClientRect();
     w = box.width; h = box.height;
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    F = Math.min(w, 1500) * 0.42;
   }
 
-  // The cursor, relative to the canvas; tilt eases toward it.
-  const mouse = { x: -1e4, y: -1e4, in: false };
-  let tiltX = 0, tiltY = 0;
+  const mouse = { x: 0, y: 0, in: false };
+  let camX = 0, camY = 0;
   addEventListener('pointermove', (e) => {
     const box = canvas.getBoundingClientRect();
     mouse.x = e.clientX - box.left; mouse.y = e.clientY - box.top;
@@ -59,59 +46,72 @@
   }, { passive: true });
   document.addEventListener('pointerleave', () => { mouse.in = false; });
 
-  const sparks = [];
-  let spin = 0.6, last = performance.now(), nextSpark = 0;
+  let t = 0;
+  const cy = () => Math.min(h * 0.32, innerHeight * 0.45);
 
-  function project() {
-    const cx = w / 2, cy = Math.min(h * 0.3, 330);
-    const R = Math.min(w * 0.55, 820);
-    const yaw = spin + tiltX * 0.35;
-    const pitch = 0.42 + tiltY * 0.25; // the disc seen from a little above
-    const cyw = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  function step(dt) {
+    t += dt;
+    // The camera follows the cursor quickly, with a little lag so it feels physical.
+    const tx = mouse.in ? (mouse.x / w - 0.5) * 0.5 : 0;
+    const ty = mouse.in ? (mouse.y / innerHeight - 0.5) * 0.35 : 0;
+    const ease = 1 - Math.exp(-dt * 9);
+    camX += (tx - camX) * ease; camY += (ty - camY) * ease;
+
+    const reach = 150, K = 90, C = 2 * Math.sqrt(K) * 0.7; // a stiff spring, a little bounce
     for (const n of nodes) {
-      const x1 = n.x * cyw - n.z * syw;
-      const z1 = n.x * syw + n.z * cyw;
-      const y2 = n.y * cp - z1 * sp;
-      const z2 = n.y * sp + z1 * cp;
-      const s = 2.2 / (2.2 + z2);
-      n.s = s; n.d = (1 - z2) / 2;
-      n.sx = cx + x1 * R * s + n.ox;
-      n.sy = cy + y2 * R * s + n.oy;
+      n.x = n.hx + Math.sin(t * n.sp + n.ph) * 0.06;
+      n.y = n.hy + Math.cos(t * n.sp * 0.8 + n.ph * 1.3) * 0.05;
+      const s = F / n.z;
+      const bx = w / 2 + (n.x - camX * (FAR - n.z) * 0.5) * s;
+      const by = cy() + (n.y - camY * (FAR - n.z) * 0.5) * s;
+      let fx = -K * n.ox - C * n.vx, fy = -K * n.oy - C * n.vy;
+      if (mouse.in) {
+        const dx = bx + n.ox - mouse.x, dy = by + n.oy - mouse.y;
+        const d = Math.hypot(dx, dy);
+        if (d < reach && d > 0.5) {
+          const push = (1 - d / reach) ** 2 * 26000 * Math.min(1.6, FOCUS / n.z);
+          fx += (dx / d) * push; fy += (dy / d) * push;
+        }
+      }
+      n.vx += fx * dt; n.vy += fy * dt;
+      n.ox += n.vx * dt; n.oy += n.vy * dt;
+      n.sx = bx + n.ox; n.sy = by + n.oy;
+      const off = Math.abs(n.z - FOCUS);
+      n.blur = off * 9 * (n.z < FOCUS ? 1.8 : 1); // the near side blurs faster, as through a lens
+      n.focus = Math.max(0, 1 - off / 1.0);
+    }
+    stepSparks(dt);
+  }
+
+  // Links: the pairs close enough in the world, both near enough to focus to draw.
+  let links = [];
+  function link() {
+    links = [];
+    for (let i = 0; i < N; i++) {
+      const a = nodes[i];
+      if (a.focus <= 0) continue;
+      for (let j = i + 1; j < N; j++) {
+        const b = nodes[j];
+        if (b.focus <= 0) continue;
+        const d = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+        if (d < LINK) links.push([i, j, 1 - d / LINK]);
+      }
     }
   }
 
-  function step(dt) {
-    spin += dt * 0.035;
-    const tx = mouse.in ? (mouse.x / w - 0.5) * 2 : 0;
-    const ty = mouse.in ? (mouse.y / h - 0.5) * 2 : 0;
-    tiltX += (tx - tiltX) * Math.min(1, dt * 2);
-    tiltY += (ty - tiltY) * Math.min(1, dt * 2);
-    const reach = 140;
-    for (const n of nodes) {
-      let fx = -n.ox * 18, fy = -n.oy * 18; // spring home
-      if (mouse.in) {
-        const dx = n.sx - mouse.x, dy = n.sy - mouse.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < reach && dist > 0.1) {
-          const push = (1 - dist / reach) ** 2 * 5200 * n.s;
-          fx += (dx / dist) * push; fy += (dy / dist) * push;
-        }
-      }
-      n.vx = (n.vx + fx * dt) * Math.pow(0.02, dt); // damped
-      n.vy = (n.vy + fy * dt) * Math.pow(0.02, dt);
-      n.ox += n.vx * dt; n.oy += n.vy * dt;
-    }
+  const sparks = [];
+  let nextSpark = 0;
+  function stepSparks(dt) {
     nextSpark -= dt;
-    if (nextSpark <= 0 && sparks.length < 14) {
+    if (nextSpark <= 0 && links.length && sparks.length < 8) {
       const [a, b] = links[(Math.random() * links.length) | 0];
-      sparks.push({ a, b, t: 0, hops: 2 + ((Math.random() * 4) | 0) });
-      nextSpark = 0.18 + Math.random() * 0.3;
+      sparks.push({ a, b, t: 0, hops: 3 + ((Math.random() * 4) | 0) });
+      nextSpark = rnd(0.25, 0.6);
     }
     for (let i = sparks.length - 1; i >= 0; i--) {
       const k = sparks[i];
-      k.t += dt * 1.6;
+      k.t += dt * 1.8;
       if (k.t < 1) continue;
-      // Hop on to a link of the node it reached, or fade out.
       const out = links.filter(([p, q]) => (p === k.b && q !== k.a) || (q === k.b && p !== k.a));
       if (--k.hops <= 0 || !out.length) { sparks.splice(i, 1); continue; }
       const [p, q] = out[(Math.random() * out.length) | 0];
@@ -119,36 +119,53 @@
     }
   }
 
+  function dot(x, y, r, blur, rgb, alpha) {
+    if (blur < 0.6) {
+      ctx.fillStyle = `rgba(${rgb},${alpha})`;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+      return;
+    }
+    // Out of focus: a soft disc, its light spread over a larger area.
+    const R = r + blur;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+    const a = alpha * Math.min(0.55, (r * 2) / R + 0.08);
+    g.addColorStop(0, `rgba(${rgb},${a})`);
+    g.addColorStop(0.55, `rgba(${rgb},${a * 0.75})`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 6.2832); ctx.fill();
+  }
+
   function draw() {
     ctx.clearRect(0, 0, w, h);
     ctx.lineWidth = 1;
-    for (const [i, j] of links) {
+    for (const [i, j, near] of links) {
       const a = nodes[i], b = nodes[j];
-      const alpha = 0.1 + 0.24 * ((a.d + b.d) / 2);
-      ctx.strokeStyle = `rgba(${MIST},${alpha})`;
+      ctx.strokeStyle = `rgba(${MIST},${0.4 * near * Math.min(a.focus, b.focus)})`;
       ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
     }
-    for (const n of nodes) {
-      const r = (n.amber ? 3 : 2) * n.s;
-      ctx.fillStyle = n.amber ? `rgba(${AMBER},${0.5 + 0.5 * n.d})` : `rgba(${MIST},${0.35 + 0.6 * n.d})`;
-      ctx.beginPath(); ctx.arc(n.sx, n.sy, r, 0, Math.PI * 2); ctx.fill();
+    const order = nodes.slice().sort((a, b) => b.z - a.z); // far first
+    for (const n of order) {
+      const r = (n.amber ? 3.2 : 2.2) * (FOCUS / n.z) ** 0.9;
+      const depth = Math.min(1, 0.45 + 0.48 * (FOCUS / n.z));
+      dot(n.sx, n.sy, r, n.blur, n.amber ? AMBER : MIST, (n.amber ? 0.95 : 0.7) * depth);
     }
     for (const k of sparks) {
       const a = nodes[k.a], b = nodes[k.b];
       const x = a.sx + (b.sx - a.sx) * k.t, y = a.sy + (b.sy - a.sy) * k.t;
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, 9);
-      glow.addColorStop(0, `rgba(${AMBER},0.9)`);
-      glow.addColorStop(1, `rgba(${AMBER},0)`);
-      ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 10);
+      g.addColorStop(0, `rgba(${AMBER},0.95)`);
+      g.addColorStop(1, `rgba(${AMBER},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, 6.2832); ctx.fill();
     }
   }
 
-  let running = false, visible = true;
+  let running = false, visible = true, last = 0;
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
-    project(); step(dt); draw();
+    step(dt); link(); draw();
     if (running) requestAnimationFrame(frame);
   }
   function go() {
@@ -157,9 +174,8 @@
     if (!want) running = false;
   }
 
-  size();
-  project(); draw();
-  addEventListener('resize', () => { size(); project(); draw(); });
+  size(); step(0); link(); draw();
+  addEventListener('resize', () => { size(); step(0); link(); draw(); });
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; go(); }).observe(canvas);
   document.addEventListener('visibilitychange', go);
   go();

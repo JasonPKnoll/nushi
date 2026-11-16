@@ -62,6 +62,11 @@ code, pre { font-family: var(--mono); }
 @keyframes fade { from { opacity: 0; } }
 
 .hero-text { position: relative; max-width: 760px; margin: 0 auto; }
+/* A soft shade behind the words, so the field never fights them. */
+.hero-text::before {
+  content: ""; position: absolute; inset: -60px -120px; z-index: -1;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--deep) 78%, transparent), transparent);
+}
 h1 { font-size: clamp(40px, 6.4vw, 76px); line-height: 1.02; letter-spacing: -.025em; }
 .lede { font-size: clamp(17px, 2vw, 20px); max-width: 640px; margin: 24px auto 0; }
 .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 36px; }
