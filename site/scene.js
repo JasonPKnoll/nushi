@@ -4,7 +4,7 @@
 // plane, so what's nearer or farther softens a little, never more. Below a screenshot the sun sits just behind its top edge, so the screenshot eclipses it.
 // At the last stop the camera looks straight down and the system settles into the flat mark above Install.
 //
-// Depth of field: canvases blurred by fixed CSS amounts about a pixel apart, so a step between them can't be
+// Depth of field: canvases blurred by fixed CSS amounts under two pixels apart, so a step between them can't be
 // seen. Every piece is drawn whole and opaque onto the one nearest its own blur (crossfading two half-transparent
 // copies showed seams). A ring is cut where a planet sits on it, so no line ever crosses a planet.
 // The cursor tilts the camera at once, and planets lean toward a nearby cursor and spring back. Scrolling fast
@@ -18,13 +18,13 @@
 
   // Signed blur levels in CSS px: positive is behind the focal plane, negative in front; stacked far to near.
   // Blurred canvases are drawn at lower resolution, which the blur hides.
-  const LEVELS = [3.2, 2.1, 1, 0, -1.2, -2.4, -3.6];
+  const LEVELS = [3, 1.5, 0, -1.8, -3.6];
   const layers = LEVELS.map((lv) => {
     const c = document.createElement('canvas');
     sky.append(c);
     const ctx = c.getContext('2d');
     if (lv) c.style.filter = `blur(${Math.abs(lv)}px)`;
-    return { c, ctx, lv, res: Math.abs(lv) <= 1 ? 1 : 0.75, used: false };
+    return { c, ctx, lv, res: lv === 0 ? 1 : Math.abs(lv) < 2 ? 0.6 : 0.45, used: false };
   });
   if (!layers[0].ctx) return;
 
@@ -285,6 +285,7 @@
   // Ring piece outline: outer edge, end cap, inner edge back, start cap; into it.pts.
   function piece(it, g, b0, b1, first, last) {
     let n = 0;
+    const w = W * (0.24 + 0.76 * cam.flat); // a fine orbit line in 3D, the mark's weight once flat
     const q = it.pts;
     const pt = (x, z) => { proj(x, 0, z, P); q[n++] = P.X; q[n++] = P.Y; };
     const edge = (r, from, to) => {
@@ -295,12 +296,12 @@
       const cx = g.r * ux, cy = g.r * uy;
       for (let j = 1; j < 4; j++) {
         const ph = (Math.PI * (dir > 0 ? j : 4 - j)) / 4;
-        pt(cx + (W / 2) * (ux * Math.cos(ph) + tx * Math.sin(ph)), -(cy + (W / 2) * (uy * Math.cos(ph) + ty * Math.sin(ph))));
+        pt(cx + (w / 2) * (ux * Math.cos(ph) + tx * Math.sin(ph)), -(cy + (w / 2) * (uy * Math.cos(ph) + ty * Math.sin(ph))));
       }
     };
-    edge(g.r + W / 2, b0, b1);
+    edge(g.r + w / 2, b0, b1);
     if (last) cap(b1, 1);
-    edge(g.r - W / 2, b1, b0);
+    edge(g.r - w / 2, b1, b0);
     if (first) cap(b0, -1);
     it.n = n;
   }
@@ -312,7 +313,7 @@
     for (const p of PLANETS) {
       if (RINGS[p.ring] !== g) continue;
       let d = Math.abs(((deg - p.a - g.turn) % 360 + 540) % 360 - 180);
-      if (d < (((p.size * 1.9) / g.r) / D2R) * k) return true;
+      if (d < (((p.size * 0.75) / g.r) / D2R) * k) return true; // just under the planet, so the gap never shows
     }
     return false;
   }
@@ -355,7 +356,7 @@
           const mid = ((b0 + b1) / 2) * D2R;
           proj(g.r * Math.cos(mid), 0, -g.r * Math.sin(mid), P);
           const d = P.depth;
-          const fade = 0.5 * (1 - flat) + flat; // one colour along the ring: depth shows by blur and size, not shade
+          const fade = 0.72 * (1 - flat) + flat; // one colour along the ring: depth shows by blur and size, not shade
           // Slate when seen in 3D, mist once it's the flat mark.
           const r = Math.round(base[0] + ((47 + (238 - 47) * (0.5 + 0.5 * flat)) - base[0]) * fade);
           const gg = Math.round(base[1] + ((74 + (241 - 74) * (0.5 + 0.5 * flat)) - base[1]) * fade);
