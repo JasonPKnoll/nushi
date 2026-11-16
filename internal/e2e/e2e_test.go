@@ -82,8 +82,13 @@ func (fakeHarness) Compacted(model.Item) bool      { return false }
 func (fakeHarness) ForkTitle(string, string) bool  { return false }
 
 // claudeOnFake is Claude's harness on the fake agent, as "claude-fake":
-// the fake agent's subagents and worktrees read as Claude's.
-type claudeOnFake struct{ claude.Harness }
+// the fake agent's subagents and worktrees read as Claude's, and its
+// workflows' files are read in the test daemon's own Claude config folder
+// (projects; workflows_test.go).
+type claudeOnFake struct {
+	claude.Harness
+	projects string
+}
 
 func (claudeOnFake) Info() model.HarnessInfo {
 	info := claude.Harness{}.Info()
@@ -153,8 +158,10 @@ func startDaemon(t *testing.T, dataDir string, history *acptest.History) *daemon
 	// Ante, Pi and PiG as their bridges on a fake Ante and Pi, Claude as
 	// Nushi's Go agent on fake claudes. "claude-fake" is Claude's harness
 	// on the fake agent, for what the fake agent plays in Claude's terms
-	// (a subagent and its worktree). What reads an agent's own files on
-	// this Mac (Agent.Local) is left out.
+	// (a subagent and its worktree, a workflow). What reads an agent's own
+	// files on this Mac (Agent.Local) is left out, but for Claude's
+	// transcripts' search and workflows, read in the daemon's own Claude
+	// config folder.
 	piStore := piStores(dataDir)
 	pis := func(f pi.Flavor) chats.Launch {
 		return launch(func(r io.Reader, w io.Writer) {
@@ -191,14 +198,16 @@ func startDaemon(t *testing.T, dataDir string, history *acptest.History) *daemon
 			kinds = append(kinds, chats.Kind{Harness: h, Launch: l, MCP: a.MCP != nil})
 		}
 	}
-	kinds = append(kinds, chats.Kind{Harness: claudeOnFake{}, Launch: fake(""), MCP: true})
+	kinds = append(kinds, chats.Kind{Harness: claudeOnFake{projects: filepath.Join(dataDir, "claude", "projects")}, Launch: fake(""), MCP: true})
 	copies, err := transcripts.Open(filepath.Join(dataDir, "transcripts"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Sleep and the copies as main has them: the settings are the daemon's.
+	// A workflow's files are read often, so a test sees its end at once.
 	svc := chats.New(t.Context(), kinds, chats.Options{Remembered: st, Sessions: st, Worktrees: git.Worktrees{}, Scratch: filepath.Join(dataDir, "scratch"),
-		Uploads: filepath.Join(dataDir, "uploads"), Publish: hub.Publish, Copies: copies, CopiesOn: st.KeepTranscripts, Sleep: st})
+		Uploads: filepath.Join(dataDir, "uploads"), Publish: hub.Publish, Copies: copies, CopiesOn: st.KeepTranscripts, Sleep: st,
+		Timing: chats.Timing{WorkflowPoll: 20 * time.Millisecond}})
 	shows := preview.New(hub.Publish)
 	shows.UseChats(svc)
 	serverTools := &servers.AgentTools{}
