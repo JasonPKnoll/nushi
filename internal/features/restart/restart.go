@@ -66,6 +66,10 @@ type Service struct {
 	// ask holds unless asked again: an app that quit can't start the new
 	// daemon, so this one keeps running.
 	Every, Lease time.Duration
+	// Looked, when set, is called after each look that found something
+	// running, once Every has passed: with true while the ask holds,
+	// false once it has lapsed and the waiting stops. A test counts them.
+	Looked func(waiting bool)
 
 	mu      sync.Mutex
 	until   time.Time // when the last ask lapses
@@ -125,6 +129,9 @@ func (s *Service) wait() {
 		lapsed := time.Now().After(s.until)
 		s.waiting = !lapsed
 		s.mu.Unlock()
+		if s.Looked != nil {
+			s.Looked(!lapsed)
+		}
 		if lapsed {
 			slog.Info("restart no longer asked: the app stopped asking")
 			return

@@ -14,16 +14,24 @@ import (
 	nushiv1 "github.com/afrase/nushi/internal/gen/nushi/v1"
 )
 
-// due says whether the daemon's restart came within wait, for a test that
-// it didn't: one that waits for the restart receives from Due, with no
-// deadline of its own (a restart that never comes ends in go test's).
-func (d *daemon) due(wait time.Duration) bool {
-	select {
-	case <-d.restart.Due():
-		return true
-	case <-time.After(wait):
-		return false
+// due says whether the daemon's restart has come, once its loop has had
+// its chance: it looked twice from now (the second look began after this
+// call), or stopped as its ask lapsed. A test that waits for the restart
+// receives from Due, with no deadline of its own (a restart that never
+// comes ends in go test's).
+func (d *daemon) due(t *testing.T) bool {
+	t.Helper()
+	isDue := func() bool {
+		select {
+		case <-d.restart.Due():
+			return true
+		default:
+			return false
+		}
 	}
+	from := d.looks.Load()
+	until(t, "the restart to look again", func() bool { return isDue() || d.lapsed.Load() || d.looks.Load() >= from+2 })
+	return isDue()
 }
 
 // A restart asked while a turn waits on the user comes once the turn has
@@ -42,7 +50,7 @@ func TestRestartWaitsForTheTurn(t *testing.T) {
 	if len(holds) != 1 || holds[0].ChatId != id || holds[0].Why != "waits on you" || holds[0].Terminal {
 		t.Errorf("holds %v, want the chat, waiting on the user", holds)
 	}
-	if d.due(300 * time.Millisecond) {
+	if d.due(t) {
 		t.Fatal("restarted while a turn waited on the user")
 	}
 	must(a.c.AnswerPermission(ctx, connect.NewRequest(&nushiv1.AnswerPermissionRequest{ChatId: id, ItemId: perm.Id, OptionId: "allow"})))
@@ -112,7 +120,7 @@ func TestRestartWaitsForATerminalsCommand(t *testing.T) {
 	if len(holds) != 1 || holds[0].ChatId != id || !strings.HasPrefix(holds[0].Why, "running sleep") || !holds[0].Terminal {
 		t.Errorf("holds %v, want the chat's terminal running sleep", holds)
 	}
-	if d.due(300 * time.Millisecond) {
+	if d.due(t) {
 		t.Fatal("restarted while a terminal ran a command")
 	}
 	must(a.c.WriteTerminal(ctx, connect.NewRequest(&nushiv1.WriteTerminalRequest{TerminalId: term.Id, Data: []byte("\x03")})))
@@ -130,10 +138,10 @@ func TestARestartNotAskedAgainLapses(t *testing.T) {
 	a.send(id, "wait")
 	a.waitFor("the turn to start", func(e *nushiv1.EventsResponse) bool { return e.GetStatus().GetBusy() })
 	must(a.c.RestartWhenIdle(ctx, connect.NewRequest(&nushiv1.RestartWhenIdleRequest{})))
-	time.Sleep(300 * time.Millisecond)
+	until(t, "the ask to lapse", d.lapsed.Load)
 	must(a.c.CancelTurn(ctx, connect.NewRequest(&nushiv1.CancelTurnRequest{ChatId: id})))
 	a.waitFor("the turn to end", turnEnded(id))
-	if d.due(300 * time.Millisecond) {
+	if d.due(t) {
 		t.Fatal("restarted on an ask that had lapsed")
 	}
 }

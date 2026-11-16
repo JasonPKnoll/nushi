@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -57,7 +58,9 @@ type daemon struct {
 	stop    func()
 	kill    func() // ends the last agent started, as if its process died
 	restart *restart.Service
-	claudes *claudes // the fake claudes Claude's Go agent ran
+	looks   *atomic.Int64 // the restart's looks (restart.Service.Looked)
+	lapsed  *atomic.Bool  // its ask lapsed, and it stopped looking
+	claudes *claudes      // the fake claudes Claude's Go agent ran
 	tools   *tools.Service
 	hub     *events.Hub
 }
@@ -221,6 +224,11 @@ func startDaemon(t *testing.T, dataDir string, history *acptest.History) *daemon
 	}()
 	restarts := restart.New(svc, restart.Together{terms, srvs})
 	restarts.Every = 20 * time.Millisecond
+	looks, lapsed := &atomic.Int64{}, &atomic.Bool{}
+	restarts.Looked = func(waiting bool) {
+		looks.Add(1)
+		lapsed.Store(!waiting)
+	}
 	sv := api.Services{Chats: svc, Agents: agents.New(nil, nil, shellenv.Off(os.Environ()), "", nil), Terms: terms, Hub: hub, Memory: memory.New(svc), Transcripts: st, Restart: restarts,
 		Servers: srvs}
 	socket, forDevices := api.Handlers(sv, toolSvc, "tok") // as main serves them
@@ -237,7 +245,7 @@ func startDaemon(t *testing.T, dataDir string, history *acptest.History) *daemon
 		svc.Close()
 	}
 	t.Cleanup(stop)
-	return &daemon{url: srv.URL, devices: devices.URL, stop: stop, restart: restarts, claudes: cls, tools: toolSvc, hub: hub, kill: func() {
+	return &daemon{url: srv.URL, devices: devices.URL, stop: stop, restart: restarts, looks: looks, lapsed: lapsed, claudes: cls, tools: toolSvc, hub: hub, kill: func() {
 		mu.Lock()
 		defer mu.Unlock()
 		kill()
