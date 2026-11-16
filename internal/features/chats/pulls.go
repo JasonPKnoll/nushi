@@ -12,10 +12,11 @@ import (
 	"github.com/afrase/nushi/internal/model"
 )
 
-// A chat's pull requests (ADR 0117): found by its branch's head (they
-// follow the branch), opened by one of its tool calls, or linked by hand;
-// at most model.MaxPulls. The record keeps them in Pulls, and the first
-// in Pull for a release before Pulls (ADR 0108).
+// A chat's pull requests (ADR 0117): found by the head of a branch it
+// pushed (they follow the branch; ADR 0059's amendment of 2026-11-16),
+// opened by one of its tool calls, or linked by hand; at most
+// model.MaxPulls. The record keeps them in Pulls, and the first in Pull
+// for a release before Pulls (ADR 0108).
 
 // errTooManyPulls refuses one pull request too many picked by hand.
 var errTooManyPulls = fmt.Errorf("a chat holds at most %d pull requests", model.MaxPulls)
@@ -216,12 +217,15 @@ func (s *Service) UnlinkPull(chatID string, pull model.ChatGitHub) error {
 	return nil
 }
 
-// DropFoundPull unlinks the pull requests found for a branch the chat's
-// folder is no longer on (one opened in the chat or linked by hand stays).
-func (s *Service) DropFoundPull(chatID, branch string) {
+// FoundPull takes what the chat's folder is on: its branch and the pull
+// request whose head that is (nil for none). That one is linked only when
+// a tool call of the chat pushed the branch (pushed.go); a new chat in a
+// folder whose branch has a pull request takes nothing. Those found for
+// another branch go (one opened in the chat or linked by hand stays).
+func (s *Service) FoundPull(chatID, branch string, pull *model.ChatGitHub) error {
 	c, err := s.listed(chatID)
 	if err != nil {
-		return
+		return err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -230,6 +234,12 @@ func (s *Service) DropFoundPull(chatID, branch string) {
 	if len(kept) != len(linked) {
 		c.saveLocked(func(s *model.ChatRecord) { setPulls(s, kept) })
 	}
+	if pull == nil || pull.Branch != branch || !c.record.PushedBranch(branch) {
+		return nil
+	}
+	p := *pull
+	p.Opened = false
+	return c.addPullLocked(p, false)
 }
 
 // pullAddressRE is a pull request's address on any host: the host, the

@@ -2912,7 +2912,8 @@ extension type NushiServiceClient(connect.Transport _transport) {
 
   /// A chat's pull request: the one it was started from, else the one whose
   /// head is its folder's branch, looked for on GitHub (and linked when
-  /// found), with the folder's repository and branch. API 81.
+  /// found; from API 119 only for a branch the chat pushed), with the
+  /// folder's repository and branch. API 81.
   Future<nushiv1nushi.FindChatPullResponse> findChatPull(
     nushiv1nushi.FindChatPullRequest input, {
     connect.Headers? headers,

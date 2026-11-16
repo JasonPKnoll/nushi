@@ -27894,10 +27894,12 @@ class FindChatPullRequest extends $pb.GeneratedMessage {
   factory FindChatPullRequest({
     $core.String? chatId,
     $core.bool? quiet,
+    $core.bool? suggest,
   }) {
     final result = FindChatPullRequest._();
     if (chatId != null) result.chatId = chatId;
     if (quiet != null) result.quiet = quiet;
+    if (suggest != null) result.suggest = suggest;
     return result;
   }
 
@@ -27916,6 +27918,7 @@ class FindChatPullRequest extends $pb.GeneratedMessage {
       createEmptyInstance: FindChatPullRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'chatId')
     ..aOB(2, _omitFieldNames ? '' : 'quiet')
+    ..aOB(3, _omitFieldNames ? '' : 'suggest')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -27959,6 +27962,19 @@ class FindChatPullRequest extends $pb.GeneratedMessage {
   $core.bool hasQuiet() => $_has(1);
   @$pb.TagNumber(2)
   void clearQuiet() => $_clearField(2);
+
+  /// Looks for the branch's pull request even when the chat didn't push
+  /// the branch, and says it in branch_pull without linking it (Link pull
+  /// request…). Without it, GitHub is asked only for a branch the chat
+  /// pushed. API 119.
+  @$pb.TagNumber(3)
+  $core.bool get suggest => $_getBF(2);
+  @$pb.TagNumber(3)
+  set suggest($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSuggest() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSuggest() => $_clearField(3);
 }
 
 class FindChatPullResponse extends $pb.GeneratedMessage {
@@ -27970,6 +27986,7 @@ class FindChatPullResponse extends $pb.GeneratedMessage {
     GitHubLink? pull,
     $core.String? error,
     $core.Iterable<GitHubLink>? pulls,
+    GitHubLink? branchPull,
   }) {
     final result = FindChatPullResponse._();
     if (host != null) result.host = host;
@@ -27979,6 +27996,7 @@ class FindChatPullResponse extends $pb.GeneratedMessage {
     if (pull != null) result.pull = pull;
     if (error != null) result.error = error;
     if (pulls != null) result.pulls.addAll(pulls);
+    if (branchPull != null) result.branchPull = branchPull;
     return result;
   }
 
@@ -28003,6 +28021,8 @@ class FindChatPullResponse extends $pb.GeneratedMessage {
         subBuilder: GitHubLink.$_createMessage)
     ..aOS(6, _omitFieldNames ? '' : 'error')
     ..pPM<GitHubLink>(7, _omitFieldNames ? '' : 'pulls',
+        subBuilder: GitHubLink.$_createMessage)
+    ..aOM<GitHubLink>(8, _omitFieldNames ? '' : 'branchPull',
         subBuilder: GitHubLink.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -28069,7 +28089,9 @@ class FindChatPullResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearDefaultBranch() => $_clearField(4);
 
-  /// The chat's pull request, if it has one.
+  /// The chat's pull request, if it has one. From API 119 one found by the
+  /// branch's head is linked only for a branch a tool call of the chat
+  /// pushed (ADR 0059's amendment of 2026-11-16).
   @$pb.TagNumber(5)
   GitHubLink get pull => $_getN(4);
   @$pb.TagNumber(5)
@@ -28094,6 +28116,21 @@ class FindChatPullResponse extends $pb.GeneratedMessage {
   /// All of the chat's pull requests, as Chat.pulls. API 118.
   @$pb.TagNumber(7)
   $pb.PbList<GitHubLink> get pulls => $_getList(6);
+
+  /// The pull request whose head is the branch, when found but not one of
+  /// the chat's: the chat didn't push the branch (only those are linked,
+  /// API 119), or it was unlinked. Looked for with suggest, or when the
+  /// chat pushed the branch.
+  @$pb.TagNumber(8)
+  GitHubLink get branchPull => $_getN(7);
+  @$pb.TagNumber(8)
+  set branchPull(GitHubLink value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasBranchPull() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBranchPull() => $_clearField(8);
+  @$pb.TagNumber(8)
+  GitHubLink ensureBranchPull() => $_ensure(7);
 }
 
 class LinkChatPullRequest extends $pb.GeneratedMessage {
@@ -34053,7 +34090,8 @@ class NushiServiceApi {
 
   /// A chat's pull request: the one it was started from, else the one whose
   /// head is its folder's branch, looked for on GitHub (and linked when
-  /// found), with the folder's repository and branch. API 81.
+  /// found; from API 119 only for a branch the chat pushed), with the
+  /// folder's repository and branch. API 81.
   $async.Future<FindChatPullResponse> findChatPull(
           $pb.ClientContext? ctx, FindChatPullRequest request) =>
       _client.invoke<FindChatPullResponse>(

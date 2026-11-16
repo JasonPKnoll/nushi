@@ -40,8 +40,10 @@ type headsCache struct {
 // to first; three at most), with the head owned by the repository the
 // branch is pushed to (a fork's pull request is on its parent). An open
 // one wins, else the newest. The default branch, a detached HEAD and a
-// folder whose remotes aren't on a host signed in to aren't looked up.
-func (s *Service) FindPull(ctx context.Context, folder string, poll bool) (BranchPull, error) {
+// folder whose remotes aren't on a host signed in to aren't looked up, nor
+// a branch look refuses (nil looks up every one): GitHub isn't asked, and
+// the rest is said.
+func (s *Service) FindPull(ctx context.Context, folder string, poll bool, look func(branch string) bool) (BranchPull, error) {
 	branch, pushed := s.Head(ctx, folder)
 	if branch == "" {
 		return BranchPull{}, nil
@@ -86,7 +88,7 @@ func (s *Service) FindPull(ctx context.Context, folder string, poll bool) (Branc
 		_, short, found := strings.Cut(def, "/") // origin/main
 		out.Default = branch == def || found && branch == short
 	}
-	if out.Default {
+	if out.Default || look != nil && !look(branch) {
 		return out, nil
 	}
 	owner, _, _ := strings.Cut(repos[0].name, "/") // the head's: the repository pushed to

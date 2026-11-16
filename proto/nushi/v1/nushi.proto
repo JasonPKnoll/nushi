@@ -509,7 +509,8 @@ service NushiService {
   rpc RestoreGitHubBranch(RestoreGitHubBranchRequest) returns (RestoreGitHubBranchResponse);
   // A chat's pull request: the one it was started from, else the one whose
   // head is its folder's branch, looked for on GitHub (and linked when
-  // found), with the folder's repository and branch. API 81.
+  // found; from API 119 only for a branch the chat pushed), with the
+  // folder's repository and branch. API 81.
   rpc FindChatPull(FindChatPullRequest) returns (FindChatPullResponse);
   // Links a pull request picked by hand to a chat, or unlinks its own.
   // API 81.
@@ -3411,6 +3412,11 @@ message FindChatPullRequest {
   string chat_id = 1;
   // Asked on the app's timer: held back while the rate limit runs low.
   bool quiet = 2;
+  // Looks for the branch's pull request even when the chat didn't push
+  // the branch, and says it in branch_pull without linking it (Link pull
+  // request…). Without it, GitHub is asked only for a branch the chat
+  // pushed. API 119.
+  bool suggest = 3;
 }
 
 message FindChatPullResponse {
@@ -3422,12 +3428,19 @@ message FindChatPullResponse {
   string branch = 3;
   // The branch is the repository's default: no pull request is looked for.
   bool default_branch = 4;
-  // The chat's pull request, if it has one.
+  // The chat's pull request, if it has one. From API 119 one found by the
+  // branch's head is linked only for a branch a tool call of the chat
+  // pushed (ADR 0059's amendment of 2026-11-16).
   GitHubLink pull = 5;
   // Why GitHub couldn't be asked this time (the link stays as it was).
   string error = 6;
   // All of the chat's pull requests, as Chat.pulls. API 118.
   repeated GitHubLink pulls = 7;
+  // The pull request whose head is the branch, when found but not one of
+  // the chat's: the chat didn't push the branch (only those are linked,
+  // API 119), or it was unlinked. Looked for with suggest, or when the
+  // chat pushed the branch.
+  GitHubLink branch_pull = 8;
 }
 
 message LinkChatPullRequest {

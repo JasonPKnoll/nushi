@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"connectrpc.com/connect"
 
@@ -27,8 +28,11 @@ func pullsProto(s model.ChatRecord) []*nushiv1.GitHubLink {
 }
 
 // FindChatPull looks for the pull request of a chat's branch and links it
-// when found: one linked by hand or unlinked stays as it is, and one found
-// for a branch the folder has left goes.
+// when found, only for a branch a tool call of the chat pushed (ADR 0059's
+// amendment of 2026-11-16): GitHub isn't asked for another, unless the
+// client asks to suggest it (branch_pull, not linked). One linked by hand
+// or unlinked stays as it is, and one found for a branch the folder has
+// left goes.
 func (s *server) FindChatPull(ctx context.Context, req *connect.Request[nushiv1.FindChatPullRequest]) (*connect.Response[nushiv1.FindChatPullResponse], error) {
 	sess, err := s.Chats.Session(req.Msg.ChatId)
 	if err != nil {
@@ -37,17 +41,14 @@ func (s *server) FindChatPull(ctx context.Context, req *connect.Request[nushiv1.
 	if sess.Scratch {
 		return connect.NewResponse(&nushiv1.FindChatPullResponse{Pull: linkProto(sess.PullLink()), Pulls: pullsProto(sess)}), nil
 	}
-	found, err := s.GitHub.FindPull(ctx, sess.Folder, req.Msg.Quiet)
+	look := func(branch string) bool { return req.Msg.Suggest || sess.PushedBranch(branch) }
+	found, err := s.GitHub.FindPull(ctx, sess.Folder, req.Msg.Quiet, look)
 	out := &nushiv1.FindChatPullResponse{Host: found.Host, Repo: found.Repo, Branch: found.Branch, DefaultBranch: found.Default}
 	if err != nil {
 		out.Error = err.Error()
 	}
 	if err == nil && found.Host != "" {
-		if found.Pull != nil {
-			err = s.Chats.LinkPull(req.Msg.ChatId, found.Pull)
-		} else {
-			s.Chats.DropFoundPull(req.Msg.ChatId, found.Branch)
-		}
+		err = s.Chats.FoundPull(req.Msg.ChatId, found.Branch, found.Pull)
 		if err == nil {
 			sess, err = s.Chats.Session(req.Msg.ChatId)
 		}
@@ -56,6 +57,9 @@ func (s *server) FindChatPull(ctx context.Context, req *connect.Request[nushiv1.
 		}
 	}
 	out.Pull, out.Pulls = linkProto(sess.PullLink()), pullsProto(sess)
+	if p := found.Pull; p != nil && !slices.ContainsFunc(sess.AllPulls(), p.Same) {
+		out.BranchPull = linkProto(p)
+	}
 	return connect.NewResponse(out), nil
 }
 
