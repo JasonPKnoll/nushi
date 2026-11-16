@@ -356,24 +356,30 @@ func TestWorkflowEnds(t *testing.T) {
 }
 
 // The agent that ran it gone, a last read after the grace: its snapshot if
-// it left one, else stopped, in Nushi's words.
+// it left one, else stopped, in Nushi's words. Reads come only from pokes
+// (an hour's poll and grace), so each step is the follower's answer to one.
 func TestAWorkflowEndsWithItsAgent(t *testing.T) {
 	for name, snapshot := range map[string]bool{"no snapshot": false, "a snapshot in the grace": true} {
 		t.Run(name, func(t *testing.T) {
-			f := workflowChat(t, Timing{WorkflowGrace: 20 * time.Millisecond}, runningAs)
-			f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+			f := workflowChat(t, Timing{WorkflowPoll: time.Hour, WorkflowGrace: time.Hour}, runningAs)
+			f.files.waitReads(t, 1)
+			eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.State == "running" })
 			f.c.mu.Lock()
 			agent := f.c.agent
 			f.c.agent = &fakeAgent{} // another process: the one that ran it went
 			f.c.pokeWorkflowsLocked()
 			f.c.mu.Unlock()
-			f.files.waitReads(t, 1)
+			// The first read after: the grace starts, and the run still runs.
+			eventually(t, f.c, func() bool { fl := f.c.following[wfCall]; return fl != nil && !fl.gone.IsZero() })
 			if w := workflowOf(f.c); w.State != "running" {
 				t.Errorf("in the grace: %+v", w)
 			}
 			if snapshot {
 				f.files.set(endedAs("done", "completed"))
 			}
+			f.c.mu.Lock()
+			f.c.pokeWorkflowsLocked() // the grace's end
+			f.c.mu.Unlock()
 			eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.Final() })
 			w := workflowOf(f.c)
 			switch {
