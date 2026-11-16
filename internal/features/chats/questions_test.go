@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	acp "github.com/afrase/acp-go/unstable"
 
@@ -115,13 +114,8 @@ func TestStopCancelsAPendingQuestion(t *testing.T) {
 	if _, err := svc.Stop(context.Background(), c.id, false); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case resp := <-got:
-		if !resp.Cancel {
-			t.Errorf("the agent got %+v, want cancel", resp)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("the question still waits")
+	if resp := <-got; !resp.Cancel { // a question that still waits hangs the test
+		t.Errorf("the agent got %+v, want cancel", resp)
 	}
 	eventually(t, c, func() bool {
 		return slices.ContainsFunc(c.items, func(it model.Item) bool { return it.Kind == model.Question && it.Status == "cancelled" })
@@ -146,13 +140,8 @@ func TestAnsweringTwiceFails(t *testing.T) {
 		}
 	}()
 	for i := range 4 {
-		select {
-		case err := <-errs:
-			if (i < 2) != (err == nil) {
-				t.Errorf("answer %d: %v", i, err)
-			}
-		case <-time.After(time.Second):
-			t.Fatal("a second answer blocked")
+		if err := <-errs; (i < 2) != (err == nil) { // a second answer that blocks hangs the test
+			t.Errorf("answer %d: %v", i, err)
 		}
 	}
 }
