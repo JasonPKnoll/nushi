@@ -19,6 +19,13 @@ import 'package:nushi/widgets.dart';
 /// LinkChatPull, Chat.pull).
 const chatPullApi = 81;
 
+/// The daemon links a pull request found by the branch's head only for a
+/// branch the chat pushed and one opened in the chat's life, nothing new
+/// for an archived chat, and says the branch's otherwise when asked
+/// (FindChatPullRequest.suggest, FindChatPullResponse.branch_pull); the
+/// rows' ask names the chat (GetGitHubItemsRequest.chat_id).
+const branchPullApi = 119;
+
 /// How often a chat's pull request is asked for while the chat is open:
 /// an open one, or a branch without one yet, each minute; one merged or
 /// closed every 15 minutes (as Orca does).
@@ -185,7 +192,9 @@ List<GitHubLink> orderPulls(
 /// details panel shows or not: at once, then on [pullWidgetPoll] (quietly),
 /// 3 s after a tool call pushed or opened one and after a turn ends, and
 /// when the window comes to the front. Each ask that finds one links it
-/// (the daemon's FindChatPull); only Unlink keeps that one off.
+/// (the daemon's FindChatPull; from API 119 only for a branch a tool call
+/// of the chat pushed, and GitHub isn't asked for another); only Unlink
+/// keeps that one off.
 class ChatPull extends ChangeNotifier {
   /// The one of [chat].
   factory of(Daemon daemon, ChatState chat) =>
@@ -449,16 +458,20 @@ class ChatPull extends ChangeNotifier {
     if (daemon.daemonApi < chatPullApi) return;
     _back.cancel();
     try {
-      final f = await daemon.client.findChatPull(
-        FindChatPullRequest(chatId: chat.id, quiet: quiet),
-      );
-      found = f;
-      chat.linkPull(
-        f.hasPull() ? f.pull : null,
-        // A daemon before API 118 says only the primary.
-        all: f.pulls.isNotEmpty ? f.pulls : null,
-      );
-      error = f.error.isEmpty ? null : f.error;
+      // An archived chat finds nothing new (ADR 0059's amendment): its
+      // rows are asked all the same.
+      if (!chat.archived || daemon.daemonApi < branchPullApi) {
+        final f = await daemon.client.findChatPull(
+          FindChatPullRequest(chatId: chat.id, quiet: quiet),
+        );
+        found = f;
+        chat.linkPull(
+          f.hasPull() ? f.pull : null,
+          // A daemon before API 118 says only the primary.
+          all: f.pulls.isNotEmpty ? f.pulls : null,
+        );
+        error = f.error.isEmpty ? null : f.error;
+      }
       await _rows(quiet);
       final l = current;
       if (l == null) {
@@ -487,8 +500,11 @@ class ChatPull extends ChangeNotifier {
   /// daemon that has it.
   Future<void> _rows(bool quiet) async {
     if (daemon.daemonApi < githubItemsApi || chat.pulls.isEmpty) return;
-    await GitHubItems.of(daemon)
-        .ask([for (final l in chat.pulls) addressOf(l)], quiet: quiet);
+    await GitHubItems.of(daemon).ask(
+      [for (final l in chat.pulls) addressOf(l)],
+      quiet: quiet,
+      chat: chat.id,
+    );
   }
 
   /// GitHub works out whether a pull request merges when it's asked, so

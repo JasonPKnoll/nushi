@@ -84,7 +84,11 @@ func (s *Service) Archive(chatID string, archived bool) error {
 		s.Archived, s.Done = archived, s.Done && !archived
 		if archived {
 			s.Pin = 0
+			if !c.record.Archived {
+				s.ArchivedAt = time.Now()
+			}
 		} else {
+			s.ArchivedAt = time.Time{}
 			s.SideOf = nil // a chat of its own now, no longer one Undo brings back
 		}
 	})

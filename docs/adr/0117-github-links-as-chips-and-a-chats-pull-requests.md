@@ -1,6 +1,6 @@
 # 0117. GitHub links are chips with a hover card; a chat has several pull requests, each a row of the PR widget
 
-Status: accepted, 2026-11-14. Amends [0059](0059-a-chats-pull-request.md) (one pull request a chat) and [0092](0092-the-details-panel-is-claude-codes-rail.md) (the PR widget).
+Status: accepted, 2026-11-14. Amends [0059](0059-a-chats-pull-request.md) (one pull request a chat) and [0092](0092-the-details-panel-is-claude-codes-rail.md) (the PR widget). Amended 2026-11-16: how they join (below).
 
 ## Context
 The owner liked three things in Claude's desktop app: a pull request or issue link in a message is an inline chip (its icon, `owner/repo#N · title`) with a hover card (state, author, age, size); its rail lists a session's pull requests, one row each (icon in the state's color, title, `#N +adds −dels`, a CI badge `● 1/2` with a popover, a ⋯ menu); and a session has several. In Nushi such a link is underlined text, a chat has one pull request (`ChatRecord.Pull`: found by its branch's head or linked by hand), and the PR widget is a tall summary of it (checks bar, reviewers, threads with Address, the Merge control, comments). An agent that opens two pull requests, or a stack, leaves all but one outside the chat. Claude's Auto-fix is out of scope (the roadmap's "Fixing CI from the chat").
@@ -71,3 +71,6 @@ It reads the same `GetGitHubItems` data as the chips and rows; before it answers
 6. 10 a chat.
 7. GitHub's shapes wherever `StatePill` and the state icons are drawn.
 8. The card of section 4: yes, live only, as Claude's app (the owner, 2026-11-14).
+
+## Amendment (2026-11-16): found only when the chat's own
+"How they join" is narrowed for one way in, the owner's words in [0059's amendment](0059-a-chats-pull-request.md): "When opening a new chat it shouldn't include any PRs", and "Let's make sure the PR link is attached to that specific chat better." **Found by the branch's head** now means: a branch a tool call of the chat pushed, a pull request opened in the chat's life (from its start, a fork's from its parent's, until it was archived), and of two chats that pushed the branch, the one that pushed last before it was opened; an archived chat finds nothing new. Found links saved before that were opened outside the chat's life are dropped as the rows are asked (`GetGitHubItemsRequest.chat_id`), not remembered as unlinked. Opened in the chat and by hand are unchanged; Link pull request… offers the branch's pull request first. Data: `ChatRecord.Pushed`, `Since`, `ArchivedAt` (new keys, so the latest release reads the file, ADR 0108); `FindChatPullRequest.suggest = 3`, `FindChatPullResponse.branch_pull = 8`, `GetGitHubItemsRequest.chat_id = 3` (API 119).
