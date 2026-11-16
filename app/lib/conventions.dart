@@ -18,6 +18,7 @@ class Conventions {
     required this.machine,
     required this.keyring,
     required this.badge,
+    this.altGr = false,
   });
 
   /// The modifier of the app's shortcuts.
@@ -38,6 +39,12 @@ class Conventions {
   /// The count on the app's icon.
   final String badge;
 
+  /// Whether Control and Alt held together are AltGr, which types a
+  /// character (a Spanish keyboard's `@` is AltGr+2): Windows reports
+  /// AltGr as both, and takes Ctrl+Alt for it too. No shortcut holds the
+  /// two there.
+  final bool altGr;
+
   /// These words, with [key] as the shortcuts' modifier.
   Conventions withKey(CommandKey key) => key == commandKey
       ? this
@@ -48,6 +55,7 @@ class Conventions {
           machine: machine,
           keyring: keyring,
           badge: badge,
+          altGr: altGr,
         );
 }
 
@@ -71,6 +79,17 @@ const linuxConventions = Conventions(
   badge: 'App icon badge',
 );
 
+/// Windows's (ADR 0125).
+const windowsConventions = Conventions(
+  commandKey: CommandKey.control,
+  reveal: 'Show in Explorer',
+  system: 'Windows',
+  machine: 'PC',
+  keyring: 'Credential Manager',
+  badge: 'taskbar badge',
+  altGr: true,
+);
+
 /// The platform's conventions, as a widget reads them: on the phone, whose
 /// web app shares the widgets but has no native edge, the paired
 /// computer's words ([phoneHost]) with the phone's own modifier, ⌘, as an
@@ -85,5 +104,8 @@ Conventions phoneHost = macConventions;
 /// The conventions of a daemon's system, as Go names it
 /// (PingResponse.os): the Mac's for "darwin", and for a daemon from before
 /// it said, which ran on a Mac.
-Conventions conventionsOf(String os) =>
-    os == 'linux' ? linuxConventions : macConventions;
+Conventions conventionsOf(String os) => switch (os) {
+  'linux' => linuxConventions,
+  'windows' => windowsConventions,
+  _ => macConventions,
+};

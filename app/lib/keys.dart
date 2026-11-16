@@ -8,10 +8,10 @@ import 'package:nushi/settings_view.dart';
 import 'package:nushi/terminal_panel.dart';
 
 // The app's shortcuts on each platform (ADR 0104): held with ⌘ on the Mac
-// and the phone, with Control on Linux, and written as each writes them
-// (⇧⌘E, Ctrl+Shift+E). Which modifier is read when a key arrives, from
-// `conventions`, never from `defaultTargetPlatform`, which says android
-// under `flutter test`.
+// and the phone, with Control on Linux and Windows, and written as each
+// writes them (⇧⌘E, Ctrl+Shift+E). Which modifier is read when a key
+// arrives, from `conventions`, never from `defaultTargetPlatform`, which
+// says android under `flutter test`.
 
 /// The modifier the app's shortcuts are held with now.
 CommandKey get commandKey => conventions.commandKey;
@@ -23,11 +23,12 @@ bool cmdPressed() => switch (commandKey) {
 };
 
 /// A shortcut held with the command key ([commandKey]), with [shift], [alt]
-/// and [ctrl] as given: ⌘ on the Mac, Control on Linux. Where Control and
-/// the same key won't do there (⌃⌘ keys, Control and `[`, which is Escape),
-/// [linux] is its own form. One value for both platforms, so it stays const
-/// and `identical` to itself, and a test that switches the conventions
-/// switches it.
+/// and [ctrl] as given: ⌘ on the Mac, Control on Linux and Windows. Where
+/// Control and the same key won't do there (⌃⌘ keys, Control and `[`, which
+/// is Escape), [linux] is its own form, and [windows] where that holds
+/// Control and Alt, which are AltGr on Windows. One value for every
+/// platform, so it stays const and `identical` to itself, and a test that
+/// switches the conventions switches it.
 class Cmd extends ShortcutActivator with MenuSerializableShortcut {
   const new(
     this.trigger, {
@@ -36,6 +37,7 @@ class Cmd extends ShortcutActivator with MenuSerializableShortcut {
     this.ctrl = false,
     this.includeRepeats = true,
     this.linux,
+    this.windows,
   }) : assert(!ctrl || linux != null, 'Control is the command key on Linux');
 
   /// The key that, with the modifiers, triggers it.
@@ -57,6 +59,10 @@ class Cmd extends ShortcutActivator with MenuSerializableShortcut {
   /// and the same keys.
   final SingleActivator? linux;
 
+  /// Its form where Control and Alt are AltGr ([Conventions.altGr]), when
+  /// [linux]'s holds both.
+  final SingleActivator? windows;
+
   /// The Mac's form: ⌘ and the rest.
   SingleActivator get mac => SingleActivator(
     trigger,
@@ -71,7 +77,8 @@ class Cmd extends ShortcutActivator with MenuSerializableShortcut {
   SingleActivator get single => switch (commandKey) {
     CommandKey.meta => mac,
     CommandKey.control =>
-      linux ??
+      (conventions.altGr ? windows : null) ??
+          linux ??
           SingleActivator(
             trigger,
             control: true,
@@ -81,10 +88,14 @@ class Cmd extends ShortcutActivator with MenuSerializableShortcut {
           ),
   };
 
-  /// Both forms' keys: a [ShortcutManager] indexes them once, and the
+  /// Every form's keys: a [ShortcutManager] indexes them once, and the
   /// conventions may change after (a test's).
   @override
-  Iterable<LogicalKeyboardKey> get triggers => [trigger, ?linux?.trigger];
+  Iterable<LogicalKeyboardKey> get triggers => [
+    trigger,
+    ?linux?.trigger,
+    ?windows?.trigger,
+  ];
 
   @override
   bool accepts(KeyEvent event, HardwareKeyboard state) =>
@@ -169,7 +180,7 @@ final List<ShortcutActivator> _linuxTerminalPasses = [
   filesKey, // Ctrl+Shift+E
   settingsKey, // Ctrl+,
   toggleTerminalKey, // Ctrl+`
-  chatTabKey, // Ctrl+Alt+1
+  chatTabKey, // Ctrl+Alt+1 (Ctrl+Shift+1 on Windows)
   changesTabKey, // Ctrl+Alt+2
   pullTabKey, // Ctrl+Alt+3
   for (var n = 1; n <= 9; n++) chatNumberKey(n), // Ctrl+1–9

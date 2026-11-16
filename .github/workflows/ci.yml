@@ -262,9 +262,41 @@ jobs:
       # Everything builds, vets and lints for Linux without cgo: macOS-only code stays in _darwin.go files (ADR 0097).
       - if: ${{ !cancelled() }}
         run: make lint-linux
+      # Everything builds, vets and lints for Windows, tests included: what macOS and Linux share stays in _unix.go files (ADR 0124).
+      - if: ${{ !cancelled() }}
+        run: make lint-windows
       # go.mod and go.sum name what the code imports, no more and no less.
       - if: ${{ !cancelled() }}
         run: go mod tidy -diff
+
+  windows:
+    # The Windows-only tests run on Windows itself (ADR 0124): the processes' job objects and handles, the data
+    # folder's DACL, batch-file shims, locks, logs, the shell's environment and Claude's history there; every
+    # package's tests build there too, but the rest assume Unix. The daemon is built as the app runs it. Unmeasured
+    # yet: 20 until it has run.
+    name: Go on Windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      # gofmt and the tests' fixtures want the files as committed, not with CRLF line ends.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - env:
+          CGO_ENABLED: "0"
+        run: go build -o bin/nushid.exe ./cmd/nushid
+      - if: ${{ !cancelled() }}
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go test ./internal/procgroup ./internal/filelock ./internal/logs ./internal/shellenv ./internal/batchfile
+          go test -run 'TestAlive|TestOpenWindows' ./internal/claudehistory
+          go test -run TestOwnDataFolder ./cmd/nushid
 
   linux-app:
     name: App tests (Linux, ${{ matrix.shard }}/2)

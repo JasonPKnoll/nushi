@@ -1,3 +1,5 @@
+//go:build unix
+
 // Command claude-record records the Claude parity scenarios
 // (internal/features/chats/testdata/claude-parity; its README says what
 // a scenario is): for each, it serves the scenario's api.json from a fake
@@ -5,7 +7,8 @@
 // client.json against the agent as Nushi would, and writes the
 // scenario's cli.jsonl (and cli-2.jsonl… for each further claude) and
 // acp.jsonl. make claude-record runs it, with Nushi's Go agent (`nushid
-// claude-acp`) as the agent.
+// claude-acp`) as the agent. It builds on Unix only, as claude-tee and
+// the process groups it ends are Unix's.
 //
 //	claude-record -tee <claude-tee> -claude <claude> [-only all|name,…] -- agent command…
 //

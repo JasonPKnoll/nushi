@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/afrase/nushi/internal/regularfile"
@@ -144,16 +143,11 @@ func Read(root, rel string) (File, error) {
 		return f, err
 	}
 	f.Data, f.Size, f.Mode = b, int64(len(b)), fi.Mode()
-	if st, ok := fi.Sys().(*syscall.Stat_t); ok {
-		f.Links, f.Owner = links(st.Nlink), st.Uid
+	if links, uid, ok := regularfile.Owner(fi); ok {
+		f.Links, f.Owner = links, uid
 	}
 	return f, nil
 }
-
-// links widens a link count, whose type is the platform's (uint16 on
-// darwin, uint32 on linux/arm64, uint64 on linux/amd64, where a plain
-// conversion reads to unconvert as one too many).
-func links[T uint16 | uint32 | uint64](n T) uint64 { return uint64(n) }
 
 // stamp is what says a file changed: its size and time, or that it's gone.
 type stamp struct {

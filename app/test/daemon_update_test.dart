@@ -10,6 +10,7 @@ import 'package:nushi/panes.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
 
+import 'fake_app_install.dart';
 import 'fake_daemon.dart';
 import 'harness.dart';
 
@@ -141,6 +142,31 @@ void main() {
     expect(find.text(_bar), findsNothing);
     expect(_asks(fake), 0);
     d.dispose();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('where the app can’t stop its daemon (Windows), neither the '
+      'bar nor the screen offers a restart: the screen says how instead', (
+    tester,
+  ) async {
+    fakeInstall.canStop = false;
+    var api = apiVersion;
+    final fake = _daemon(() => PingResponse(apiVersion: api, build: '7-1000'));
+    final d = await _open(tester, fake);
+    expect(find.text(_bar), findsOneWidget);
+    expect(find.text('Restart now'), findsNothing);
+    d.dispose();
+
+    api = restartWhenIdleApi - 1;
+    final old = await _open(tester, fake);
+    expect(find.text('Restart daemon'), findsNothing);
+    expect(
+      find.text(
+        'To restart it, quit nushid in Activity Monitor: Nushi starts the '
+        'new one.',
+      ),
+      findsOneWidget,
+    );
+    old.dispose();
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('a daemon newer than the bundled one (an older copy of the app '

@@ -126,13 +126,16 @@ func UserSettings() string { return filepath.Join(ConfigDir(), "settings.json") 
 
 // SignedIn asks the CLI whether it's signed in (`claude auth status`,
 // JSON): "yes" or "no", or "" when it can't say. Claude reads its own
-// login for that; Nushi sees only the answer's loggedIn.
+// login for that; Nushi sees only the answer's loggedIn. Signed out, it
+// exits 1 after printing its answer (docs/facts/claude.md), so the answer
+// is read whatever the exit; one that didn't start or was stopped printed
+// none.
 func SignedIn(run func(args ...string) ([]byte, error)) string {
-	out, err := run("auth", "status", "--json")
+	out, _ := run("auth", "status", "--json")
 	var st struct {
 		LoggedIn *bool `json:"loggedIn"`
 	}
-	if err != nil || json.Unmarshal(out, &st) != nil || st.LoggedIn == nil {
+	if json.Unmarshal(out, &st) != nil || st.LoggedIn == nil {
 		return ""
 	}
 	if *st.LoggedIn {

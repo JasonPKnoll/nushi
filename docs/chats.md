@@ -105,12 +105,12 @@ Nushi remembers all of it. ⌘1–⌘9 and ⌥⌘↑ ⌥⌘↓ go through the ch
 | ⌘[ and ⌘] | Back and Forward: the chat (or Jira, or GitHub) shown before, or after going back (View › Back, Forward, and the chevrons beside the sidebar button). A deleted or archived chat is passed over. On Linux Alt+Left and Alt+Right. |
 | ⌥⌘↑ and ⌥⌘↓ | The chat before or after in the sidebar (View › Previous Chat, Next Chat; ⌘[ and ⌘] until Back and Forward took them). On Linux Ctrl+Page Up and Ctrl+Page Down. |
 | ⌃Tab, ⌃⇧Tab | The next tab and the one before, round, as in a browser: Chat, Changes and Pull request (when the chat has one); wherever the focus is (View › Next Tab, Previous Tab). On Linux Ctrl+Tab and Ctrl+Shift+Tab. |
-| ⌃⌘1, ⌃⌘2, ⌃⌘3 | Show Chat, Changes or Pull Request (View menu). |
+| ⌃⌘1, ⌃⌘2, ⌃⌘3 | Show Chat, Changes or Pull Request (View menu). On Linux Ctrl+Alt+1–3; on Windows Ctrl+Shift+1–3, since Ctrl+Alt is AltGr there, which types `@`, `#` and `|` on many keyboards. |
 | ⌘W | Close the preview tab showing, and with the last the pane (File › Close Tab), its changes saved first. A focused terminal keeps it, to close itself. |
 | ⌘S | Save the file being edited in the preview (File › Save). |
 | ⌘K, ⌘⇧P | The command palette. |
 | ⌘F | Find. |
-| Any character | Typed with nothing that takes text focused (after a click on the transcript, say), it goes at the end of the chat's box, which takes the focus, as if typed there: `/` opens the commands. Keys with ⌘, ⌃ or ⌥, Esc, the arrows, Tab, Enter and Space keep their meaning, as do R on a selection (reply), a field, a terminal, the preview's editor, an open menu and a dialog ([ADR 0121](adr/0121-type-to-write.md)). |
+| Any character | Typed with nothing that takes text focused (after a click on the transcript, say), it goes at the end of the chat's box, which takes the focus, as if typed there: `/` opens the commands. Keys with ⌘, ⌃ or ⌥ (but AltGr's characters on Windows), Esc, the arrows, Tab, Enter and Space keep their meaning, as do R on a selection (reply), a field, a terminal, the preview's editor, an open menu and a dialog ([ADR 0121](adr/0121-type-to-write.md)). |
 | ⌘; | The next typo in the composer ([Spell check](#spell-check)). |
 | ⌘P | Open file. |
 | ⇧⌘E | Show or hide the Files pane. |

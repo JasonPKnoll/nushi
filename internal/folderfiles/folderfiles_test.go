@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/afrase/nushi/internal/testcheck"
@@ -23,7 +22,7 @@ func TestHash(t *testing.T) {
 	testcheck.Write(t, path("shown"), shown)
 	testcheck.Write(t, path("large"), large)
 	testcheck.NoErr(t, os.Symlink("shown", path("link")))
-	testcheck.NoErr(t, syscall.Mkfifo(path("fifo"), 0o600))
+	testcheck.Fifo(t, path("fifo"))
 	for name, text := range map[string]string{"shown": shown, "large": large} {
 		sum := sha256.Sum256([]byte(text))
 		f, fits := hash(path(name), maxBytes)
