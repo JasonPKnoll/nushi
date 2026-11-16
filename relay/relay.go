@@ -124,6 +124,14 @@ type peer struct {
 	wmu sync.Mutex
 }
 
+// expire closes a listener still waiting for a dialer, at MaxWait: pings
+// keep a waiting listener open only so long. One with a peer stays.
+func (p *peer) expire() {
+	if p.other.Load() == nil {
+		_ = p.ws.Close()
+	}
+}
+
 // New returns the relay's handler.
 func New(lim Limits) http.Handler {
 	lim.PerIP = min(lim.PerIP, max(1, lim.Total/2))
@@ -175,12 +183,7 @@ func (s *server) listen(w http.ResponseWriter, r *http.Request) {
 		_ = ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(4403, "not this id's key"), time.Now().Add(time.Second))
 		return
 	}
-	// Pings keep a waiting listener open only so long.
-	waited := time.AfterFunc(s.lim.MaxWait, func() {
-		if p.other.Load() == nil {
-			_ = ws.Close()
-		}
-	})
+	waited := time.AfterFunc(s.lim.MaxWait, p.expire)
 	defer waited.Stop()
 	// A second listener is the key's holder again (a daemon that came
 	// back): it replaces the one waiting. Only then is it told it's

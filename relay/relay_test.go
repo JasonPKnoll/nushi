@@ -543,16 +543,22 @@ func TestWaitingLifetime(t *testing.T) {
 		t.Fatal("closed too soon")
 	}
 
-	l, d := pair(t, url, newKey())
+	// One with a peer stays when its wait's time comes. That moment is run
+	// here, not waited for: a MaxWait short enough to wait out could pass
+	// before a slow machine has brought the two together.
+	s := New(Defaults).(*server)
+	srv := httptest.NewServer(s)
+	t.Cleanup(srv.Close)
+	key := newKey()
+	l, d := pair(t, "ws"+strings.TrimPrefix(srv.URL, "http"), key)
+	s.mu.Lock()
+	waiting := s.rooms[idOf(key)].waiting // the dialer hasn't spoken yet
+	s.mu.Unlock()
 	send(t, d, "hello")
 	expect(t, l, "hello")
-	got := make(chan string, 1)
-	go func() { m, _ := l.ReadMessage(); got <- string(m) }()
-	time.Sleep(3 * lim.MaxWait / 2)
+	waiting.expire()
 	send(t, d, "still here")
-	if m := <-got; m != "still here" {
-		t.Fatalf("read %q", m)
-	}
+	expect(t, l, "still here")
 }
 
 // Only the holder of an id's key listens there: someone who knows the id
