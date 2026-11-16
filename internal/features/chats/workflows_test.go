@@ -751,3 +751,22 @@ func TestNoWorkflowWithoutItsFiles(t *testing.T) {
 		t.Errorf("followed: %+v", it.Workflow)
 	}
 }
+
+// A run's files written again change only its Active time, and the item
+// takes a new run for it, never changing the one it had: copies of the
+// item handed out (GetWorkflow's, a published event's) share that one and
+// read it without the chat's lock (a data race on CI, 2026-11-16).
+func TestWorkflowTouchedIsANewRun(t *testing.T) {
+	at := time.Unix(1700000000, 0)
+	it := model.Item{ID: "call", Workflow: &model.Workflow{RunID: "wf_abc", State: "running", Active: at}}
+	handedOut := it
+	later := *it.Workflow
+	later.Active = at.Add(time.Minute)
+	(&chat{}).setWorkflowLocked(&it, &later)
+	if handedOut.Workflow.Active != at {
+		t.Fatalf("the copy handed out changed: %v", handedOut.Workflow.Active)
+	}
+	if it.Workflow.Active != later.Active || it.Workflow == handedOut.Workflow {
+		t.Fatalf("the item's run: %+v", it.Workflow)
+	}
+}

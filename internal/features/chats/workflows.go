@@ -202,13 +202,17 @@ func quit(w model.Workflow, now time.Time) *model.Workflow {
 }
 
 // setWorkflowLocked sets the call's run and publishes it when it changed
-// (its files' time aside, which changes with every write).
+// (its files' time aside, which changes with every write). A run once set
+// is never changed in place: copies of the item handed out (GetWorkflow's,
+// a published event's) share it and read it without the chat's lock.
 func (c *chat) setWorkflowLocked(it *model.Item, w *model.Workflow) {
 	if w != nil && it.Workflow != nil {
 		was, now := *it.Workflow, *w
 		was.Active, now.Active = time.Time{}, time.Time{}
 		if reflect.DeepEqual(was, now) {
-			it.Workflow.Active = w.Active
+			kept := *it.Workflow
+			kept.Active = w.Active
+			it.Workflow = &kept
 			return
 		}
 	}
