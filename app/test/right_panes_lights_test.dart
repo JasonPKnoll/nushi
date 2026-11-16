@@ -68,10 +68,8 @@ void main() {
       final line = windowFor(besideFrom(specs)!, sidebar: false);
       final from = line + 3;
       final to = line - 3 < 720 ? line - 3 : 720.0;
-      final (d, _) = await panesApp(tester, width: from, open: open);
-      for (var w = from; w >= to; w -= 1) {
-        viewport(tester, Size(w, 900));
-        await tester.pump();
+      var (d, _) = await panesApp(tester, width: from, open: open);
+      void check(double w) {
         expect(tester.takeException(), isNull, reason: 'overflow at $w');
         final buttons = tester.getRect(find.byType(TitleButtons));
         final row = find
@@ -102,6 +100,17 @@ void main() {
         expect(tester.getRect(row).left, greaterThanOrEqualTo(pane.left));
         expect(tester.getRect(row).right, lessThanOrEqualTo(pane.right));
       }
+
+      await narrowing(
+        tester,
+        from: from,
+        to: to,
+        check: check,
+        reopen: () async {
+          await closeView(tester, d);
+          (d, _) = await panesApp(tester, width: from, open: open);
+        },
+      );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await render(
