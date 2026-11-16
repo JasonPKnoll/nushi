@@ -21,7 +21,11 @@ func Guard(cmd *exec.Cmd) {
 	if env == nil {
 		env = os.Environ()
 	}
-	path, args, err := Command(cmd.Path, cmd.Args[1:], env)
+	var args []string
+	if len(cmd.Args) > 1 {
+		args = cmd.Args[1:]
+	}
+	path, args, err := Command(cmd.Path, args, env)
 	if err != nil {
 		cmd.Err = err
 		return
