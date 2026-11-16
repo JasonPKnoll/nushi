@@ -58,11 +58,10 @@ class WindowsDesktop implements Desktop {
     }
   }
 
-  static void _failed(String call, int code) =>
-      appLog.warn('the desktop opened nothing', {
-        'call': call,
-        'code': '$code',
-      });
+  static void _failed(String call, int code) => appLog.warn(
+    'the desktop opened nothing',
+    {'call': call, 'code': '$code'},
+  );
 }
 
 /// shell32 and ole32, loaded before the first call, so the process's
