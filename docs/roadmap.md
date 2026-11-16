@@ -50,6 +50,7 @@ What isn't built yet and the decisions still open, each checked against the code
 
 ### Changes and review
 
+- **A comment button on the diff's lines** (owner, 2026-11-17, from the promo site's demo): a blue + that shows at the start of the line under the cursor, as GitHub has it, so it's plain that a line takes a comment; today only clicking or dragging across line numbers starts one, which nothing shows.
 - **Review comments by an agent** (from JetBrains AIR): a side chat reviews the changes and posts comments through a small MCP tool (`add_comment(file, line, text)`); they show in Changes, and those picked go to the main chat.
 - **Findings, picked** (after a finding opened the chat's Changes at its line, 2026-10-26): tick a review's findings in its card and send them back to the agent ("fix these"), or show them as comments in Changes. Each finding already has a stable id (`findingIds`: its file, line and summary).
 - **More git from Changes**: push, and staging by hunk ([ADR 0079](adr/0079-stage-and-commit-from-changes.md) has whole files; diff_view has no per-hunk controls yet).
@@ -82,6 +83,10 @@ What isn't built yet and the decisions still open, each checked against the code
 
 - **Mobile, next**: an `Events` filter for cellular; tool output and diffs fetched on expanding them (the API would need an item's own call); renaming the device after pairing; a native iOS app with the Keychain and Face ID if the developer program ever works out.
 - **After a revoke** (ADR 0034's 2026-11-04 amendment, the relay review's #1 and #6): the Mac shows which devices haven't moved to the new id and key yet, and the devices paired since the revoked one was last seen, with "Pair again" and "Revoke these too"; a "Revoke and reset" for a lost or stolen phone that drops the old ids at once and makes a new VAPID key (the phones subscribe again); the relay closing a replaced listener with a code of its own (4409), so the Mac warns that another holder of the id's key listens (left until the relay's listen allowlist lands, which changes the same code); a new pairing announced by a macOS notification and a push to the other devices.
+
+### The site
+
+- **Animated clips** (owner, 2026-11-17: screenshots for now, so they stay current): short looping clips made the way `make screenshots` makes its pictures, a scripted turn on made-up data captured frame by frame and joined with ffmpeg, so they refresh with the app instead of going stale like a screen recording.
 
 ## Decisions to revisit
 
