@@ -530,6 +530,14 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+      // The attached image is decoded on the real clock: its thumbnail is
+      // in the picture only once it has come.
+      final thumbnail = find.byType(RawImage);
+      expect(thumbnail, findsOneWidget);
+      await untilReal(
+        tester,
+        () => tester.widget<RawImage>(thumbnail).image != null,
+      );
       // With room, the words; beside a pane, the same actions as icons.
       expect(find.text('Queue'), findsOneWidget);
       expect(find.text('Stop and send'), findsOneWidget);

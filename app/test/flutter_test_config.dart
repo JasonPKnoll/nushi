@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/conventions.dart';
@@ -37,10 +38,10 @@ import 'harness.dart';
 /// age a golden shows never moves. No test sees what another left: the
 /// app's prefs as at launch, nothing the app holds in memory while it runs
 /// (`run_state.dart`'s: agents, caches, drafts, groups opened…), no pull
-/// request read, review comments, clones or theme files known; the Mac's
-/// native edge (on every host), no speller, a fake install, so nothing
-/// starts or stops a daemon, a fake file manager, so nothing opens on
-/// the desktop, and a phone paired with a Mac.
+/// request read, review comments, clones or theme files known, no image
+/// decoded; the Mac's native edge (on every host), no speller, a fake
+/// install, so nothing starts or stops a daemon, a fake file manager, so
+/// nothing opens on the desktop, and a phone paired with a Mac.
 /// The test process's data folder goes when its tests end; on Linux it
 /// holds the process's `XDG_CONFIG_HOME` too, where enchant makes its
 /// folder, so no test writes in the user's.
@@ -86,6 +87,15 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     forgetJiraView();
     forgetGitHubView();
     unawaited(themeFiles.forget());
+    // No image another test decoded: one in the cache is drawn in a
+    // widget's first frame, one that isn't only once its decode ends, so
+    // a picture would depend on the tests before it. (A test that never
+    // made the binding has no cache.)
+    if (BindingBase.debugBindingType() != null) {
+      PaintingBinding.instance.imageCache
+        ..clear()
+        ..clearLiveImages();
+    }
   });
   tearDownAll(() {
     final dir = Directory(dataDir);
