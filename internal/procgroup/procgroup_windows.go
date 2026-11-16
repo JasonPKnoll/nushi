@@ -14,12 +14,22 @@ import (
 	"github.com/afrase/nushi/internal/batchfile"
 )
 
-// Own guards cmd against cmd.exe (batchfile.Guard), as every command
+// Own has cmd start in a console process group of its own, which starts
+// with Ctrl+C off: a Ctrl+C at the daemon's console (a dev's terminal)
+// doesn't end what the daemon started before the daemon closes its chats,
+// as a Unix process group keeps a terminal's SIGINT from it; acp-go does
+// the same for an agent. That group isn't one its children are killed by, so Kill
+// finds them by their parents, and a Group by its job (ADR 0123). Own
+// also guards cmd against cmd.exe (batchfile.Guard), as every command
 // Nushi starts passes here: an npm shim runs as node and its script, and
-// nothing runs from the current folder by a bare name. Windows has no
-// process group a child joins by itself, so Kill finds what cmd started by
-// its parents instead (ADR 0123).
-func Own(cmd *exec.Cmd) { batchfile.Guard(cmd) }
+// nothing runs from the current folder by a bare name.
+func Own(cmd *exec.Cmd) {
+	batchfile.Guard(cmd)
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.CreationFlags |= windows.CREATE_NEW_PROCESS_GROUP
+}
 
 // Kill kills p's process tree with taskkill's /T, which follows each
 // process's parent from p down. One whose parent ended before the kill is

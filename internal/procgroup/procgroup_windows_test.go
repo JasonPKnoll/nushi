@@ -5,6 +5,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unsafe"
@@ -94,4 +95,15 @@ func children(t *testing.T, parent int, exe string) []uint32 {
 func gone(h windows.Handle, wait time.Duration) bool {
 	ev, err := windows.WaitForSingleObject(h, uint32(wait.Milliseconds()))
 	return err == nil && ev == windows.WAIT_OBJECT_0
+}
+
+// A command Own sets up starts in a console process group of its own, and
+// keeps the flags it had.
+func TestOwnStartsAGroup(t *testing.T) {
+	cmd := exec.Command("cmd.exe", "/c", "exit")
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NO_WINDOW}
+	Own(cmd)
+	if f := cmd.SysProcAttr.CreationFlags; f != windows.CREATE_NO_WINDOW|windows.CREATE_NEW_PROCESS_GROUP {
+		t.Errorf("creation flags %#x", f)
+	}
 }
