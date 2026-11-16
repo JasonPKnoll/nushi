@@ -93,13 +93,18 @@ func TestNothingPrivateLogged(t *testing.T) {
 	srvs := newServers(svc, filepath.Join(data, "servers.json"), hub.Publish)
 	srv := httptest.NewServer(api.WithToken("tok", api.New(api.Services{Chats: svc, Agents: agents.New(nil, nil, shellenv.Off(os.Environ()), "", nil), Terms: terms, Hub: hub,
 		Memory: memory.New(svc), LogPrefs: st, Transcripts: st, Servers: srvs})))
+	follow, unfollow := context.WithCancel(context.Background())
+	followed := make(chan struct{})
 	go func() {
-		_ = hub.Subscribe(context.Background(), func(e model.Event) bool { terms.Follow(e); return true }, events.Unbounded())
+		defer close(followed)
+		_ = hub.Subscribe(follow, func(e model.Event) bool { terms.Follow(e); return true }, events.Unbounded())
 	}()
 
 	ctx := context.Background()
 	a := open(t, &daemon{url: srv.URL})
 	defer func() {
+		unfollow() // the follower ends with the test, before what it follows closes
+		<-followed
 		a.quit()
 		srv.CloseClientConnections()
 		srv.Close()
