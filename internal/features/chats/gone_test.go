@@ -170,6 +170,7 @@ func TestAChatWithWorkStaysWhenItsSessionIsGone(t *testing.T) {
 				testcheck.NoErr(t, os.WriteFile(filepath.Join(tc.sess.Folder, "notes.md"), []byte("x"), 0o600))
 			}
 			svc, agent, sessions, ev := goneService(t, errNotFound, always, tc.sess, Options{})
+			agent.deletes = true // or Delete asks it for nothing, the gone session or not
 			svc.worktrees, svc.scratch = tc.worktrees, scratch
 			_, _ = svc.Get("c")
 			c := svc.chats["c"]

@@ -141,6 +141,7 @@ func TestAChatStaysIfItsWorktreeOrHistoryCantGo(t *testing.T) {
 	}
 
 	svc, agent, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
+	agent.deletes = true // it would delete the history, had the worktree gone
 	svc.worktrees = stuckWorktrees{}
 	c.mu.Lock()
 	c.record.Worktree = &model.Worktree{Path: "/w"}
