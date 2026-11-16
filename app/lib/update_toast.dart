@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:nushi/daemon.dart';
+import 'package:nushi/gen/nushi/v1/nushi.pb.dart' show UpdateCheck;
 import 'package:nushi/markdown.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/native.dart';
@@ -324,33 +325,58 @@ class _UpdateToastState extends State<UpdateToast> {
 
 /// Asks the daemon for a newer release now (the palette's Check for
 /// updates): the card shows a newer one, even one dismissed before;
-/// otherwise a note says the app is up to date.
+/// otherwise a toast says the app is up to date. Asking, past a moment, a
+/// toast with a spinner says so; the answer takes its place with an icon
+/// of its own, so the two never look alike.
 Future<void> checkForUpdates(BuildContext context, Daemon d) async {
   final toasts = Toasts.maybeOf(context);
+  final t = NushiTheme.of(context).t;
   // From the menu bar or the palette: nothing else shows it's asking.
-  final slow = Timer(
-    Waits.slow,
-    () => showToast(
+  var asking = false;
+  final slow = Timer(Waits.slow, () {
+    asking = true;
+    showToast(
       toasts,
       'Checking for updates…',
+      leading: const Spinner(),
+      replace: true,
       duration: const Duration(minutes: 1),
-    ),
-  );
-  await tryOrShow(context, () async {
-    final u = await d.checkForUpdates().whenComplete(() {
-      slow.cancel();
-      toasts?.hide();
-    });
-    if (u.version.isNotEmpty && dismissedUpdate.value == u.version) {
-      dismissedUpdate.value = null;
-    }
-    if (updateToShow(d) == null) {
-      showToast(toasts, switch (u.latest) {
-        '' => 'Nushi has no release yet.',
-        final latest when d.daemonVersion.isEmpty =>
-          'The latest release is $latest; this is a development build.',
-        final latest => 'Nushi is up to date ($latest).',
-      });
-    }
+    );
   });
+  final UpdateCheck u;
+  try {
+    u = await d.checkForUpdates();
+  } on Object catch (e) {
+    showToast(toasts, errorText(e), replace: asking);
+    return;
+  } finally {
+    slow.cancel();
+  }
+  if (u.version.isNotEmpty && dismissedUpdate.value == u.version) {
+    dismissedUpdate.value = null;
+  }
+  if (updateToShow(d) != null) {
+    // The card says it.
+    if (asking) toasts?.hide();
+    return;
+  }
+  final (text, icon, color) = switch (u.latest) {
+    '' => ('Nushi has no release yet.', Icons.info_outline, t.textSecondary),
+    final latest when d.daemonVersion.isEmpty => (
+      'The latest release is $latest; this is a development build.',
+      Icons.info_outline,
+      t.textSecondary,
+    ),
+    final latest => (
+      'Nushi is up to date ($latest).',
+      Icons.check_circle,
+      t.done,
+    ),
+  };
+  showToast(
+    toasts,
+    text,
+    leading: Icon(icon, size: 16, color: color),
+    replace: asking,
+  );
 }

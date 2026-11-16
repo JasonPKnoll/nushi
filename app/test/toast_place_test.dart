@@ -8,6 +8,7 @@ import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/phone/ui.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/spinner.dart';
 import 'package:nushi/top_notices.dart';
 import 'package:nushi/update_toast.dart';
 import 'package:nushi/widgets.dart';
@@ -95,11 +96,27 @@ void main() {
           var checking = checkForUpdates(context, d);
           await tester.pump(const Duration(milliseconds: 400));
           await shot('c_checking');
+          expect(
+            find.descendant(
+              of: find.byType(ToastLine),
+              matching: find.byType(Spinner),
+            ),
+            findsOneWidget,
+          );
           checked.complete(
             CheckForUpdatesResponse(update: UpdateCheck(latest: '0.1.16')),
           );
           await checking;
           await shot('d_up_to_date');
+          expect(find.text('Nushi is up to date (0.1.16).'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byType(ToastLine),
+              matching: find.byIcon(Icons.check_circle),
+            ),
+            findsOneWidget,
+          );
+          expect(find.byType(Spinner), findsNothing);
           hide(context);
           await tester.pumpAndSettle();
           // The update card, alone and with a toast.

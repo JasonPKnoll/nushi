@@ -13,15 +13,16 @@ import 'package:nushi/theme/theme.dart';
 typedef ToastAction = ({String label, VoidCallback onPressed});
 
 /// Shows the app's one toast in [toasts] (`Toasts.maybeOf(context)`):
-/// [text], after [icon] when given (the failure's color when [failed]),
-/// then [action] as a compact button and, when [closable], a ×
-/// (docs/design.md's Toasts). It stays [duration]; with
+/// [text], after [leading] or [icon] when given (the icon in the failure's
+/// color when [failed]), then [action] as a compact button and, when
+/// [closable], a × (docs/design.md's Toasts). It stays [duration]; with
 /// [replace], it takes the place of the one showing, else it waits its
 /// turn.
 void showToast(
   Toasts? toasts,
   String text, {
   IconData? icon,
+  Widget? leading,
   bool failed = false,
   ToastAction? action,
   bool closable = false,
@@ -32,6 +33,7 @@ void showToast(
   (close) => ToastLine(
     text,
     icon: icon,
+    leading: leading,
     failed: failed,
     action: action == null
         ? null
@@ -316,20 +318,22 @@ class _ToastCard extends StatelessWidget {
   }
 }
 
-/// A toast's line: [icon] (the failure's color when [failed]), [text],
-/// then [action] and × ([onClose]) when given, from the app's own
-/// controls, compact (ADR 0122).
+/// A toast's line: [leading] or [icon] (the failure's color when
+/// [failed]), [text], then [action] and × ([onClose]) when given, from the
+/// app's own controls, compact (ADR 0122).
 class ToastLine extends StatelessWidget {
   const new(
     this.text, {
     super.key,
     this.icon,
+    this.leading,
     this.action,
     this.onClose,
     this.failed = false,
   });
 
   final IconData? icon;
+  final Widget? leading;
   final String text;
   final ToastAction? action;
   final VoidCallback? onClose;
@@ -341,7 +345,9 @@ class ToastLine extends StatelessWidget {
     return Row(
       spacing: 8,
       children: [
-        if (icon case final icon?)
+        if (leading case final leading?)
+          SizedBox.square(dimension: 16, child: leading)
+        else if (icon case final icon?)
           Icon(icon, size: 16, color: failed ? t.crashed : t.textSecondary),
         Expanded(child: Text(text)),
         if (action case final action?)
