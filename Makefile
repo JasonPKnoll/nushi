@@ -243,10 +243,12 @@ lint-windows: $(GOLANGCI)
 # packages only in a platform's *_macos.dart, *_linux.dart or
 # *_windows.dart files (tools/native-edge, ADR 0097, 0104, 0125), and the
 # app's views built from the shared controls and tokens
-# (tools/design-check, docs/design.md): anywhere.
+# (tools/design-check, docs/design.md), and each app test file in one
+# shard of the set its host needs (tools/test-shards -check): anywhere.
 lint-dart:
 	go run ./tools/native-edge $(addsuffix /lib,$(DART_DIRS))
 	go run ./tools/design-check app/lib
+	go run ./tools/test-shards -check
 	$(BUF) lint
 	$(BUF) format --diff --exit-code
 	@for d in $(DART_DIRS); do echo "flutter analyze $$d"; (cd $$d && flutter analyze --fatal-infos) || exit 1; done
