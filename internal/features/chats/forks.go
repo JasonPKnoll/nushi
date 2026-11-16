@@ -164,6 +164,7 @@ func (c *chat) forkedLocked(items []model.Item) {
 func forkRecord(id, sid string, of model.ChatRecord) model.ChatRecord {
 	r := model.ChatRecord{ID: id, SessionID: sid, Agent: of.Agent, Folder: of.Folder, Title: forkTitle(of.Title), Name: forkTitle(of.Name),
 		Mode: of.Mode, Created: time.Now(), HasMessages: true, Issue: of.Issue, GitHub: of.GitHub, Pull: of.Pull, Pulls: slices.Clone(of.Pulls), NoPulls: slices.Clone(of.NoPulls),
+		Pushed: slices.Clone(of.Pushed), Since: cmp.Or(of.Since, of.Created),
 		Color: of.Color, Pins: slices.Clone(of.Pins), Ultracode: of.Ultracode, Picks: maps.Clone(of.Picks)}
 	if of.Worktree != nil {
 		wt := *of.Worktree
@@ -269,7 +270,7 @@ func (s *Service) keepSide(ctx context.Context, id string, archive bool) (string
 	c.record = forkRecord(c.id, sid, of)
 	c.record.Mode, c.record.Picks = mode, picks
 	if archive {
-		c.record.Archived, c.record.Name, c.record.Title = true, "", sideTitle(of)
+		c.record.Archived, c.record.ArchivedAt, c.record.Name, c.record.Title = true, time.Now(), "", sideTitle(of)
 		c.record.SideOf = &model.SideOf{Chat: p.id, Base: len(base)}
 	}
 	c.lastItem = lastItem

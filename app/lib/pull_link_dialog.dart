@@ -34,9 +34,12 @@ GitHubRef? parsePullRef(String text, {String host = '', String repo = ''}) {
   return null;
 }
 
-/// Link pull request…: a field for its link or number, and the open pull
-/// requests of the chat's repository that are mine or ask my review (the
-/// inbox's, asked once); picking one asks GitHub for it and links it.
+/// Link pull request…: a field for its link or number, the pull request of
+/// the folder's branch first when it has one the chat hasn't (a chat links
+/// it by itself only once it pushed the branch: ADR 0059's amendment), and
+/// the open pull requests of the chat's repository that are mine or ask my
+/// review (the inbox's, asked once); picking one asks GitHub for it and
+/// links it.
 Future<void> linkPull(BuildContext context, ChatPull cp) =>
     showDialog<void>(context: context, builder: (_) => _LinkPull(cp));
 
@@ -52,6 +55,10 @@ class _LinkPull extends StatefulWidget {
 class _LinkPullState extends State<_LinkPull> {
   final _text = TextEditingController();
   List<GitHubItem> _pulls = const [];
+
+  /// The pull request of the folder's branch, when the chat hasn't it: its
+  /// row as known (none before GitHub said), and the branch.
+  (GitHubRef, GitHubItem?, String)? _branch;
   String? _error;
   bool _busy = false;
 
@@ -68,6 +75,37 @@ class _LinkPullState extends State<_LinkPull> {
   void initState() {
     super.initState();
     unawaited(_list());
+    unawaited(_suggest());
+  }
+
+  /// Asks the daemon for the branch's pull request, not linked
+  /// (FindChatPull's suggest), and GitHub for its row.
+  Future<void> _suggest() async {
+    final cp = widget.cp;
+    if (cp.daemon.daemonApi < branchPullApi) return;
+    try {
+      final f = await cp.daemon.client.findChatPull(
+        FindChatPullRequest(chatId: cp.chat.id, suggest: true),
+      );
+      if (!f.hasBranchPull() || !mounted) return;
+      final a = addressOf(f.branchPull);
+      final items = GitHubItems.of(cp.daemon);
+      setState(() => _branch = (a.ref, null, f.branch));
+      await items.ask([a], quiet: false);
+      final it = items.look(a).item;
+      if (mounted) setState(() => _branch = (a.ref, it, f.branch));
+    } on Object {
+      // The list and the field still link one.
+    }
+  }
+
+  /// Whether [it] is the branch's, which shows first.
+  bool _isBranch(GitHubItem it) {
+    final b = _branch?.$1;
+    return b != null &&
+        b.host == it.ref.host &&
+        b.repo.toLowerCase() == it.ref.repo.toLowerCase() &&
+        b.number == it.ref.number;
   }
 
   @override
@@ -132,6 +170,39 @@ class _LinkPullState extends State<_LinkPull> {
     unawaited(_link(ref));
   }
 
+  /// A pull request to pick: its number in its state's color, its title
+  /// and its author ([it] null: the number alone, until GitHub says).
+  Widget _row(GitHubRef ref, GitHubItem? it) {
+    final theme = NushiTheme.of(context);
+    final t = theme.t;
+    return Tap(
+      onTap: _busy ? null : () => _link(ref),
+      padding: const EdgeInsets.all(6),
+      child: Row(
+        children: [
+          Text(
+            '#${ref.number}',
+            style: theme.code(
+              it == null ? t.textMuted : itemColor(t, it),
+              size: 12,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              it?.title ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.ui(t.text, size: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(it?.author ?? '', style: theme.ui(t.textMuted, size: 12)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
@@ -172,32 +243,26 @@ class _LinkPullState extends State<_LinkPull> {
               padding: const EdgeInsets.only(top: 6),
               child: Text(e, style: theme.ui(t.crashed, size: 12)),
             ),
-          if (_pulls.isNotEmpty) ...[
+          if (_branch case (final ref, final it, final branch)?) ...[
             const SizedBox(height: 10),
-            for (final it in _pulls.take(8))
-              Tap(
-                onTap: _busy ? null : () => _link(it.ref),
-                padding: const EdgeInsets.all(6),
-                child: Row(
-                  children: [
-                    Text(
-                      '#${it.ref.number}',
-                      style: theme.code(itemColor(t, it), size: 12),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        it.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.ui(t.text, size: 12),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(it.author, style: theme.ui(t.textMuted, size: 12)),
-                  ],
-                ),
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: 'The pull request of '),
+                  TextSpan(
+                    text: branch,
+                    style: theme.code(t.textSecondary, size: 11.5),
+                  ),
+                ],
               ),
+              style: theme.ui(t.textMuted, size: 12),
+            ),
+            _row(ref, it),
+          ],
+          if (_pulls.where((it) => !_isBranch(it)) case final pulls
+              when pulls.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            for (final it in pulls.take(8)) _row(it.ref, it),
           ],
         ],
       ),

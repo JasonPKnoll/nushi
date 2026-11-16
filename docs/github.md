@@ -64,9 +64,16 @@ The app asks the daemon once a chip is built (`GetGitHubItems`, the chips of a m
 
 ## A chat's pull request
 
-A chat on a branch finds its pull request by itself: the one whose head is the branch ([ADR 0059](adr/0059-a-chats-pull-request.md)). It looks:
+A chat finds its pull request by itself once it pushed its branch: the one whose head is that branch, opened in the chat's life ([ADR 0059](adr/0059-a-chats-pull-request.md) and its amendment of 2026-11-16). A new chat on a branch that already has a pull request takes nothing; Link pull request… offers that one first.
 
-- when the chat opens, and each minute while it's open (the details panel shown or not);
+- **Pushed by the chat**: a tool call of the chat that ran `git push` or `gh pr create`, or a `create_pull_request` tool, records the folder's branch then. GitHub is asked only for such a branch.
+- **In its life**: opened at or after the chat started (a fork's start is its parent's), and before it was archived. An archived chat finds nothing new.
+- **A shared branch**: of two chats of the repository that pushed it, the one that pushed last before the pull request was opened takes it.
+- A found pull request opened outside the chat's life, left by an older version, goes the next time its row is asked; it isn't remembered as unlinked, so linking it by hand works.
+
+It looks:
+
+- when the chat opens, and each minute while it's open (the details panel shown or not), unless it's archived;
 - a few seconds after the agent pushes or runs `gh pr create`, and after each turn;
 - when Nushi's window comes to the front.
 
@@ -74,7 +81,7 @@ The widget's title says when it last looked ("Checked 20 s ago · every minute")
 
 ### The Pull request widget
 
-A chat can hold up to 10 pull requests ([ADR 0117](adr/0117-github-links-as-chips-and-a-chats-pull-requests.md)): the one of its branch (found, and gone when the branch changes), each its own tool call opened (`gh pr create` or a `create_pull_request` tool, linked as the call completes; it stays when the branch changes), and those linked by hand (Link another pull request…, or a link chip's Link to this chat). Unlinking one keeps it from being found or linked again.
+A chat can hold up to 10 pull requests ([ADR 0117](adr/0117-github-links-as-chips-and-a-chats-pull-requests.md)): the one of a branch it pushed (found, and gone when the branch changes), each its own tool call opened (`gh pr create` or a `create_pull_request` tool, linked as the call completes; it stays when the branch changes), and those linked by hand (Link another pull request…, or a link chip's Link to this chat). Unlinking one keeps it from being found or linked again.
 
 The details panel's **Pull request** widget ("Pull requests" with two or more) is a row each, 44 tall, in the order linked except that a stack (one's base is another's head) lists its base first:
 
@@ -86,7 +93,7 @@ A click opens the Pull request tab on it. The checks bar, the reviewers, the thr
 
 While the chat shows, a tool call of its that opens a pull request (`gh pr create`, a `create_pull_request` tool) or merges one of its own (`gh pr merge`, a `merge_pull_request` tool) gets a card after its turn group: a filled card with the state pill, `owner/repo #n · author · age`, the title, the files and `+adds −dels` as tags, and under a hairline the checks in words or the row's cue. A click opens the tab on it; right-click is the row's ⋯. It lives in the app's memory only: leaving the chat, or quitting, drops it (ADR 0117).
 
-The rows are asked each minute while the chat is open, in one `GetGitHubItems` call a host; the tab's pull request is read whole as before. The widget's ⋯ links one by hand; without one it says "No pull request for `branch`", with Link….
+The rows are asked each minute while the chat is open, in one `GetGitHubItems` call a host; the tab's pull request is read whole as before. The widget's ⋯ links one by hand; without one it says "No pull request linked for `branch`", with Link…, whose dialog offers the branch's pull request first when there is one.
 
 The header's chip is the chat's pull requests: the primary's icon, number and badges (a narrow header drops the badges first), then `+2`; its hover is the card for one, the rows for several; a click opens the tab, which with several starts with a menu field of the rows (its pick remembered for the chat).
 

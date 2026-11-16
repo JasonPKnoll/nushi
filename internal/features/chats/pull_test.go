@@ -3,6 +3,7 @@ package chats
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/afrase/nushi/internal/model"
 	"github.com/afrase/nushi/internal/testcheck"
@@ -51,11 +52,11 @@ func TestLinkPull(t *testing.T) {
 	}
 	testcheck.NoErr(t, svc.AddPull(c.id, pullLink(8, ""))) // by hand, it comes back
 	link(pullLink(10, "sub"))
-	svc.DropFoundPull(c.id, "sub")
+	testcheck.NoErr(t, svc.FoundPull(c.id, "sub", nil, time.Time{}))
 	if got := all(); got != "[9 8 10]" {
 		t.Fatalf("on its branch: %s", got)
 	}
-	svc.DropFoundPull(c.id, "main")
+	testcheck.NoErr(t, svc.FoundPull(c.id, "main", nil, time.Time{}))
 	if got := all(); got != "[9 8]" {
 		t.Fatalf("its branch left: %s", got)
 	}
@@ -146,7 +147,7 @@ func TestOpenedPull(t *testing.T) {
 	}
 	found := pullLink(12, "sub")
 	testcheck.NoErr(t, svc.LinkPull(c.id, &found))
-	svc.DropFoundPull(c.id, "main")
+	testcheck.NoErr(t, svc.FoundPull(c.id, "main", nil, time.Time{}))
 	s, _ = svc.Session(c.id)
 	if all := s.AllPulls(); len(all) != 1 || all[0].ID != "PR_12" || !all[0].Opened || all[0].Branch != "" {
 		t.Fatalf("found by its branch, then the branch changed: %+v", all)

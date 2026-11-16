@@ -40,6 +40,7 @@ Future<(Daemon, FakeDaemon)> _app(
   GitHubPull? whole,
   Size size = const Size(1700, 900),
   bool details = true,
+  bool archived = false,
 }) async {
   viewport(tester, size);
   showDetails.value = details;
@@ -47,6 +48,12 @@ Future<(Daemon, FakeDaemon)> _app(
   widgetOrder.value = ['Pull request'];
   pullSeen.value = {};
   final c = chat('c', 'claude', 'Add Sub and Neg');
+  if (archived) {
+    c
+      ..archived = true
+      ..pull = _link
+      ..pulls.add(_link);
+  }
   final fake = FakeDaemon([c])
     ..answer = (input) => switch (input) {
       FindChatPullRequest() =>
@@ -252,15 +259,32 @@ void main() {
     );
   });
 
-  testWidgets('no pull request yet: the branch, and Link…', (tester) async {
+  testWidgets('no pull request linked: the branch, and Link…', (tester) async {
     final (d, fake) = await _app(tester);
     expect(
-      _inPull(find.text('No pull request for subtract', findRichText: true)),
+      _inPull(
+        find.text('No pull request linked for subtract', findRichText: true),
+      ),
       findsOneWidget,
     );
     expect(_inPull(find.text('Link…')), findsOneWidget);
     expect(fake.calls.whereType<FindChatPullRequest>(), isNotEmpty);
     expect(fake.calls.whereType<GetGitHubPullRequest>(), isEmpty);
+    d.dispose();
+  }, variant: _mac);
+
+  // The owner's report: old chats had pull requests opened after they
+  // were archived. An archived chat finds nothing new; its rows are asked
+  // with the chat named, so the daemon drops one opened outside its life.
+  testWidgets('an archived chat asks for its rows, never to find one', (
+    tester,
+  ) async {
+    final (d, fake) = await _app(tester, archived: true, whole: pull());
+    expect(_asks(fake), 0);
+    final rows = fake.calls.whereType<GetGitHubItemsRequest>();
+    expect(rows, isNotEmpty);
+    expect(rows.every((r) => r.chatId == 'c'), isTrue);
+    expect(fake.calls.whereType<GetGitHubPullRequest>(), isNotEmpty);
     d.dispose();
   }, variant: _mac);
 

@@ -96,7 +96,7 @@ func TestSessionsShareNothing(t *testing.T) {
 		case reflect.Map:
 			f.Set(reflect.MakeMap(f.Type()))
 		default:
-			if f.Type() != reflect.TypeFor[time.Time]() && refs(f.Type()) { // a Time is a value
+			if refs(f.Type()) {
 				t.Errorf("%s holds references clone doesn't copy", field.Name)
 			}
 			continue
@@ -119,6 +119,9 @@ func TestSessionsShareNothing(t *testing.T) {
 
 // refs says whether a value of t holds a pointer, slice, map, or the like.
 func refs(t reflect.Type) bool {
+	if t == reflect.TypeFor[time.Time]() {
+		return false // a value: its Location is never changed in place
+	}
 	switch t.Kind() {
 	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Interface, reflect.Chan, reflect.Func, reflect.UnsafePointer:
 		return true

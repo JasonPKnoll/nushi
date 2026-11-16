@@ -12,10 +12,11 @@ import (
 	"github.com/afrase/nushi/internal/model"
 )
 
-// A chat's pull requests (ADR 0117): found by its branch's head (they
-// follow the branch), opened by one of its tool calls, or linked by hand;
-// at most model.MaxPulls. The record keeps them in Pulls, and the first
-// in Pull for a release before Pulls (ADR 0108).
+// A chat's pull requests (ADR 0117): found by the head of a branch it
+// pushed (they follow the branch; ADR 0059's amendment of 2026-11-16),
+// opened by one of its tool calls, or linked by hand; at most
+// model.MaxPulls. The record keeps them in Pulls, and the first in Pull
+// for a release before Pulls (ADR 0108).
 
 // errTooManyPulls refuses one pull request too many picked by hand.
 var errTooManyPulls = fmt.Errorf("a chat holds at most %d pull requests", model.MaxPulls)
@@ -214,22 +215,6 @@ func (s *Service) UnlinkPull(chatID string, pull model.ChatGitHub) error {
 	})
 	c.logLocked().Info("pull request unlinked")
 	return nil
-}
-
-// DropFoundPull unlinks the pull requests found for a branch the chat's
-// folder is no longer on (one opened in the chat or linked by hand stays).
-func (s *Service) DropFoundPull(chatID, branch string) {
-	c, err := s.listed(chatID)
-	if err != nil {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	linked := c.record.LinkedPulls()
-	kept := slices.DeleteFunc(slices.Clone(linked), func(p model.ChatGitHub) bool { return p.Branch != "" && p.Branch != branch })
-	if len(kept) != len(linked) {
-		c.saveLocked(func(s *model.ChatRecord) { setPulls(s, kept) })
-	}
 }
 
 // pullAddressRE is a pull request's address on any host: the host, the
