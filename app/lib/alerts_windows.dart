@@ -1,6 +1,6 @@
 import 'package:nushi/alerts.dart';
 
-/// Windows posts no notifications yet (ADR 0124; toasts need the app
+/// Windows posts no notifications yet (ADR 0125; toasts need the app
 /// registered with an AppUserModelID, which its package will do): every
 /// call does nothing, and whether the system lets the app notify has no
 /// answer, so Settings doesn't offer it.

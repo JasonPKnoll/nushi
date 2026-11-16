@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:nushi/mermaid.dart';
 
 /// Windows draws no diagrams yet: there's no web view to run mermaid.js in
-/// (ADR 0124). A diagram shows its source and says so.
+/// (ADR 0125). A diagram shows its source and says so.
 class WindowsDiagrams implements Diagrams {
   const new();
 

@@ -79,7 +79,7 @@ const linuxConventions = Conventions(
   badge: 'App icon badge',
 );
 
-/// Windows's (ADR 0124).
+/// Windows's (ADR 0125).
 const windowsConventions = Conventions(
   commandKey: CommandKey.control,
   reveal: 'Show in Explorer',

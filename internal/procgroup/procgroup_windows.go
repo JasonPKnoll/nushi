@@ -20,7 +20,7 @@ import (
 // doesn't end what the daemon started before the daemon closes its chats,
 // as a Unix process group keeps a terminal's SIGINT from it; acp-go does
 // the same for an agent. That group isn't one its children are killed by, so Kill
-// finds them by their parents, and a Group by its job (ADR 0123). Own
+// finds them by their parents, and a Group by its job (ADR 0124). Own
 // also guards cmd against cmd.exe (batchfile.Guard), as every command
 // Nushi starts passes here: an npm shim runs as node and its script, and
 // nothing runs from the current folder by a bare name.

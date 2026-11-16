@@ -35,7 +35,7 @@ const (
 	linuxIcon = "com.nushihq.Nushi"
 )
 
-// The Windows app's icon (ADR 0124), which its runner's Runner.rc embeds:
+// The Windows app's icon (ADR 0125), which its runner's Runner.rc embeds:
 // the same art at a Windows icon's sizes, each the detail drawn for it.
 const windowsIcon = "app/windows/runner/resources/app_icon.ico"
 

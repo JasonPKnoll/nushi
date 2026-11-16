@@ -25,7 +25,7 @@ const _fontKeys = [
   r'HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts',
 ];
 
-/// Windows's installed fonts (ADR 0124): every family as the registry's
+/// Windows's installed fonts (ADR 0125): every family as the registry's
 /// font list names them (`reg query`), and the monospaced ones among
 /// [_known] whose file is in the system's or the user's fonts folder.
 /// Telling every monospaced family needs DirectWrite, which comes later.

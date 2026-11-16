@@ -1,5 +1,5 @@
 // Command native-edge checks that the app's native code stays at its edge
-// (ADR 0097, 0104, 0124): platform channels and messages (MethodChannel,
+// (ADR 0097, 0104, 0125): platform channels and messages (MethodChannel,
 // EventChannel, BasicMessageChannel, a BinaryMessenger, a MethodCall or its
 // codec, SystemChannels, sendPlatformMessage) and FFI (dart:ffi,
 // package:ffi) appear in the Dart libraries it's given only in a platform's
@@ -93,7 +93,7 @@ func main() {
 	if len(uses) > 0 {
 		fmt.Fprintln(os.Stderr, "Native code goes behind an interface its user declares, each platform's implementation in "+
 			"<capability>_macos.dart, <capability>_linux.dart or <capability>_windows.dart, reached only through Native "+
-			"and chosen in main.dart (native_macos.dart, native_linux.dart or native_windows.dart; ADR 0097, 0104 and 0124, docs/adr/).")
+			"and chosen in main.dart (native_macos.dart, native_linux.dart or native_windows.dart; ADR 0097, 0104 and 0125, docs/adr/).")
 		os.Exit(1)
 	}
 }

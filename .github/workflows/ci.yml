@@ -262,7 +262,7 @@ jobs:
       # Everything builds, vets and lints for Linux without cgo: macOS-only code stays in _darwin.go files (ADR 0097).
       - if: ${{ !cancelled() }}
         run: make lint-linux
-      # Everything builds, vets and lints for Windows, tests included: what macOS and Linux share stays in _unix.go files (ADR 0123).
+      # Everything builds, vets and lints for Windows, tests included: what macOS and Linux share stays in _unix.go files (ADR 0124).
       - if: ${{ !cancelled() }}
         run: make lint-windows
       # go.mod and go.sum name what the code imports, no more and no less.

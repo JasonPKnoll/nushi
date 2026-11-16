@@ -1,6 +1,6 @@
-# 0125. Agents on Windows start with the registry's environment
+# 0126. Agents on Windows start with the registry's environment
 
-Status: accepted, 2026-11-14. Amends [0048](0048-agents-start-with-the-login-shells-environment.md) (the login shell's environment) and [0123](0123-the-daemon-builds-on-windows.md) (the daemon on Windows).
+Status: accepted, 2026-11-14. Amends [0048](0048-agents-start-with-the-login-shells-environment.md) (the login shell's environment) and [0124](0124-the-daemon-builds-on-windows.md) (the daemon on Windows).
 
 ## Context
 Agents start with the environment the user's login shell gives a terminal, which the daemon reads by running that shell (ADR 0048), whatever started the daemon. Windows has no login shell: a terminal there, PowerShell or cmd, starts with the environment Windows builds for every new process from the registry, the system's variables and the user's (System Properties' Environment Variables, and what an installer adds to Path). The daemon ran `/bin/sh`, which isn't there, so agents got the daemon's own environment: what the app had when it started the daemon, missing any Path an installer changed since. And `LookPath` couldn't find a program there at all: it read `PATH` by its Unix name (Windows's is `Path`, the same variable whatever its case), wanted a mode bit Windows doesn't have, and didn't try `PATHEXT`'s extensions (`claude` is `claude.exe`, npm's `claude.cmd`).

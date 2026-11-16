@@ -1,4 +1,4 @@
-# 0123. The daemon builds on Windows
+# 0124. The daemon builds on Windows
 
 Status: accepted, 2026-11-13. Builds on [0097](0097-native-code-behind-interfaces.md) (the seams) and [0101](0101-the-daemon-runs-on-linux.md) (a second platform's files).
 

@@ -1,6 +1,6 @@
 import 'package:nushi/window_drag.dart';
 
-/// Windows's window, which keeps the system's title bar (ADR 0124), as
+/// Windows's window, which keeps the system's title bar (ADR 0125), as
 /// Linux's does: it moves and zooms the window, so a header does neither,
 /// and there's no menu bar for the app's menus. Nothing presents it yet:
 /// no notification's click asks.

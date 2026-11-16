@@ -6,7 +6,7 @@ import 'package:nushi/shell_windows.dart';
 import 'package:nushi/web_page.dart';
 import 'package:nushi/web_views.dart';
 
-/// Windows's web views, none yet (ADR 0124; WebView2 later): as on Linux,
+/// Windows's web views, none yet (ADR 0125; WebView2 later): as on Linux,
 /// a file's preview and a browser tab are placeholders
 /// (`outside_page.dart`) whose button opens the page in the default
 /// browser. That browser is the program Windows associates with https,

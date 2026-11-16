@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// On Windows (ADR 0123) no terminal starts yet: its pseudo-terminal is
+// On Windows (ADR 0124) no terminal starts yet: its pseudo-terminal is
 // ConPTY's, not a device a program opens (docs/roadmap.md). Start refuses,
 // so none of the rest runs.
 

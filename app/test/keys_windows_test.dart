@@ -13,7 +13,7 @@ import 'package:nushi/window_drag_windows.dart';
 import 'fake_daemon.dart';
 import 'harness.dart';
 
-// The app's keys on Windows (ADR 0124): Linux's, held with Control, but
+// The app's keys on Windows (ADR 0125): Linux's, held with Control, but
 // none with Control and Alt, which is AltGr there: a Spanish keyboard
 // types `|`, `@` and `#` with AltGr and 1–3, and Windows reports AltGr as
 // Control and right Alt (and takes Ctrl+Alt for it too). The chat's tabs

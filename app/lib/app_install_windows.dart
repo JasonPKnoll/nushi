@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:nushi/app_install.dart';
 import 'package:nushi/app_log.dart';
 
-/// Windows's install (ADR 0124): `nushi.exe` with the daemon,
+/// Windows's install (ADR 0125): `nushi.exe` with the daemon,
 /// `nushid.exe`, beside it, the version Flutter writes into
 /// `data\flutter_assets\version.json`, and the data folder nushid picks
-/// itself (ADR 0123). The daemon starts on its own, with the app's
+/// itself (ADR 0124). The daemon starts on its own, with the app's
 /// environment and no login shell (Windows has none to start it
 /// through), and logs to its folder itself.
 class WindowsAppInstall implements AppInstall {

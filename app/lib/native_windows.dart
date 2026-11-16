@@ -12,7 +12,7 @@ import 'package:nushi/native.dart';
 import 'package:nushi/web_views_windows.dart';
 import 'package:nushi/window_drag_windows.dart';
 
-/// Windows's implementation of each native capability (ADR 0124): Explorer
+/// Windows's implementation of each native capability (ADR 0125): Explorer
 /// and the shell's associations through FFI, no runner channel of its own
 /// yet; notifications, the clipboard's files, Start at login, web views
 /// and spell check do nothing for now.

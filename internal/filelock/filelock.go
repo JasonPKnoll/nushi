@@ -4,7 +4,7 @@
 // locks are one kind; on Linux they are apart and F_GETLK never sees a
 // flock lock, so Held also reads /proc/locks, the kernel's list of every
 // lock held (held_linux.go). On Windows a lock is LockFileEx's, and none
-// is read without taking it (filelock_windows.go, ADR 0123).
+// is read without taking it (filelock_windows.go, ADR 0124).
 package filelock
 
 import (

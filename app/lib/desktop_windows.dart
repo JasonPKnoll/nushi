@@ -7,7 +7,7 @@ import 'package:nushi/app_log.dart';
 import 'package:nushi/desktop.dart';
 import 'package:nushi/shell_windows.dart';
 
-/// Windows's file manager and default apps (ADR 0124): Explorer shows a
+/// Windows's file manager and default apps (ADR 0125): Explorer shows a
 /// file selected (the shell's `SHOpenFolderAndSelectItems`) and opens a
 /// folder; a file opens as text with the program Windows has for `.txt`,
 /// whatever the file is (else Notepad). Each program starts with none of

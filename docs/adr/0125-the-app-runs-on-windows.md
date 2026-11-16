@@ -1,9 +1,9 @@
-# 0124. The app runs on Windows
+# 0125. The app runs on Windows
 
-Status: accepted, 2026-11-14. Builds on [0097](0097-native-code-behind-interfaces.md) (the seams), [0104](0104-the-app-runs-on-linux.md) (the Linux app) and [0123](0123-the-daemon-builds-on-windows.md) (the daemon on Windows).
+Status: accepted, 2026-11-14. Builds on [0097](0097-native-code-behind-interfaces.md) (the seams), [0104](0104-the-app-runs-on-linux.md) (the Linux app) and [0124](0124-the-daemon-builds-on-windows.md) (the daemon on Windows).
 
 ## Context
-The daemon builds and answers on Windows (ADR 0123). The app reaches the OS only through `Native`, a set of interfaces with one implementation per platform (ADR 0097); Linux's set made the second (ADR 0104), with a GTK runner and channels of its own. Flutter builds a Windows runner as it does a GTK one. This is the app's first phase there: it builds, starts its daemon, and shows and runs chats; what each capability needs from Windows comes after.
+The daemon builds and answers on Windows (ADR 0124). The app reaches the OS only through `Native`, a set of interfaces with one implementation per platform (ADR 0097); Linux's set made the second (ADR 0104), with a GTK runner and channels of its own. Flutter builds a Windows runner as it does a GTK one. This is the app's first phase there: it builds, starts its daemon, and shows and runs chats; what each capability needs from Windows comes after.
 
 ## Decision
 - **Runner**: `flutter create`'s `app/windows`, titled Nushi at 1280×800, with the system's title bar (as on Linux: headers don't move the window, no menu bar) and no channel of its own: what a capability needs from Windows is a call through `dart:ffi` or a system program, so the runner stays as generated, but for its icon, the Mac's and Linux's art at Windows's sizes in one `.ico` (`make icons`).

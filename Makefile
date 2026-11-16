@@ -227,7 +227,7 @@ lint-linux: $(GOLANGCI)
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOLANGCI) run ./...
 
 # Every package built, vetted and linted for Windows without cgo (ADR
-# 0123): what it lacks answers errors.ErrUnsupported, code macOS and Linux
+# 0124): what it lacks answers errors.ErrUnsupported, code macOS and Linux
 # share is in a _unix.go file, and a test of Unix's behaviour in a
 # _unix_test.go one, so the _windows.go files and their tests are checked
 # anywhere. unused is off: what only Unix's files call (the terminal's
@@ -241,7 +241,7 @@ lint-windows: $(GOLANGCI)
 
 # The protos' and Dart's, and the native code of the app and its Dart
 # packages only in a platform's *_macos.dart, *_linux.dart or
-# *_windows.dart files (tools/native-edge, ADR 0097, 0104, 0124), and the
+# *_windows.dart files (tools/native-edge, ADR 0097, 0104, 0125), and the
 # app's views built from the shared controls and tokens
 # (tools/design-check, docs/design.md): anywhere.
 lint-dart:

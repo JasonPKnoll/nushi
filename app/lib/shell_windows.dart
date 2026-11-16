@@ -6,7 +6,7 @@ import 'package:nushi/app_install.dart';
 
 /// What Windows's shell associates with a scheme or an extension
 /// (shlwapi's `AssocQueryStringW`), and starting a program the way the
-/// Linux runner does (ADR 0124): with the app's environment less Nushi's
+/// Linux runner does (ADR 0125): with the app's environment less Nushi's
 /// own variables, so a browser, editor or file manager started from a
 /// development run can't hand its data folder to a terminal it opens.
 
