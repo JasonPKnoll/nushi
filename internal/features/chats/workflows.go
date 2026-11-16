@@ -47,11 +47,15 @@ func (c *chat) workflowLocked(it *model.Item) {
 		return
 	}
 	f := &follow{poke: make(chan struct{}, 1), since: time.Now()}
-	if !c.reopeningLocked() && c.agent != nil && it.Workflow.State == "" {
+	// The agent running now ran it, unless the chat is reopening: a run
+	// followed again after its items were let go is still its agent's.
+	if !c.reopeningLocked() && c.agent != nil {
 		f.owner = c.agent
-		w := *it.Workflow
-		w.Started = time.Now()
-		it.Workflow = &w
+		if it.Workflow.State == "" {
+			w := *it.Workflow
+			w.Started = time.Now()
+			it.Workflow = &w
+		}
 	}
 	if c.following == nil {
 		c.following = map[string]*follow{}
