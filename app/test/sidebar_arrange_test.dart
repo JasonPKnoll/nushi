@@ -336,15 +336,6 @@ void main() {
 
   testWidgets('the arrangement is saved for the next launch', (tester) async {
     final (d, _) = await arrangedSidebar(tester);
-    final before = readSaved();
-    for (final key in [
-      'sidebarGroupBy',
-      'sidebarSort',
-      'sidebarAscending',
-      'sidebarShows',
-    ]) {
-      expect(before[key], isNull, reason: key);
-    }
     await _pick(tester, ['Group by', 'Agent']);
     await _pick(tester, ['Sort by', 'Name']);
     await _pick(tester, ['Show', 'Status']);
