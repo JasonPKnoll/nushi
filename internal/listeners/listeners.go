@@ -21,7 +21,7 @@
 // (procfs); /proc/net/tcp and tcp6, which can't tell IPV6_V6ONLY, are the
 // fallback where sock_diag can't be asked (sockets.go).
 //
-// On Windows (listeners_windows.go, ADR 0131) they come from iphlpapi's
+// On Windows (listeners_windows.go, ADR 0133) they come from iphlpapi's
 // GetExtendedTcpTable, IPv4's table and IPv6's, each row a socket and the
 // pid that owns it (no cgo; parsed in tcptable.go). Measured on
 // 2026-11-17 (Windows 11 23H2, an i9-9900K, 455 processes, 132 listening

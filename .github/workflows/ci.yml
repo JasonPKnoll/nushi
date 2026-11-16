@@ -383,7 +383,7 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: |
-          go test ./internal/procgroup ./internal/filelock ./internal/logs ./internal/shellenv ./internal/batchfile
+          go test ./internal/procgroup ./internal/filelock ./internal/logs ./internal/shellenv ./internal/batchfile ./internal/listeners ./internal/footprint
           go test -run 'TestAlive|TestOpenWindows' ./internal/claudehistory
           go test -run TestOwnDataFolder ./cmd/nushid
 
