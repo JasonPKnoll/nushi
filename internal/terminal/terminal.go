@@ -1,11 +1,14 @@
 // Package terminal runs a program (a shell) in a pseudo-terminal and keeps
-// its recent output, so a client can attach, leave and attach again.
+// its recent output, so a client can attach, leave and attach again. On
+// Unix the pseudo-terminal is a pty device (terminal_unix.go); on Windows
+// it is ConPTY's pseudo-console, with the program's tree in a job object
+// (terminal_windows.go, ADR 0132).
 package terminal
 
 import (
 	"bytes"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -22,9 +25,10 @@ const (
 
 // Terminal is a program running in a pseudo-terminal.
 type Terminal struct {
-	pty     *os.File
-	cmd     *exec.Cmd
-	tty     int32 // the terminal's device, to find what runs on it
+	sys               // the OS's own: a Unix pty, or Windows's pseudo-console
+	out     io.Reader // what the program writes
+	in      io.Writer // what the program reads
+	proc    *os.Process
 	changed func()
 	done    chan struct{} // closed once the program has exited
 	closing sync.Once     // Close's work, done once
@@ -46,7 +50,7 @@ func (t *Terminal) read(read chan<- struct{}) {
 	defer close(read)
 	buf := make([]byte, 32<<10)
 	for {
-		n, err := t.pty.Read(buf)
+		n, err := t.out.Read(buf)
 		if n > 0 {
 			t.emit(buf[:n])
 		}
@@ -83,13 +87,13 @@ func (t *Terminal) emit(b []byte) {
 // wait records the exit once the program ends and its output has been read
 // (or, if something it started keeps the terminal open, soon after).
 func (t *Terminal) wait(read <-chan struct{}) {
-	_ = t.cmd.Wait()
+	code := t.waitProgram()
 	select {
 	case <-read:
 	case <-time.After(500 * time.Millisecond):
 	}
 	t.mu.Lock()
-	t.code = t.cmd.ProcessState.ExitCode()
+	t.code = code
 	t.program = ""
 	t.mu.Unlock()
 	close(t.done)
@@ -127,7 +131,7 @@ func (t *Terminal) watch() {
 // programOf returns the command line of process group pg in the
 // foreground, or "" when that is the program the terminal started with.
 func (t *Terminal) programOf(pg int) string {
-	if pg <= 0 || pg == t.cmd.Process.Pid {
+	if pg <= 0 || pg == t.proc.Pid {
 		return ""
 	}
 	return commandLine(pg)
@@ -163,16 +167,16 @@ func commandLine(pid int) string {
 	return strings.TrimSpace(strings.Join(args, " "))
 }
 
-// Pid is the program's process id: it leads the terminal's session and
-// its own process group.
-func (t *Terminal) Pid() int { return t.cmd.Process.Pid }
+// Pid is the program's process id: on Unix it leads the terminal's session
+// and its own process group; on Windows its job holds what it starts.
+func (t *Terminal) Pid() int { return t.proc.Pid }
 
 // Done is closed once the program has exited.
 func (t *Terminal) Done() <-chan struct{} { return t.done }
 
 // Write sends input to the program.
 func (t *Terminal) Write(p []byte) error {
-	_, err := t.pty.Write(p)
+	_, err := t.in.Write(p)
 	return err
 }
 
@@ -235,4 +239,6 @@ func (t *Terminal) Attach(stop <-chan struct{}, fn func([]byte) bool) {
 // later ones wait for it: once the master is closed the device is free, and
 // the next terminal opened on this Mac (another test's shell, a Terminal.app
 // tab) may be given it, so listing what runs on it then would find theirs.
+// On Windows the pseudo-console is closed (CTRL_CLOSE_EVENT to what is
+// attached to it), and what still runs after the grace is ended with its job.
 func (t *Terminal) Close() { t.closing.Do(t.hangUp) }

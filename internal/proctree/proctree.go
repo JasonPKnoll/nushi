@@ -7,7 +7,7 @@
 // /proc, each process's stat and cmdline (proctree_linux.go, through
 // procfs); on Windows a Toolhelp snapshot and NtQueryInformationProcess,
 // with no process groups, and a process ended only outright
-// (proctree_windows.go, signal_windows.go, ADR 0130). Another OS reads no
+// (proctree_windows.go, signal_windows.go, ADR 0132). Another OS reads no
 // processes (proctree_other.go, ADR 0097).
 package proctree
 

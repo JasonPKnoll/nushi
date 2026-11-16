@@ -8,7 +8,7 @@ import (
 )
 
 // signalGroup sends nothing: Windows has no process groups (Pgid is 0, so
-// none is ever asked for, ADR 0130).
+// none is ever asked for, ADR 0132).
 func signalGroup(int, bool) error {
 	return fmt.Errorf("signalling a process group on windows: %w", errors.ErrUnsupported)
 }

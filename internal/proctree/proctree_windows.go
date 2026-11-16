@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// On Windows (ADR 0130) who started whom is a Toolhelp snapshot's; a
+// On Windows (ADR 0132) who started whom is a Toolhelp snapshot's; a
 // process's start time is GetProcessTimes's and its command line the
 // system's own copy (NtQueryInformationProcess), both readable for the
 // user's own processes. Windows has no process groups: Pgid is 0, so
