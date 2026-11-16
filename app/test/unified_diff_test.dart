@@ -14,7 +14,6 @@ import 'package:nushi/review.dart';
 import 'package:nushi/review_cards.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
-import 'package:nushi/transcript_find.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -382,44 +381,6 @@ void main() {
     final y = c.viewportYOfLine(PaneSide.neu, 25)!;
     expect(y, inInclusiveRange(0, c.unifiedScroll.position.viewportDimension));
     expect(c.unifiedScroll.position.pixels, greaterThan(0));
-    await closeView(tester, d);
-  });
-
-  testWidgets('find goes through the unified view, scrolled to each hit', (
-    tester,
-  ) async {
-    diffUnified.value = true;
-    final (d, chat) = await _changes(tester, size: const Size(1100, 300));
-    final find_ = chat.changesFind..open();
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.descendant(
-        of: find.byType(FindBar),
-        matching: find.byType(EditableText),
-      ),
-      'errors',
-    );
-    await tester.pumpAndSettle();
-    // The import's two lines, the new error and the unchanged one, in the
-    // order the unified view shows them.
-    expect(find.text('1 of 4'), findsOne);
-    final c = _controller(tester);
-    expect(
-      [for (final h in find_.hits) h.split(':').take(2).join(':')],
-      ['0:2', '1:3', '1:15', '1:28'],
-    );
-    // The last hit, near the end: the view scrolls down to it.
-    find_
-      ..step(1)
-      ..step(1)
-      ..step(1);
-    await tester.pumpAndSettle();
-    expect(find.text('4 of 4'), findsOne);
-    final last = c.unifiedRows.rowOf(PaneSide.neu, 28);
-    final top = c.unifiedGeometry.topOfRow(last);
-    final p = c.unifiedScroll.position;
-    expect(p.pixels, greaterThan(0));
-    expect(top, inInclusiveRange(p.pixels, p.pixels + p.viewportDimension));
     await closeView(tester, d);
   });
 

@@ -294,7 +294,7 @@ void main() {
       expect(c.shownFile, 'b.md');
       expect(c.fileNames, ['a.md', 'b.md']);
       c.openInFiles('c.md');
-      expect(c.pane.value, 'agent');
+      expect((c.pane.value, c.shownFile), ('agent', 'c.md'));
       expect(c.fileNames, ['a.md', 'b.md', 'c.md']);
     });
   });

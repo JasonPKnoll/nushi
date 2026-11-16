@@ -66,6 +66,8 @@ void main() {
             size: size,
             brightness: brightness,
           );
+          expect(tester.takeException(), isNull);
+          expectTextInside(tester, size.width);
           expect(
             tester.getSize(find.byType(SettingsNav)).width,
             SettingsNav.width,

@@ -5,7 +5,6 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
@@ -334,15 +333,6 @@ void main() {
     expect(pane, findsNothing);
     d.dispose();
   }, variant: _mac);
-
-  test('a file and a subagent sit side by side', () {
-    final c = ChatState('c', '/Users/me/nushi')..openInFiles('a.md');
-    expect(c.shownFile, 'a.md');
-    c.pane.value = 'agent';
-    expect(c.shownFile, 'a.md');
-    c.openInFiles('b.md');
-    expect((c.pane.value, c.shownFile), ('agent', 'b.md'));
-  });
 
   testWidgets('the pane with a Markdown file, dark, wide', (tester) async {
     final d = await _app(tester);

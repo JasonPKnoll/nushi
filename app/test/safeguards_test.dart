@@ -45,7 +45,8 @@ void main() {
     ('dark', Tokens.dark),
     ('light', Tokens.light),
   ]) {
-    for (final width in [720.0, 1700.0]) {
+    // One width: nothing checked here depends on it.
+    for (final width in [720.0]) {
       testWidgets('a response stopped by safeguards is folded above the '
           'notice (${width.round()}, $name)', (tester) async {
         viewport(tester, Size(width, 300));
@@ -81,12 +82,10 @@ void main() {
         );
         // Notice lines, not messages: no bold label.
         expect(find.textContaining('**'), findsNothing);
-        if (width == 720) {
-          await expectLater(
-            find.byType(Scaffold),
-            matchesGoldenFile('goldens/safeguards_$name.png'),
-          );
-        }
+        await expectLater(
+          find.byType(Scaffold),
+          matchesGoldenFile('goldens/safeguards_$name.png'),
+        );
         d.dispose();
       });
     }

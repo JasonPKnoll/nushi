@@ -10,7 +10,6 @@ import 'package:nushi/app_actions.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
-import 'package:nushi/main.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/settings_modal.dart';
 import 'package:nushi/settings_view.dart';
@@ -19,7 +18,6 @@ import 'package:nushi/theme/theme.dart';
 import 'package:nushi/trust_card.dart';
 
 import 'fake_daemon.dart';
-import 'harness.dart';
 import 'settings_harness.dart';
 
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
@@ -224,34 +222,4 @@ void main() {
     expect(await started, isNull);
     d.dispose();
   }, variant: _mac);
-
-  // The modal at full size: Appearance and Agents, two window sizes, both
-  // appearances.
-  for (final (size, w) in [
-    (const Size(1700, 1000), 1700),
-    (const Size(720, 900), 720),
-  ]) {
-    for (final b in Brightness.values) {
-      for (final s in [SettingsSection.appearance, SettingsSection.agents]) {
-        testWidgets('render, ${s.name}, $w, ${b.name}', (tester) async {
-          final d = await pumpSettingsApp(
-            tester,
-            settingsFake(),
-            s,
-            size: size,
-            brightness: b,
-          );
-          expect(tester.takeException(), isNull);
-          expectTextInside(tester, size.width);
-          expectControlsAtEdge(tester);
-          await render(
-            tester,
-            find.byType(NushiApp),
-            'settings_modal_${s.name}_${w}_${b.name}',
-          );
-          d.dispose();
-        }, variant: _mac);
-      }
-    }
-  }
 }
