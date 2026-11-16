@@ -345,7 +345,8 @@ class _PhaseRow extends StatelessWidget {
   }
 }
 
-/// An agent: its mark, label, time and tokens; a click shows its steps.
+/// An agent: its mark (the running dot while it runs), label, time and
+/// tokens; a click shows its steps.
 class _AgentRow extends StatelessWidget {
   const new(this.a, {required this.onTap});
 
@@ -366,7 +367,19 @@ class _AgentRow extends StatelessWidget {
         child: Row(
           spacing: 8,
           children: [
-            SizedBox(width: 14, child: Center(child: TaskMark(a.state))),
+            // A running row has no state words to say so, as a card's
+            // does: its mark is the running dot (design.md).
+            SizedBox(
+              width: 14,
+              child: Center(
+                child: a.state == 'running'
+                    ? CustomPaint(
+                        size: const Size.square(TaskMark.size),
+                        painter: StatusMark(t.running),
+                      )
+                    : TaskMark(a.state),
+              ),
+            ),
             Expanded(
               child: Shine(
                 on: a.state == 'running',
