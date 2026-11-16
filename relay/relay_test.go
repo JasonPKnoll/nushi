@@ -273,27 +273,59 @@ func TestIdle(t *testing.T) {
 	lim.Idle = time.Second
 	url := start(t, lim)
 
-	// Pings keep a connection open. The client gives up on a pong after
-	// three pings, so they're far enough apart for a loaded CI runner.
-	old := KeepAlive
-	t.Cleanup(func() { KeepAlive = old }) // should pair fail
-	KeepAlive = 200 * time.Millisecond
-	l, d := pair(t, url, newKey())
-	KeepAlive = old // read as a connection starts: the next pair goes without pings
-	got := make(chan string, 1)
-	go func() { m, _ := l.ReadMessage(); got <- string(m) }() // reading takes the pongs in
-	time.Sleep(5 * lim.Idle / 2)
-	send(t, d, "still here")
-	if m := <-got; m != "still here" {
-		t.Fatalf("read %q", m)
+	// Pings keep a pair open. The relay rightly closes one whose pings a
+	// stall of the runner held up for Idle, so a try that closed is tried
+	// again; a relay that ignores pings closes every try.
+	for try := 1; !pingsKeepOpen(t, url, lim.Idle); try++ {
+		if try == 3 {
+			t.Fatal("pings didn't keep a pair open")
+		}
 	}
 
 	// Silence doesn't.
-	l, d = pair(t, url, newKey())
+	l, d := pair(t, url, newKey())
 	send(t, d, "hello")
 	expect(t, l, "hello")
 	expectClosed(t, d)
 	expectClosed(t, l)
+}
+
+// pingsKeepOpen pairs, pings both ends a tenth of idle apart for 2.5
+// idle, and says whether a message still crosses.
+func pingsKeepOpen(t *testing.T, url string, idle time.Duration) bool {
+	t.Helper()
+	l, d := pair(t, url, newKey())
+	pingEvery(t, l, idle/10)
+	pingEvery(t, d, idle/10)
+	got := make(chan string, 1)
+	go func() { m, _ := l.ReadMessage(); got <- string(m) }() // a closed pair reads ""
+	time.Sleep(5 * idle / 2)
+	_ = d.WriteMessage([]byte("still here"))
+	return <-got == "still here"
+}
+
+// pingEvery pings c's relay every d until the test ends, as a client
+// does (KeepAlive). The test pings rather than the client, whose own
+// pings come with a deadline: it gives up after three of them without a
+// pong, a margin a loaded runner's stall breaks (TestIdle once read ""
+// so on CI).
+func pingEvery(t *testing.T, c *Conn, d time.Duration) {
+	t.Helper()
+	stop, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		tick := time.NewTicker(d)
+		defer tick.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-tick.C:
+				_ = c.ws.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second)) // a closed one fails: the test reads that
+			}
+		}
+	}()
+	t.Cleanup(func() { close(stop); <-done })
 }
 
 // The relay binary writes nothing to disk and logs only that it started:
@@ -487,20 +519,16 @@ func TestWaitingLifetime(t *testing.T) {
 	lim := Defaults
 	lim.MaxWait = time.Second
 	url := start(t, lim)
-	// The client gives up on a pong after three pings, so they're far
-	// enough apart for a loaded CI runner (as in TestIdle).
-	old := KeepAlive
-	t.Cleanup(func() { KeepAlive = old })
-	KeepAlive = 200 * time.Millisecond
 	var dl Dialer
+	began := time.Now() // before the relay starts its wait
 	l, err := dl.Listen(context.Background(), url, newKey())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	began := time.Now()
+	pingEvery(t, l, 200*time.Millisecond)
 	expectClosed(t, l)
-	if time.Since(began) < lim.MaxWait-50*time.Millisecond {
+	if time.Since(began) < lim.MaxWait {
 		t.Fatal("closed too soon")
 	}
 
