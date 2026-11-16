@@ -4,9 +4,10 @@
 // plane, so what's nearer or farther softens a little, never more. Below a screenshot the sun sits just behind its top edge, so the screenshot eclipses it.
 // At the last stop the camera looks straight down and the system settles into the flat mark above Install.
 //
-// Depth of field: canvases blurred by fixed CSS amounts under two pixels apart, so a step between them can't be
-// seen. Every piece is drawn whole and opaque onto the one nearest its own blur (crossfading two half-transparent
-// copies showed seams). A ring is cut where a planet sits on it, so no line ever crosses a planet.
+// Depth of field, on one canvas with no filters: everything is drawn with a soft edge as wide as its own blur.
+// A ring arc is one shape whose soft edge widens continuously along it with depth, so nothing steps or travels
+// along a line; a planet or the sun is a disc whose rim fades over its blur. Rings are drawn first and are cut
+// under their planets, so a line never crosses a planet.
 // The cursor tilts the camera at once, and planets lean toward a nearby cursor and spring back. Scrolling fast
 // winds the rings a little. Nothing turns on its own: the loop runs only while something is still moving, then
 // stops, so an idle page costs nothing. One still frame under Reduce Motion. Plain canvas, no library.
@@ -16,17 +17,10 @@
   const TAU = Math.PI * 2, D2R = Math.PI / 180;
   const AMBER = '245,165,36';
 
-  // Signed blur levels in CSS px: positive is behind the focal plane, negative in front; stacked far to near.
-  // Blurred canvases are drawn at lower resolution, which the blur hides.
-  const LEVELS = [3, 1.5, 0, -1.8, -3.6];
-  const layers = LEVELS.map((lv) => {
-    const c = document.createElement('canvas');
-    sky.append(c);
-    const ctx = c.getContext('2d');
-    if (lv) c.style.filter = `blur(${Math.abs(lv)}px)`;
-    return { c, ctx, lv, res: lv === 0 ? 1 : Math.abs(lv) < 2 ? 0.6 : 0.45, used: false };
-  });
-  if (!layers[0].ctx) return;
+  const cv = document.createElement('canvas');
+  sky.append(cv);
+  const g = cv.getContext('2d');
+  if (!g) return;
 
   // The mark, normalised so the outer ring's centre line has radius 1. Angles are in the mark's own y-down
   // screen space, so seen from straight above with no turn it is the mark exactly.
@@ -69,25 +63,14 @@
     g.fillStyle = r; g.fillRect(0, 0, 16, 16);
   }
 
-  // Reusable draw items (no closures or arrays made per frame).
-  const K_STAR = 0, K_GLOW = 1, K_PIECE = 2, K_SUN = 3, K_PLANET = 4;
-  const PIECES_PER_ARC = 14;
-  const pool = [];
-  const item = (i) => pool[i] || (pool[i] = { k: 0, d: 0, c: 0, x: 0, y: 0, r: 0, a: 0, col: '', p: null, pts: new Float32Array(44), n: 0 });
-  let items = [];
-
   // Stops, read from the page.
   const wide = matchMedia('(min-width: 980px)');
   let stops = [], vw = 0, vh = 0, max = 0;
   function measure() {
     vw = innerWidth; vh = innerHeight;
     const dpr = Math.min(devicePixelRatio || 1, 2);
-    for (const L of layers) {
-      const k = dpr * L.res;
-      L.c.width = Math.round(vw * k); L.c.height = Math.round(vh * k);
-      L.ctx.setTransform(k, 0, 0, k, 0, 0);
-      L.used = true;
-    }
+    cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
     max = Math.max(0, document.documentElement.scrollHeight - vh);
     stops = [...document.querySelectorAll('[data-cam]')].map((el) => {
       const [elev, az, D, K, focus, flat, labels] = el.dataset.cam.split(/\s+/);
@@ -230,155 +213,149 @@
   }
 
   // ---------- draw ----------
-  // Draw one item onto the two canvases either side of its blur, faded by how close it is to each.
-  function put(it) {
-    const c = Math.max(LEVELS[LEVELS.length - 1], Math.min(LEVELS[0], it.c));
-    let i = 0, best = 1e9;
-    for (let j = 0; j < LEVELS.length; j++) { const e = Math.abs(LEVELS[j] - c); if (e < best) { best = e; i = j; } }
-    paint(layers[i], it, it.a);
-  }
-  let sunX = 0, sunY = 0, sunS = 0;
-  function paint(L, it, alpha) {
-    const g = L.ctx;
-    L.used = true;
-    g.globalAlpha = alpha;
-    const flat = cam.flat;
-    switch (it.k) {
-      case K_STAR:
-        g.drawImage(DOT, it.x - it.r, it.y - it.r, it.r * 2, it.r * 2);
-        break;
-      case K_GLOW: {
-        const gr = g.createRadialGradient(it.x, it.y, 0, it.x, it.y, it.r);
-        gr.addColorStop(0, `rgba(${AMBER},${0.2 * (1 - flat)})`); gr.addColorStop(1, `rgba(${AMBER},0)`);
-        g.fillStyle = gr; g.beginPath(); g.arc(it.x, it.y, it.r, 0, TAU); g.fill();
-        break;
-      }
-      case K_PIECE: {
-        const q = it.pts;
-        g.fillStyle = it.col;
-        g.beginPath(); g.moveTo(q[0], q[1]);
-        for (let j = 2; j < it.n; j += 2) g.lineTo(q[j], q[j + 1]);
-        g.closePath(); g.fill();
-        break;
-      }
-      case K_SUN: {
-        const gr = g.createRadialGradient(it.x - it.r * 0.3, it.y - it.r * 0.3, it.r * 0.1, it.x, it.y, it.r);
-        gr.addColorStop(0, flat > 0.9 ? '#F5A524' : '#FFD27A'); gr.addColorStop(1, '#F5A524');
-        g.fillStyle = gr; g.beginPath(); g.arc(it.x, it.y, it.r, 0, TAU); g.fill();
-        break;
-      }
-      case K_PLANET: {
-        // A small sphere lit from the sun's side; a flat mist disc once it's the mark.
-        const X = it.x, Y = it.y, r = it.r;
-        const dx = sunX - X, dy = sunY - Y, dl = Math.hypot(dx, dy) || 1, lit = 0.55 * (1 - flat);
-        const gr = g.createRadialGradient(X + (dx / dl) * r * lit, Y + (dy / dl) * r * lit, r * 0.05, X, Y, r);
-        const m = (a, b) => Math.round(a + (b - a) * flat);
-        gr.addColorStop(0, `rgb(${m(214, 238)},${m(222, 241)},${m(228, 245)})`);
-        gr.addColorStop(0.5, `rgb(${m(128, 238)},${m(148, 241)},${m(160, 245)})`);
-        gr.addColorStop(1, `rgb(${m(36, 238)},${m(56, 241)},${m(66, 245)})`);
-        g.fillStyle = gr; g.beginPath(); g.arc(X, Y, r, 0, TAU); g.fill();
-        break;
-      }
-    }
+  const mix = (a, b, t) => Math.round(a + (b - a) * t);
+  // A disc with a rim that fades over its blur: `mid` at the centre to `rim` at its edge, then a highlight
+  // toward (lx, ly) for a lit sphere.
+  function disc(x, y, r, b, mid, rim, hi, lx, ly) {
+    const R = r + b, e = r / (r + 0.6 * b);
+    const gr = g.createRadialGradient(x, y, 0, x, y, R);
+    gr.addColorStop(0, `rgba(${mid},${e})`);
+    gr.addColorStop(Math.max(0, r - b) / R, `rgba(${rim},${e})`);
+    gr.addColorStop(1, `rgba(${rim},0)`);
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, R, 0, TAU); g.fill();
+    if (!hi) return;
+    const hr = r * 0.95;
+    const h = g.createRadialGradient(x + lx * r, y + ly * r, 0, x + lx * r * 0.6, y + ly * r * 0.6, hr);
+    h.addColorStop(0, `rgba(${hi},${0.95 * e})`);
+    h.addColorStop(1, `rgba(${hi},0)`);
+    g.fillStyle = h; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
   }
 
-  // Ring piece outline: outer edge, end cap, inner edge back, start cap; into it.pts.
-  function piece(it, g, b0, b1, first, last) {
-    let n = 0;
+  // One run of a ring, from b0 to b1 degrees, as a single shape: the band's two edges (and round ends where the
+  // arc itself ends), each point pushed out from the centre line by `grow` times the blur at that point.
+  // The soft edge is built from shapes laid over each other, widest and faintest first, close enough together
+  // that no band shows between them.
+  const PASSES = [[2.1, 0.05], [1.8, 0.07], [1.5, 0.09], [1.25, 0.11], [1.0, 0.13], [0.78, 0.16], [0.58, 0.2], [0.4, 0.24], [0.22, 0.3], [0, 1]];
+  const MAXP = 80;
+  const cx_ = new Float32Array(MAXP), cy_ = new Float32Array(MAXP), ox_ = new Float32Array(MAXP), oy_ = new Float32Array(MAXP),
+    ix_ = new Float32Array(MAXP), iy_ = new Float32Array(MAXP), bl_ = new Float32Array(MAXP);
+  function run(gR, b0, b1, capA, capB, col) {
     const w = W * (0.24 + 0.76 * cam.flat); // a fine orbit line in 3D, the mark's weight once flat
-    const q = it.pts;
-    const pt = (x, z) => { proj(x, 0, z, P); q[n++] = P.X; q[n++] = P.Y; };
-    const edge = (r, from, to) => {
-      for (let j = 0; j <= 4; j++) { const a = (from + ((to - from) * j) / 4) * D2R; pt(r * Math.cos(a), -r * Math.sin(a)); }
+    const n = Math.min(MAXP - 1, Math.max(2, Math.ceil((b1 - b0) / 2.5)));
+    let sum = 0, wpx = 0;
+    for (let j = 0; j <= n; j++) {
+      const a = (b0 + ((b1 - b0) * j) / n) * D2R, c = Math.cos(a), sn = -Math.sin(a);
+      proj(gR.r * c, 0, gR.r * sn, P); cx_[j] = P.X; cy_[j] = P.Y; bl_[j] = Math.abs(coc(P.depth)); sum += bl_[j]; wpx += w * P.s;
+      proj((gR.r + w / 2) * c, 0, (gR.r + w / 2) * sn, P); ox_[j] = P.X; oy_[j] = P.Y;
+      proj((gR.r - w / 2) * c, 0, (gR.r - w / 2) * sn, P); ix_[j] = P.X; iy_[j] = P.Y;
+    }
+    const avg = sum / (n + 1); wpx /= n + 1;
+    const energy = wpx / (wpx + 0.9 * avg); // a blurred line spreads its light, so it's fainter
+    // Push point (x, y) away from the centre line's point j by e px, along its own direction or, if it sits on
+    // the centre line (the band seen edge-on), across the line.
+    const out = (x, y, j, e, side) => {
+      let dx = x - cx_[j], dy = y - cy_[j], d = Math.hypot(dx, dy);
+      if (d < 0.3) {
+        const k = Math.min(n, j + 1), m = Math.max(0, j - 1);
+        const tx = cx_[k] - cx_[m], ty = cy_[k] - cy_[m], tl = Math.hypot(tx, ty) || 1;
+        dx = (-ty / tl) * side; dy = (tx / tl) * side; d = 1;
+      }
+      g.lineTo(x + (dx / d) * e, y + (dy / d) * e);
     };
-    const cap = (deg, dir) => {
+    const cap = (deg, j, dir, e) => {
       const ux = Math.cos(deg * D2R), uy = Math.sin(deg * D2R), tx = -uy * dir, ty = ux * dir;
-      const cx = g.r * ux, cy = g.r * uy;
-      for (let j = 1; j < 4; j++) {
-        const ph = (Math.PI * (dir > 0 ? j : 4 - j)) / 4;
-        pt(cx + (w / 2) * (ux * Math.cos(ph) + tx * Math.sin(ph)), -(cy + (w / 2) * (uy * Math.cos(ph) + ty * Math.sin(ph))));
+      for (let q = 1; q < 6; q++) {
+        const ph = (Math.PI * (dir > 0 ? q : 6 - q)) / 6;
+        proj(gR.r * ux + (w / 2) * (ux * Math.cos(ph) + tx * Math.sin(ph)), 0, -(gR.r * uy + (w / 2) * (uy * Math.cos(ph) + ty * Math.sin(ph))), P);
+        out(P.X, P.Y, j, e, 1);
       }
     };
-    edge(g.r + w / 2, b0, b1);
-    if (last) cap(b1, 1);
-    edge(g.r - w / 2, b1, b0);
-    if (first) cap(b0, -1);
-    it.n = n;
+    g.fillStyle = col;
+    for (const [grow, alpha] of PASSES) {
+      if (grow && avg < 0.25) continue;
+      g.globalAlpha = grow ? alpha : Math.min(1, energy + 0.15) * (avg > 0.25 ? 0.5 : 1);
+      g.beginPath();
+      for (let j = 0; j <= n; j++) out(ox_[j], oy_[j], j, bl_[j] * grow, 1);
+      if (capB) cap(b1, n, 1, bl_[n] * grow);
+      for (let j = n; j >= 0; j--) out(ix_[j], iy_[j], j, bl_[j] * grow, -1);
+      if (capA) cap(b0, 0, -1, bl_[0] * grow);
+      g.closePath(); g.fill();
+    }
+    g.globalAlpha = 1;
   }
 
-  // Whether a ring is cut at this angle (degrees) for a planet sitting there; never once it's the flat mark.
-  function cut(g, deg) {
-    const k = 1 - Math.min(1, cam.flat * 2); // the gaps close as it flattens into the mark
+  // Whether a ring is cut at this angle (degrees) for a planet sitting there; the gaps close as it flattens
+  // into the mark.
+  function cut(gR, deg) {
+    const k = 1 - Math.min(1, cam.flat * 2);
     if (k <= 0) return false;
     for (const p of PLANETS) {
-      if (RINGS[p.ring] !== g) continue;
-      let d = Math.abs(((deg - p.a - g.turn) % 360 + 540) % 360 - 180);
-      if (d < (((p.size * 0.75) / g.r) / D2R) * k) return true; // just under the planet, so the gap never shows
+      if (RINGS[p.ring] !== gR) continue;
+      const d = Math.abs(((deg - p.a - gR.turn) % 360 + 540) % 360 - 180);
+      if (d < (((p.size * 0.75) / gR.r) / D2R) * k) return true;
     }
     return false;
   }
 
+  const bodies = [];
   let shownDim = -1;
   function draw() {
     if (Math.abs(T.dim - shownDim) > 0.005) { shownDim = T.dim; sky.style.opacity = T.dim.toFixed(3); }
-    for (const L of layers) if (L.used) { L.ctx.globalAlpha = 1; L.ctx.clearRect(0, 0, vw, vh); L.used = false; }
-    let n = 0;
+    g.globalAlpha = 1;
+    g.clearRect(0, 0, vw, vh);
     const flat = cam.flat;
 
     for (const st of STARS) {
       proj(st.x, st.y, st.z, P);
       if (P.depth < 0.6 || P.X < -20 || P.X > vw + 20 || P.Y < -20 || P.Y > vh + 20) continue;
-      const it = item(n++);
-      it.k = K_STAR; it.d = P.depth; it.c = Math.min(4, coc(P.depth)); it.x = P.X; it.y = P.Y; it.r = st.s * 1.6; it.a = st.a * (1 - 0.6 * flat);
+      const r0 = st.s * 1.6, r = r0 + Math.min(4, Math.abs(coc(P.depth)));
+      g.globalAlpha = st.a * (1 - 0.6 * flat) * (r0 / r);
+      g.drawImage(DOT, P.X - r, P.Y - r, r * 2, r * 2);
     }
+    g.globalAlpha = 1;
 
     proj(0, 0, 0, P);
-    sunX = P.X; sunY = P.Y; sunS = P.s;
-    const sd = P.depth;
+    const sunX = P.X, sunY = P.Y, sunS = P.s, sunD = P.depth;
     {
-      const it = item(n++);
-      it.k = K_GLOW; it.d = sd + 3; it.c = LEVELS[0]; it.x = sunX; it.y = sunY; it.r = sunS * 0.9; it.a = 1;
+      const R = sunS * 0.9, gr = g.createRadialGradient(sunX, sunY, 0, sunX, sunY, R);
+      gr.addColorStop(0, `rgba(${AMBER},${0.2 * (1 - flat)})`); gr.addColorStop(1, `rgba(${AMBER},0)`);
+      g.fillStyle = gr; g.beginPath(); g.arc(sunX, sunY, R, 0, TAU); g.fill();
     }
 
-    // Rings: each arc in short pieces, so each piece is blurred for its own depth.
-    const base = [13, 22, 28];
-    for (const g of RINGS) {
+    // Rings: slate-mist when seen in 3D, mist once it's the flat mark.
+    const t = 0.36 + 0.64 * flat;
+    const col = `rgb(${mix(47, 238, t)},${mix(74, 241, t)},${mix(87, 245, t)})`;
+    const STEP = 2;
+    for (const gR of RINGS) {
       for (let a = 0; a < 4; a++) {
-        const a0 = g.from + a * 90 + g.turn;
-        for (let j = 0; j < PIECES_PER_ARC; j++) {
-          const b0 = a0 + (g.span * j) / PIECES_PER_ARC, b1 = a0 + (g.span * (j + 1)) / PIECES_PER_ARC;
-          if (cut(g, (b0 + b1) / 2)) continue;
-          const it = item(n++);
-          const step = g.span / PIECES_PER_ARC;
-          const first = j === 0 || cut(g, b0 - step / 2), last = j === PIECES_PER_ARC - 1 || cut(g, b1 + step / 2);
-          // Each piece reaches a little into its neighbours, so their soft edges overlap instead of leaving a seam.
-          piece(it, g, first ? b0 : b0 - step * 0.35, last ? b1 : b1 + step * 0.35, first, last);
-          const mid = ((b0 + b1) / 2) * D2R;
-          proj(g.r * Math.cos(mid), 0, -g.r * Math.sin(mid), P);
-          const d = P.depth;
-          const fade = 0.72 * (1 - flat) + flat; // one colour along the ring: depth shows by blur and size, not shade
-          // Slate when seen in 3D, mist once it's the flat mark.
-          const r = Math.round(base[0] + ((47 + (238 - 47) * (0.5 + 0.5 * flat)) - base[0]) * fade);
-          const gg = Math.round(base[1] + ((74 + (241 - 74) * (0.5 + 0.5 * flat)) - base[1]) * fade);
-          const b = Math.round(base[2] + ((87 + (245 - 87) * (0.5 + 0.5 * flat)) - base[2]) * fade);
-          it.k = K_PIECE; it.d = d; it.c = coc(d); it.a = 1; it.col = `rgb(${r},${gg},${b})`;
+        const a0 = gR.from + a * 90 + gR.turn, a1 = a0 + gR.span;
+        let from = null;
+        for (let b = a0; b < a1 + STEP; b += STEP) {
+          const end = b >= a1, gap = !end && cut(gR, b + STEP / 2);
+          if (!end && !gap) { if (from === null) from = b; continue; }
+          if (from !== null) run(gR, from, Math.min(b, a1), from === a0, end, col);
+          from = null;
         }
       }
     }
-    {
-      const it = item(n++);
-      it.k = K_SUN; it.d = sd; it.c = coc(sd); it.x = sunX; it.y = sunY; it.r = SUN * sunS * (0.62 + 0.38 * flat); it.a = 1;
-    }
-    for (const p of PLANETS) {
-      if (p.rad < 0.3) continue;
-      const it = item(n++);
-      it.k = K_PLANET; it.d = p.depth; it.c = coc(p.depth); it.x = p.X + p.ox; it.y = p.Y + p.oy; it.r = p.rad; it.a = 1;
-    }
 
-    items.length = 0;
-    for (let i = 0; i < n; i++) items.push(pool[i]);
-    items.sort((a, b) => b.d - a.d);
-    for (const it of items) put(it);
+    // The sun and the planets, far to near.
+    bodies.length = 0;
+    bodies.push({ sun: true, d: sunD });
+    for (const p of PLANETS) if (p.rad >= 0.3) bodies.push({ p, d: p.depth });
+    bodies.sort((a, b) => b.d - a.d);
+    for (const b of bodies) {
+      if (b.sun) {
+        disc(sunX, sunY, SUN * sunS * (0.62 + 0.38 * flat), Math.abs(coc(sunD)), AMBER, AMBER, flat > 0.9 ? null : '255,214,140', -0.3, -0.3);
+        continue;
+      }
+      const p = b.p, X = p.X + p.ox, Y = p.Y + p.oy;
+      const dx = sunX - X, dy = sunY - Y, dl = Math.hypot(dx, dy) || 1, lit = 0.5 * (1 - flat);
+      disc(X, Y, p.rad, Math.abs(coc(p.depth)),
+        `${mix(118, 238, flat)},${mix(138, 241, flat)},${mix(150, 245, flat)}`,
+        `${mix(52, 238, flat)},${mix(72, 241, flat)},${mix(84, 245, flat)}`,
+        flat > 0.9 ? null : '226,232,238', (dx / dl) * lit, (dy / dl) * lit);
+    }
 
     for (const p of PLANETS) {
       if (p.label < 0.02) { if (p.shown) { p.el.style.opacity = '0'; p.shown = false; } continue; }
