@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/code_runs.dart';
@@ -21,6 +23,19 @@ Future<void> _settle() async {
   for (var i = 0; i < 20; i++) {
     await Future<void>.delayed(Duration.zero);
   }
+}
+
+/// Waits for [started], a run's start, in a widget test: its wait for a
+/// new shell's prompt is on the test's clock, which only a pump moves.
+Future<void> _start(WidgetTester tester, Future<void> started) async {
+  var done = false;
+  unawaited(started.whenComplete(() => done = true));
+  await tester.pump();
+  for (var i = 0; i < 20 && !done; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(done, isTrue, reason: 'the run started');
+  await started;
 }
 
 typedef _Setup = (FakeShells, Terminals, CodeRuns);
@@ -203,28 +218,37 @@ void main() {
     },
   );
 
-  test('a busy tab by its program, a shell without marks', () async {
+  // A shell without marks shows ▷ as running for a second and a half
+  // after the line is typed: on the test's clock, which these two move.
+  testWidgets('a busy tab by its program, a shell without marks', (
+    tester,
+  ) async {
     final (shells, terms, runs) = _setup(replay: r'$ ', program: 'vim');
     terms.active['c'] = 'a';
     shells.newReplay = '% ';
     final run = runs.of('ls');
-    await runs.start(terms, run, 'ls');
+    await _start(tester, runs.start(terms, run, 'ls'));
     expect(run.terminalId, 'new0');
+    await tester.pump(const Duration(milliseconds: 1500));
   });
 
-  test('a shell without marks: output after the typed line, no end', () async {
+  testWidgets('a shell without marks: output after the typed line, no end', (
+    tester,
+  ) async {
     final (shells, terms, runs) = _setup(replay: r'$ ');
     terms.active['c'] = 'a';
     final run = runs.of('ls');
-    await runs.start(terms, run, 'ls');
+    await _start(tester, runs.start(terms, run, 'ls'));
     expect(run.marked, isFalse);
     shells.write('a', 'ls\r\nREADME.md\r\napp\r\n');
-    await _settle();
+    await tester.pump();
     expect(run.lastLine, 'app');
     expect(run.lines(), ['README.md', 'app']);
     expect(run.state, RunState.running);
     expect(runs.outputs.value, isEmpty);
-    await Future<void>.delayed(const Duration(milliseconds: 1600));
+    await tester.pump(const Duration(milliseconds: 1499));
+    expect(run.busy(shells.list.first), isTrue, reason: 'just typed');
+    await tester.pump(const Duration(milliseconds: 1));
     expect(run.busy(shells.list.first), isFalse, reason: 'no program runs');
   });
 
