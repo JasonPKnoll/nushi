@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"os"
 	"os/exec"
@@ -97,18 +98,18 @@ func setup(t *testing.T, configurations ...string) (*Service, *fakeChats, string
 }
 
 // freePort is a port nothing listens on now, nor on the next few, and
-// each of those next few binds as the fake server binds it. A dial alone
-// misses a port another connection's end holds (in use or in TIME_WAIT,
-// which a port from the ephemeral range may be), where Linux refuses the
-// fake server's bind.
+// each of them binds as the fake server binds it (a dial alone misses a
+// port another connection's end holds, where Linux refuses that bind).
+// It's a random one from below the ports the system gives to whoever
+// asks for any (32768 and up on Linux, 49152 on macOS): one the system
+// gave and took back is given again, on Linux to one in some thousands
+// of the listeners and connections that come next, any of which, in the
+// tests running beside these, would have it before the fake server.
 func freePort(t *testing.T) int {
 	t.Helper()
 	for range 50 {
-		ln, err := net.Listen("tcp4", "127.0.0.1:0")
-		testcheck.NoErr(t, err)
-		p := ln.Addr().(*net.TCPAddr).Port
-		_ = ln.Close()
-		if p+5 < 65535 && free(t, p+1) && free(t, p+2) && free(t, p+3) {
+		p := 20000 + rand.IntN(10000)
+		if free(t, p) && free(t, p+1) && free(t, p+2) && free(t, p+3) {
 			return p
 		}
 	}
