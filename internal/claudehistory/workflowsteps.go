@@ -1,7 +1,6 @@
 package claudehistory
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -122,7 +121,7 @@ func toolTitle(name string, input json.RawMessage) string {
 	for _, k := range []string{"description", "command", "file_path", "path", "pattern", "url", "query", "prompt"} {
 		if s, ok := in[k].(string); ok && strings.TrimSpace(s) != "" {
 			first, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
-			return name + " " + label(first, "")
+			return name + " " + label(secrets.MaskText(first), "")
 		}
 	}
 	return name
@@ -144,12 +143,13 @@ func toolKind(name string) string {
 	return "other"
 }
 
+// inputText is a call's input as indented JSON, masked as a chat's
+// transcript masks a tool call's input.
 func inputText(input json.RawMessage) string {
-	var b bytes.Buffer
-	if json.Indent(&b, input, "", "  ") != nil {
+	if !json.Valid(input) {
 		return ""
 	}
-	return clipText(secrets.Mask(b.String(), "…", nil), stepCap)
+	return clipText(secrets.MaskInput(string(input)), stepCap)
 }
 
 // resultText is a tool result's text: a string, or its text blocks.

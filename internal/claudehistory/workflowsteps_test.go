@@ -81,3 +81,24 @@ func TestWorkflowAgentStepsCap(t *testing.T) {
 		t.Errorf("%d items, %d earlier, last %q", len(items), earlier, items[len(items)-1].Text)
 	}
 }
+
+// A step's input and title are masked as the chat's transcript masks a
+// tool call: values under a secret's key, NAME=value pairs, the shapes.
+func TestWorkflowAgentStepsMasked(t *testing.T) {
+	l, id, folder, session := fakeRun(t, launchedLine+startA, "")
+	testcheck.Write(t, filepath.Join(session, "subagents", "workflows", "wf_abc", "agent-a1.jsonl"),
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"GH_TOKEN=abcd1234efgh gh api x","password":"hunter22"}}]}}`+"\n")
+	items, _, err := l.WorkflowAgentItems(id, folder, model.Workflow{RunID: "wf_abc"}, "a1", 400)
+	testcheck.NoErr(t, err)
+	if len(items) != 1 {
+		t.Fatalf("items %+v", items)
+	}
+	for _, s := range []string{items[0].Input, items[0].Title} {
+		if strings.Contains(s, "abcd1234efgh") || strings.Contains(s, "hunter22") {
+			t.Errorf("kept: %q", s)
+		}
+	}
+	if !strings.Contains(items[0].Input, "GH_TOKEN=••••") || !strings.Contains(items[0].Title, "GH_TOKEN=••••") {
+		t.Errorf("input %q, title %q", items[0].Input, items[0].Title)
+	}
+}
