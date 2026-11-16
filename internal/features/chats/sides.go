@@ -294,6 +294,17 @@ func (s *Service) CloseSide(id string) error {
 // that reconnects within it still has them.
 var SidesGrace = 2 * time.Minute
 
+// SidesAfter starts the side chats' grace: time.AfterFunc, which a test
+// replaces to see a grace begin and end it itself, not by a clock.
+var SidesAfter = time.AfterFunc
+
+// Followers is how many apps follow the events now (Following).
+func (s *Service) Followers() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.following
+}
+
 // Following counts an app following the events (by +1, then -1), on the
 // Mac's socket and devices' channels alike. Side chats live only in the
 // apps (ADR 0027): once none has followed for SidesGrace, they're closed
@@ -306,7 +317,7 @@ func (s *Service) Following(n int) {
 		s.idle.Stop()
 	}
 	if s.following == 0 && !s.closing {
-		s.idle = time.AfterFunc(SidesGrace, s.closeSides)
+		s.idle = SidesAfter(SidesGrace, s.closeSides)
 	}
 }
 

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -75,7 +76,7 @@ func TestASideChatGoesWhenTheAppLeaves(t *testing.T) {
 // Side chats stay while any app follows, the Mac's or a phone's: the Mac
 // quitting doesn't close the one a phone is using.
 func TestSideChatsStayWhileAPhoneFollows(t *testing.T) {
-	shortSidesGrace(t)
+	g := holdGraces(t)
 	ctx := context.Background()
 	history := &acptest.History{}
 	d := startDaemon(t, t.TempDir(), history)
@@ -84,14 +85,15 @@ func TestSideChatsStayWhileAPhoneFollows(t *testing.T) {
 	mac.say(id, "hello")
 	side := must(phone.c.ForkChat(ctx, connect.NewRequest(&nushiv1.ForkChatRequest{ChatId: id}))).ChatId
 	mac.quit()
-	time.Sleep(200 * time.Millisecond) // many graces
+	until(t, "the Mac's app to leave", func() bool { return d.chats.Followers() == 1 })
+	g.end() // any grace the Mac's leaving began
 	if !history.Has(side) {
 		t.Fatal("the Mac quitting closed the side chat a phone follows")
 	}
 	phone.quit()
-	if !testcheck.Eventually(func() bool { return !history.Has(side) }) {
-		t.Error("the side chat outlived every app")
-	}
+	until(t, "the side chats' grace", func() bool { return g.count() > 0 })
+	g.end()
+	until(t, "the side chat to go once every app had", func() bool { return !history.Has(side) })
 }
 
 // A side chat starts in its chat's mode, the agent's permission control,
@@ -132,4 +134,53 @@ func shortSidesGrace(t *testing.T) {
 	g := chats.SidesGrace
 	t.Cleanup(func() { chats.SidesGrace = g })
 	chats.SidesGrace = 10 * time.Millisecond
+}
+
+// graces holds the side chats' graces for one test (chats.SidesAfter),
+// which calls holdGraces before it starts a daemon, as shortSidesGrace's
+// test does: each grace begun is kept, never ended by a clock, and end
+// runs those still pending, as their timers would have.
+type graces struct {
+	mu    sync.Mutex
+	begun []grace
+}
+
+type grace struct {
+	timer *time.Timer
+	run   func()
+}
+
+func holdGraces(t *testing.T) *graces {
+	t.Helper()
+	g := &graces{}
+	after := chats.SidesAfter
+	t.Cleanup(func() { chats.SidesAfter = after })
+	chats.SidesAfter = func(_ time.Duration, f func()) *time.Timer {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		tm := time.AfterFunc(time.Hour, func() {}) // only to be stopped: end runs f
+		g.begun = append(g.begun, grace{tm, f})
+		return tm
+	}
+	return g
+}
+
+// count is how many graces have begun.
+func (g *graces) count() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return len(g.begun)
+}
+
+// end ends every grace begun and not stopped since.
+func (g *graces) end() {
+	g.mu.Lock()
+	begun := g.begun
+	g.begun = nil
+	g.mu.Unlock()
+	for _, gr := range begun {
+		if gr.timer.Stop() {
+			gr.run()
+		}
+	}
 }

@@ -57,6 +57,7 @@ type daemon struct {
 	devices string // as a paired device's channel does
 	stop    func()
 	kill    func() // ends the last agent started, as if its process died
+	chats   *chats.Service
 	restart *restart.Service
 	looks   *atomic.Int64 // the restart's looks (restart.Service.Looked)
 	lapsed  *atomic.Bool  // its ask lapsed, and it stopped looking
@@ -245,7 +246,7 @@ func startDaemon(t *testing.T, dataDir string, history *acptest.History) *daemon
 		svc.Close()
 	}
 	t.Cleanup(stop)
-	return &daemon{url: srv.URL, devices: devices.URL, stop: stop, restart: restarts, looks: looks, lapsed: lapsed, claudes: cls, tools: toolSvc, hub: hub, kill: func() {
+	return &daemon{url: srv.URL, devices: devices.URL, stop: stop, chats: svc, restart: restarts, looks: looks, lapsed: lapsed, claudes: cls, tools: toolSvc, hub: hub, kill: func() {
 		mu.Lock()
 		defer mu.Unlock()
 		kill()

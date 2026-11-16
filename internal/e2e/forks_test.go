@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -103,7 +102,7 @@ func TestForkFromAMessage(t *testing.T) {
 // is no longer thrown away when the app goes, and reopens on its own agent
 // with the chat's conversation and its own.
 func TestKeepASideChat(t *testing.T) {
-	shortSidesGrace(t)
+	g := holdGraces(t)
 	ctx := context.Background()
 	history := &acptest.History{}
 	d := startDaemon(t, t.TempDir(), history)
@@ -120,7 +119,8 @@ func TestKeepASideChat(t *testing.T) {
 		t.Error("the side chat is still one")
 	}
 	a.quit() // side chats end once no app follows: a kept one isn't one
-	time.Sleep(100 * time.Millisecond)
+	until(t, "the side chats' grace", func() bool { return g.count() > 0 })
+	g.end()
 	if !history.Has(side) {
 		t.Fatal("the kept side chat's session was deleted")
 	}
