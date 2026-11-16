@@ -25,6 +25,8 @@ import 'package:nushi/thinking.dart';
 import 'package:nushi/tool_calls.dart';
 import 'package:nushi/turn_retry.dart';
 import 'package:nushi/widgets.dart';
+import 'package:nushi/workflow_card.dart';
+import 'package:nushi/workflows.dart';
 
 /// The widest a user message's bubble goes (ADR 0076).
 const _bubbleWidth = 640.0;
@@ -94,6 +96,9 @@ class ItemView extends StatelessWidget {
         );
       case ItemKind.ITEM_KIND_TOOL_CALL:
         if (item.hasFindings()) return FindingsCard(item.findings, chat);
+        if (isWorkflow(item)) {
+          return WorkflowCard(item, chat, daemon: daemon, still: still);
+        }
         return ToolCallView(item, still: still, refs: _refs);
       case ItemKind.ITEM_KIND_QUESTION:
         return QuestionCard(

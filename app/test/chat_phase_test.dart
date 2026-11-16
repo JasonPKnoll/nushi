@@ -103,4 +103,27 @@ void main() {
     expect(background.phase, ChatPhase.background);
     expect(of(ChatStatus(busy: true, background: 1)).phase, ChatPhase.working);
   });
+
+  test('a running workflow and an own turn are working; waiting and '
+      'archived still come first; the box still goes by busy', () {
+    ChatState of(ChatStatus s) => ChatState('x', '/f')..status(s);
+    final workflow = of(ChatStatus(background: 1, workflows: 1));
+    final own = of(ChatStatus(ownTurn: true));
+    expect(workflow.phase, ChatPhase.working);
+    expect(own.phase, ChatPhase.working);
+    expect(workflow.busy, isFalse);
+    expect(of(ChatStatus(background: 1)).phase, ChatPhase.background);
+    expect(
+      of(ChatStatus(workflows: 1, waiting: true)).phase,
+      ChatPhase.waiting,
+    );
+    expect(
+      (of(ChatStatus(workflows: 1, ownTurn: true))..archived = true).phase,
+      ChatPhase.archived,
+    );
+    expect(groupPhase([workflow, of(ChatStatus())]), ChatPhase.working);
+    expect(workingWords(workflow), 'Running a workflow');
+    expect(workingWords(own), 'Working on its own, after a background task');
+    expect(backgroundWords(2), 'Working in the background: 2 background tasks');
+  });
 }

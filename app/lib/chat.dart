@@ -27,7 +27,7 @@ import 'package:nushi/transcript_find.dart';
 enum ChatPhase {
   archived, // no agent runs; read-only until unarchived
   waiting, // on the user: a permission prompt or a question
-  working, // a turn runs
+  working, // a turn runs, the agent works on its own, or a workflow runs
   background, // no turn runs, but subagents or commands it started do
   expired, // its agent deleted its session: it can't reopen
   failed, // its reopen failed
@@ -278,7 +278,12 @@ class ChatState extends ChangeNotifier {
   bool reopenFailed = false; // no agent runs: its reopen failed (a notice)
   bool sessionGone = false; // and its agent no longer has its session
   bool canSleep = false; // its agent runs and can reopen the session
-  int background = 0; // subagents and background commands running (API 84)
+  // Subagents, background commands and workflows running (API 84); of
+  // those, workflows, and whether the agent works on its own after a
+  // background task: both count as working (API 120, ADR 0127).
+  int background = 0;
+  int workflows = 0;
+  bool ownTurn = false;
   DateTime? started; // when the running turn started
   bool stopping = false; // the app asked the turn to stop
   // How the last turn ended, as the daemon judged it (API 107); unspecified
@@ -292,7 +297,7 @@ class ChatState extends ChangeNotifier {
       ? .archived
       : waiting
       ? .waiting
-      : busy
+      : busy || ownTurn || workflows > 0
       ? .working
       : background > 0
       ? .background
@@ -819,6 +824,8 @@ class ChatState extends ChangeNotifier {
     sessionGone = s.sessionGone;
     canSleep = s.canSleep;
     background = s.background;
+    workflows = s.workflows;
+    ownTurn = s.ownTurn;
     started = s.started == 0
         ? null
         : DateTime.fromMillisecondsSinceEpoch(s.started.toInt());
@@ -902,9 +909,15 @@ class ChatState extends ChangeNotifier {
   }
 }
 
-/// Whether [it] is a subagent or background command that runs.
+/// Whether [it] is a subagent, background command or workflow that runs.
 bool _runs(Item it) =>
-    it.backgroundCommand.state == 'running' || it.subagent.state == 'running';
+    it.backgroundCommand.state == 'running' ||
+    it.subagent.state == 'running' ||
+    workflowRuns(it);
+
+/// Whether [it] launched a workflow that runs and isn't stalled (ADR 0127).
+bool workflowRuns(Item it) =>
+    it.workflow.state == 'running' && !it.workflow.stalled;
 
 /// Where the last [n] of [items] before [end] start: [n] back, and further
 /// back to the call that started a subagent whose steps are among them, so

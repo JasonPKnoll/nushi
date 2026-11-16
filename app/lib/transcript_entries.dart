@@ -5,14 +5,18 @@ import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/message_actions.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/subagents.dart';
+import 'package:nushi/workflows.dart';
 
 // The transcript's entries: its items grouped into runs and subagents,
 // their keys and the room above each, and a message on its way.
 
 /// Whether [e] is a tool call that shows as a row, and can join a run of
-/// them (a review's findings show as a card of their own).
+/// them (a review's findings and a workflow show as cards of their own).
 bool _row(Object? e) =>
-    e is Item && e.kind == ItemKind.ITEM_KIND_TOOL_CALL && !e.hasFindings();
+    e is Item &&
+    e.kind == ItemKind.ITEM_KIND_TOOL_CALL &&
+    !e.hasFindings() &&
+    !isWorkflow(e);
 
 /// The items, with each run of tool calls as one list, and each subagent
 /// as one [SubagentRun] with what it did.

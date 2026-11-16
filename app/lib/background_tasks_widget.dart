@@ -9,24 +9,30 @@ import 'package:nushi/status.dart';
 import 'package:nushi/subagents.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/widgets.dart';
+import 'package:nushi/workflows.dart';
 
 /// The panel's Background tasks widget, as Claude Code's rail lists them:
-/// the chat's running subagents and background commands, a row each (its
-/// icon, its task or command, how long it has run, its Stop), [shownTasks]
-/// of them and "Show more" for the rest; then "n finished", a row of its
-/// own, which opens the others, the latest first: they stay, to go back
-/// into what one did. A row's tooltip says what it's doing, or how it
+/// the chat's running workflows, subagents and background commands, a row
+/// each (its icon, its task or command, how long it has run, its Stop),
+/// [shownTasks] of them and "Show more" for the rest; then "n finished", a
+/// row of its own, which opens the others, the latest first: they stay, to
+/// go back into what one did. A row's tooltip says what it's doing, or how it
 /// ended, and the worktree it works in. Null (no widget) before the chat
 /// has any.
 PanelWidget? backgroundTasksWidget(ChatState chat, Daemon daemon) {
   final subs = subagentsOf(chat.withRunning);
   final commands = backgroundCommandsOf(chat.withRunning);
+  final flows = workflowsOf(chat.withRunning);
+  bool flowRuns(Item it) => workflowLive(it.workflow);
   final running = [
+    for (final it in flows.where(flowRuns)) _WorkflowRow(chat, daemon, it),
     for (final s in subs.where(subagentRunning)) _AgentRow(chat, daemon, s),
     for (final it in commands.where(commandRunning))
       _CommandRow(chat, daemon, it),
   ];
   final rest = [
+    for (final it in flows.reversed.where((it) => !flowRuns(it)))
+      _WorkflowRow(chat, daemon, it),
     for (final s in subs.reversed.where((s) => !subagentRunning(s)))
       _AgentRow(chat, daemon, s),
     for (final it in commands.reversed.where((it) => !commandRunning(it)))
@@ -221,6 +227,47 @@ class _AgentRow extends StatelessWidget {
       stop: subagentStoppable(s)
           ? stopButton(context, daemon, chat, s.call.id)
           : null,
+    );
+  }
+}
+
+/// A workflow: its name, how long it ran, and in its tooltip its state
+/// and description; a click opens its pane.
+class _WorkflowRow extends StatelessWidget {
+  const new(this.chat, this.daemon, this.it);
+
+  final ChatState chat;
+  final Daemon daemon;
+  final Item it;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = NushiTheme.of(context);
+    final w = it.workflow;
+    final runs = workflowLive(w);
+    return _row(
+      context,
+      icon: Icons.account_tree_outlined,
+      name: Text(
+        w.name.isEmpty ? 'Workflow' : w.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.ui(theme.t.text),
+      ),
+      time: _time(
+        context,
+        started: w.started.toInt(),
+        ended: w.ended.toInt(),
+        state: w.state == 'unknown' ? 'ended' : w.state,
+        runs: runs && !w.stalled,
+      ),
+      open: () => chat.pane.value = it.id,
+      tooltip: [
+        'Workflow',
+        workflowState(w),
+        if (w.description.isNotEmpty) w.description,
+      ].join('\n'),
+      stop: runs ? stopButton(context, daemon, chat, it.id) : null,
     );
   }
 }
