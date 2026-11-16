@@ -23,15 +23,21 @@ const (
 var errJournalTooBig = errors.New("workflow journal too big")
 
 // journalRow is one agent of a workflow as its journal tells: State is
-// "running" from its started line, "done" from its result, "failed".
+// "running" from its started line, "done" from its result, "failed", or
+// "stopped" when the run it started in ended before it did (a resume
+// follows).
 type journalRow struct {
 	Key, AgentID, Label, Phase, State string
 }
 
 // journal reads a workflow's journal incrementally: off is how far it read,
 // carry the start of a line not yet ended. Rows are in start order, found
-// by their key (a failed line has an empty agentId). Each launched line
-// starts the rows again: a resumed run replays what it cached.
+// by their key (a failed line has an empty agentId). The journal is one
+// for every run of the same id, as Claude's own reader takes it: a resume
+// appends a resumed line (a launched one only for a hidden script's), keeps
+// the results it has, and starts again only what had none. So each resumed
+// or launched line ends the rows still running, stopped with the run
+// before; one started again runs again.
 type journal struct {
 	off      int64
 	carry    []byte
@@ -115,8 +121,12 @@ func (j *journal) line(line []byte) {
 	}
 	i, known := j.byKey[l.Key]
 	switch {
-	case l.Type == "launched":
-		j.rows, j.byKey = nil, map[string]int{}
+	case l.Type == "launched" || l.Type == "resumed":
+		for i := range j.rows {
+			if j.rows[i].State == "running" {
+				j.rows[i].State = "stopped"
+			}
+		}
 	case l.Key == "":
 		j.skipped++
 	case l.Type == "started" && known:

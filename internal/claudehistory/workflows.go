@@ -94,7 +94,10 @@ type steps struct {
 	items []model.Item
 }
 
-// runDir opens session sid's folder in folder's history, for a run of w's.
+// runDir opens session sid's folder in folder's history, for a run of w's,
+// and the key Runs keeps it by: the run and its task, since a resumed run
+// keeps its run id and gets a new task (Claude 2.1.325), and the snapshot
+// of the run it resumed, another task's, must not end it.
 func (l Local) runDir(sid, folder string, w model.Workflow) (*os.Root, string, error) {
 	if !sessionID.MatchString(sid) || !claude.ValidRunID(w.RunID) || w.TaskID != "" && !claude.ValidTaskID(w.TaskID) {
 		return nil, "", fmt.Errorf("workflow %q of session %q: %w", w.RunID, sid, fs.ErrNotExist)
@@ -104,7 +107,7 @@ func (l Local) runDir(sid, folder string, w model.Workflow) (*os.Root, string, e
 	if err != nil {
 		return nil, "", err
 	}
-	return root, dir + "\x00" + w.RunID, nil
+	return root, dir + "\x00" + w.RunID + "\x00" + w.TaskID, nil
 }
 
 // ReadWorkflow reads the run w names (its RunID and TaskID, and Started,
@@ -236,6 +239,7 @@ func (r *run) summary(w model.Workflow) model.Workflow {
 		case "failed":
 			w.Failed++
 			count(&w, i, func(p *model.WorkflowPhase) { p.Failed++ })
+		case "stopped": // the run it was in ended before it did
 		default:
 			w.RunningCount++
 			if len(w.Running) < model.WorkflowRunning {

@@ -238,6 +238,37 @@ func TestSnapshotLooseTypes(t *testing.T) {
 	}
 }
 
+// A resumed run keeps its run id and gets a new task: the snapshot of the
+// run it resumed (killed, the old task's) ends only the old call's card,
+// even after that card's read kept it, and the killed run's agent with no
+// result shows stopped, not running.
+func TestAResumedWorkflow(t *testing.T) {
+	l, id, folder, session := fakeRun(t, launchedLine+startA+resultA+startB, `{"status":"killed","taskId":"told"}`)
+	old, err := l.ReadWorkflow(id, folder, model.Workflow{RunID: "wf_abc", TaskID: "told"})
+	testcheck.NoErr(t, err)
+	if old.State != "stopped" || old.End != "killed" {
+		t.Fatalf("the killed run: %+v", old)
+	}
+	f, err := os.OpenFile(filepath.Join(session, "subagents", "workflows", "wf_abc", "journal.jsonl"), os.O_APPEND|os.O_WRONLY, 0)
+	testcheck.NoErr(t, err)
+	_, _ = f.WriteString(`{"type":"resumed"}` + "\n")
+	_ = f.Close()
+	w := model.Workflow{RunID: "wf_abc", TaskID: "tnew"}
+	got, err := l.ReadWorkflow(id, folder, w)
+	testcheck.NoErr(t, err)
+	if got.State != "running" || got.Done != 1 || got.RunningCount != 0 || len(got.Running) != 0 || got.Agents != 2 {
+		t.Errorf("the resumed run: %+v", got)
+	}
+	agents, err := l.WorkflowAgents(id, folder, w)
+	testcheck.NoErr(t, err)
+	if len(agents) != 2 || agents[0].State != "done" || agents[1].State != "stopped" {
+		t.Errorf("its agents: %+v", agents)
+	}
+	if again, _ := l.ReadWorkflow(id, folder, model.Workflow{RunID: "wf_abc", TaskID: "told"}); again.State != "stopped" {
+		t.Errorf("the old call's card: %+v", again)
+	}
+}
+
 // The summary on the item stays small whatever the run: phases, running
 // labels and their length capped, a secret's shape masked.
 func TestWorkflowSummaryBounds(t *testing.T) {

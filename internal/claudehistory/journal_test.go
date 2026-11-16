@@ -136,12 +136,20 @@ func (c *countingReader) ReadAt(p []byte, off int64) (int, error) {
 	return n, err
 }
 
-// A resumed run starts again at its second launched line: its cached
-// agents come back done at once, and none is counted twice.
-func TestJournalResume(t *testing.T) { // synthetic: no resumed run was recorded yet
-	j := readAll(t, launchedLine+startA+resultA+startB+launchedLine+startA+resultA+startB)
-	if states(j) != "map:a=done:a1 map:b=running:a2" {
-		t.Errorf("got %q", states(j))
+// A resumed run appends a resumed line to the same journal (Claude
+// 2.1.325 appends no launched line for it, and keeps the results it has):
+// the agents it had done stay done, the one it starts again runs, and one
+// the killed run left without a result and the resume doesn't start again
+// is stopped. A hidden script's resume appends a launched line instead,
+// which reads the same.
+func TestJournalResume(t *testing.T) {
+	const resumed = `{"type":"resumed"}` + "\n"
+	startC := `{"type":"started","key":"k3","agentId":"a3","label":"map:c","phase":"Map"}` + "\n"
+	for name, again := range map[string]string{"resumed": resumed, "a hidden script's": launchedLine} {
+		j := readAll(t, launchedLine+startA+resultA+startB+startC+again+startB)
+		if got := states(j); got != "map:a=done:a1 map:b=running:a2 map:c=stopped:a3" {
+			t.Errorf("%s: got %q", name, got)
+		}
 	}
 }
 
