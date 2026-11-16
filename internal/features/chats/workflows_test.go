@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -318,6 +319,29 @@ func TestAWorkflowStaysWithItsSession(t *testing.T) {
 	defer f.files.mu.Unlock()
 	if len(f.files.sids) != 1 || !f.files.sids[launched] {
 		t.Errorf("read sessions %v, want only %s", f.files.sids, launched)
+	}
+}
+
+// A Move or a rewind would stop the claude that runs the workflow: both
+// are refused while it runs or stalls, and go on once it ended.
+func TestNoMoveOrRewindWhileAWorkflowRuns(t *testing.T) {
+	f := workflowChat(t, Timing{}, runningAs)
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+	for _, stalled := range []bool{false, true} {
+		f.c.mu.Lock()
+		f.c.itemLocked(wfCall).Workflow.Stalled = stalled
+		f.c.mu.Unlock()
+		if err := f.svc.Move(t.Context(), f.c.id, t.TempDir(), false); err == nil || !strings.Contains(err.Error(), "workflow") {
+			t.Errorf("stalled %v: moved: %v", stalled, err)
+		}
+		if _, err := f.svc.Rewind(t.Context(), f.c.id, "x"); err == nil || !strings.Contains(err.Error(), "workflow") {
+			t.Errorf("stalled %v: rewound: %v", stalled, err)
+		}
+	}
+	f.files.set(endedAs("done", "completed"))
+	eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.Final() })
+	if _, err := f.svc.Rewind(t.Context(), f.c.id, "x"); err == nil || strings.Contains(err.Error(), "workflow") {
+		t.Errorf("once it ended: %v", err)
 	}
 }
 

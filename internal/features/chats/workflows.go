@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/afrase/nushi/internal/model"
@@ -79,6 +80,13 @@ func (c *chat) followWorkflowsLocked() {
 			c.workflowLocked(it)
 		}
 	}
+}
+
+// workflowLiveLocked says a workflow of the chat's hasn't ended: running,
+// or stalled (nothing says it ended). A Move or a rewind would stop the
+// claude that runs it (another session), so neither starts while one is.
+func (c *chat) workflowLiveLocked() bool {
+	return slices.ContainsFunc(c.items, func(it model.Item) bool { return it.Workflow != nil && it.Workflow.State == "running" })
 }
 
 // pokeWorkflowsLocked has each workflow followed read its files now:

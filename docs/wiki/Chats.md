@@ -117,6 +117,8 @@ Claude can run a workflow: a script that has many helpers work in phases, in the
 
 A workflow that writes nothing for an hour says "no activity for 1h" and no longer counts as working; it still ends when Claude says so.
 
+While a workflow runs, the chat can't be moved or rewound: that would stop it. Stop it first, or wait for it to end.
+
 ## Pick the mode, model and effort
 
 In the box's bottom row, after the **+**, are the agent's own options (in a side chat and on the phone they're under the box):
