@@ -15,6 +15,10 @@
 //   - containing "wait": nothing, until the turn is cancelled (10 s at most);
 //   - containing "subagent": a subagent, as claude-agent-acp showed one
 //     without its own session, that runs the prompt as a command and ends;
+//   - containing "workflow": a Workflow call that launches a run in the
+//     background, as Claude Code 2.1.325 sent it (the "workflow" parity
+//     recording: run wf_769a004c-2aa, task w9u1xb6ik), then a message; the
+//     run's files are the test's to write;
 //   - containing "screenshot": a tool call that returns an image
 //     (Screenshot), then a message;
 //   - containing "tool": a command run with the prompt as its input and
@@ -432,6 +436,18 @@ func (a *Agent) prompt(session string, blocks []string) string { //nolint:gocogn
 		a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "a1", "status": "completed",
 			"_meta": claudeCode(map[string]any{"toolName": "Agent"})})
 		a.say(session, "The subagent is done.")
+	case strings.Contains(text, "workflow"):
+		claudeCode := func(fields map[string]any) map[string]any { return map[string]any{"claudeCode": fields} }
+		a.update(session, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "wf1", "title": "Workflow", "kind": "other", "status": "pending",
+			"rawInput": map[string]any{}, "_meta": claudeCode(map[string]any{"toolName": "Workflow"})})
+		a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "wf1", "_meta": claudeCode(map[string]any{"toolName": "Workflow",
+			"toolResponse": map[string]any{"status": "async_launched", "taskId": "w9u1xb6ik", "taskType": "local_workflow", "workflowName": "two-phases",
+				"runId": "wf_769a004c-2aa", "summary": "Ask four helpers in two phases"}})})
+		a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "wf1", "status": "completed",
+			"content": []map[string]any{{"type": "content", "content": map[string]any{"type": "text",
+				"text": "Workflow launched in background. Task ID: w9u1xb6ik\nSummary: Ask four helpers in two phases\nRun ID: wf_769a004c-2aa\n"}}},
+			"_meta": claudeCode(map[string]any{"toolName": "Workflow"})})
+		a.say(session, "The workflow runs in the background.")
 	case strings.Contains(text, "screenshot"):
 		a.update(session, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "t3", "title": "Take a screenshot", "status": "in_progress"})
 		a.update(session, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "t3", "status": "completed",
