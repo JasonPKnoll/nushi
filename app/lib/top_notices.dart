@@ -9,7 +9,8 @@ import 'package:nushi/toast.dart';
 /// What floats at the top of a view that isn't a chat, under its header
 /// (ADR 0111, 0128): the [bars], centred and at most [FloatBar.width]
 /// wide; the [card] (the newer release's) at the right, clear of the
-/// header's buttons; and where the toasts show ([ToastAnchor]), centred
+/// header's buttons (in a chat, the transcript's right, left of the
+/// details rail); and where the toasts show ([ToastAnchor]), centred
 /// under the bars. A chat places the same over its transcript (`Beside`'s
 /// notices). It covers the main area and takes no pointer but theirs.
 class TopNotices extends StatelessWidget {
@@ -56,9 +57,9 @@ class TopNotices extends StatelessWidget {
 enum NoticeSlot { card, bars, toasts }
 
 /// Places [TopNotices.slots] (ADR 0128): the bars centred across the
-/// width, the top given down; the card at the right; the toasts' anchor
-/// centred over the column from its left to its right (the chat's
-/// transcript, or the whole width), under the bars. A bar or the
+/// width, the top given down; the card at the right of the column from
+/// its left to its right (the chat's transcript, or the whole width); the
+/// toasts' anchor centred over that column, under the bars. A bar or the
 /// toasts that would meet the card, in a narrow window, go under it.
 mixin NoticesPlace on MultiChildLayoutDelegate {
   /// Lays the notices out; see [NoticesPlace].
@@ -68,11 +69,8 @@ mixin NoticesPlace on MultiChildLayoutDelegate {
     required double left,
     required double right,
   }) {
-    final card = layoutChild(
-      NoticeSlot.card,
-      BoxConstraints(maxWidth: width),
-    );
-    final cardLeft = width - TopNotices.cardInset - card.width;
+    final card = layoutChild(NoticeSlot.card, BoxConstraints(maxWidth: width));
+    final cardLeft = max(0.0, right - TopNotices.cardInset - card.width);
     positionChild(NoticeSlot.card, Offset(cardLeft, top));
     final under = top + card.height + TopNotices.gap;
     // Whether something centred at [centre], [across] wide, meets the card.

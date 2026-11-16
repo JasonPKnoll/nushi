@@ -4,12 +4,11 @@ import 'package:connectrpc/connect.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nushi/beside.dart';
+import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/palette.dart';
-import 'package:nushi/panes.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/settings_rows.dart';
 import 'package:nushi/slides.dart';
@@ -104,11 +103,11 @@ void main() {
           );
           expect(toastButtons(tester), buttons);
           final box = tester.getRect(updateToast);
-          // In the main area's top right corner, under its header and so
-          // clear of the header's buttons (ADR 0128).
-          final main = tester.getRect(find.byType(Beside));
-          expect(box.right, main.right - TopNotices.cardInset);
-          expect(box.top, main.top + PaneHeader.height + FloatBar.inset);
+          // At the transcript's top right, under the header and so clear
+          // of its buttons, left of the details rail (ADR 0128).
+          final transcript = tester.getRect(find.byType(ChatView));
+          expect(box.right, transcript.right - TopNotices.cardInset);
+          expect(box.top, transcript.top + FloatBar.inset);
           expect(
             tester.getRect(find.byType(StatusBar)).right,
             lessThan(box.left),
@@ -127,9 +126,9 @@ void main() {
             expect(error.height, lessThan(40));
           }
           if (width == 1700) {
-            // Over the details panel's top, its text's width.
-            final text = tester.getRect(find.text('Environment')).left;
-            expect(box.left, text);
+            // The rail shows, and the card is left of it.
+            final rail = tester.getRect(find.text('Environment')).left;
+            expect(box.right, lessThan(rail));
           }
           await render(
             tester,

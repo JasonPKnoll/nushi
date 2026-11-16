@@ -137,7 +137,8 @@ void main() {
           // At the top right, under the header's buttons.
           final card = tester.getRect(updateToast);
           expect(card.top, headerBottom + 8);
-          expect(card.right, main.right - TopNotices.cardInset);
+          // The transcript's top right: left of the details rail.
+          expect(card.right, transcript.right - TopNotices.cardInset);
           say(
             context,
             'Archived side chat',
