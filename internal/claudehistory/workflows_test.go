@@ -200,7 +200,8 @@ func TestWorkflowSnapshots(t *testing.T) {
 		{"cancelled", `{"status":"cancelled"}`, model.Workflow{}, false, "stopped", "cancelled"},
 		{"paused", `{"status":"paused"}`, model.Workflow{}, false, "unknown", "paused"},
 		{"a new word", `{"status":"zapped"}`, model.Workflow{}, false, "unknown", "zapped"},
-		{"no status", `{}`, model.Workflow{}, false, "unknown", ""},
+		{"no status", `{}`, model.Workflow{}, false, "done", "completed"},
+		{"no status, an error", `{"error":"boom"}`, model.Workflow{}, false, "failed", "failed"},
 		{"a number", `{"status":3}`, model.Workflow{}, false, "unknown", ""},
 		{"half written", `{"status":"compl`, model.Workflow{}, false, "running", ""},
 	} {

@@ -35,7 +35,8 @@ type snapshotAgent struct {
 }
 
 // readSnapshot reads a snapshot's JSON; an error only when it isn't a JSON
-// object (one being written, say).
+// object (one being written, say). One with no status is completed, or
+// failed when it has an error, as Claude 2.1.325's own loader reads it.
 func readSnapshot(data []byte) (snapshot, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -44,6 +45,12 @@ func readSnapshot(data []byte) (snapshot, error) {
 	s := snapshot{Status: str(raw["status"]), TaskID: str(raw["taskId"]), Name: str(raw["workflowName"]), Summary: str(raw["summary"]),
 		Error: str(raw["error"]), Started: ms(raw["startTime"]), Duration: time.Duration(num(raw["durationMs"])) * time.Millisecond,
 		AgentCount: int(num(raw["agentCount"]))}
+	if _, ok := raw["status"]; !ok { // as Claude's own reader takes one without
+		s.Status = "completed"
+		if s.Error != "" {
+			s.Status = "failed"
+		}
+	}
 	var phases []map[string]json.RawMessage
 	_ = json.Unmarshal(raw["phases"], &phases)
 	for _, p := range phases {
