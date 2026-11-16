@@ -74,14 +74,29 @@ func TestAMoveKeepsAWorktreeWithAServer(t *testing.T) {
 	}
 }
 
+// serversThenWorktrees removes worktrees as removingWorktrees does, and
+// keeps which servers had been stopped as each went.
+type serversThenWorktrees struct {
+	removingWorktrees
+	servers       *fakeServers
+	stoppedAtEach [][]string
+}
+
+func (w *serversThenWorktrees) Remove(ctx context.Context, wt model.Worktree, force bool) error {
+	w.servers.mu.Lock()
+	w.stoppedAtEach = append(w.stoppedAtEach, slices.Clone(w.servers.stopped))
+	w.servers.mu.Unlock()
+	return w.removingWorktrees.Remove(ctx, wt, force)
+}
+
 // Deleting a chat with its worktree stops the worktree's servers before
 // it goes.
 func TestDeleteStopsTheWorktreesServers(t *testing.T) {
 	svc, _, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
-	wts := &removingWorktrees{}
-	svc.worktrees = wts
 	w := t.TempDir()
 	servers := &fakeServers{in: []string{w}}
+	wts := &serversThenWorktrees{servers: servers}
+	svc.worktrees = wts
 	svc.UseServers(servers)
 	c.mu.Lock()
 	c.record.EarlierWorktrees = []model.Worktree{{Path: w}}
@@ -89,6 +104,9 @@ func TestDeleteStopsTheWorktreesServers(t *testing.T) {
 	testcheck.NoErr(t, svc.Delete(context.Background(), c.id, DeleteOptions{w: {RemoveWorktree: true}}))
 	if !slices.Equal(servers.stopped, []string{w}) || !slices.Equal(wts.removed, []string{w}) {
 		t.Errorf("stopped %q, removed %q", servers.stopped, wts.removed)
+	}
+	if len(wts.stoppedAtEach) != 1 || !slices.Equal(wts.stoppedAtEach[0], []string{w}) {
+		t.Errorf("as the worktree went, the servers stopped were %q, want its own", wts.stoppedAtEach)
 	}
 }
 
