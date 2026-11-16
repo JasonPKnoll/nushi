@@ -230,12 +230,36 @@ jobs:
           du -sh "$FLUTTER_ROOT"
 
   linux:
-    name: Go packages (Linux)
+    name: Go tests (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # As on the Mac: the tests in a new order each run.
     env:
       GOTESTFLAGS: -shuffle=on
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # npm's install runs under bubblewrap on Linux (internal/npm's tests run it); Ubuntu's AppArmor denies it
+      # unprivileged user namespaces unless that rule is off.
+      - run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - run: make test-go
+      # go.mod and go.sum name what the code imports, no more and no less.
+      - if: ${{ !cancelled() }}
+        run: go mod tidy -diff
+
+  # Beside Linux's tests, not after them: the two lints took as long as the tests (2026-11-16).
+  linux-lint:
+    name: Go lint (Linux, Windows)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -265,16 +289,8 @@ jobs:
           path: ~/.cache/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-${{ steps.week.outputs.week }}
           restore-keys: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-
-      # npm's install runs under bubblewrap on Linux (internal/npm's tests run it); Ubuntu's AppArmor denies it
-      # unprivileged user namespaces unless that rule is off.
-      - run: |
-          sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends bubblewrap
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
-      - run: make test-go
       # Everything builds, vets and lints for Linux without cgo: macOS-only code stays in _darwin.go files (ADR 0097).
-      - if: ${{ !cancelled() }}
-        run: make lint-linux
+      - run: make lint-linux
       # Everything builds, vets and lints for Windows, tests included: what macOS and Linux share stays in _unix.go files (ADR 0124).
       - if: ${{ !cancelled() }}
         run: make lint-windows
@@ -283,9 +299,6 @@ jobs:
         with:
           path: ~/.cache/golangci-lint
           key: ${{ steps.lint-cache.outputs.cache-primary-key }}
-      # go.mod and go.sum name what the code imports, no more and no less.
-      - if: ${{ !cancelled() }}
-        run: go mod tidy -diff
 
   windows:
     # The Windows-only tests run on Windows itself (ADR 0124): the processes' job objects and handles, the data
