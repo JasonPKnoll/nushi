@@ -52,11 +52,15 @@ func TestAFailedReopenIsntRetriedOnEveryCall(t *testing.T) {
 	agent.quit()
 	eventually(t, c, func() bool { return c.agent == nil })
 	agent.loadErr = errors.New("no such session")
+	before, _, _ := agent.count()
 	for range 3 {
 		_, _ = svc.Get(c.id) // the reopen it starts is what's tested
 		eventually(t, c, func() bool { return !c.busy })
 	}
 	launches, _, _ := agent.count()
+	if launches != before+1 {
+		t.Errorf("%d agents started over three looks, want 1", launches-before)
+	}
 	notices := func() int { // under the chat's lock
 		n := 0
 		for _, it := range c.items {

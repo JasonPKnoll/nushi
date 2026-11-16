@@ -118,7 +118,13 @@ func TestAFailingReopenTriesOncePerShow(t *testing.T) {
 	eventually(t, c, func() bool { return !c.busy && c.reopenFailed })
 	before, _, _ := agent.count()
 	for i := 1; i <= 3; i++ {
-		_, _ = svc.Get(c.id) // not a show
+		_, _ = svc.Get(c.id) // not a show: a reopen it started would have the chat busy by now
+		c.mu.Lock()
+		busy := c.busy
+		c.mu.Unlock()
+		if busy {
+			t.Fatalf("a look that isn't a show reopened the chat (show %d)", i)
+		}
 		testcheck.NoErr(t, svc.Reopen(c.id))
 		eventually(t, c, func() bool { return !c.busy && c.reopenFailed })
 		if launches, _, _ := agent.count(); launches != before+i {
