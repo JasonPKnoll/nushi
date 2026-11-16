@@ -152,15 +152,21 @@ func TestWatchSendsChanges(t *testing.T) {
 	if f := next(); !f.Missing || f.Path != path {
 		t.Fatalf("first = %+v; want missing %s", f, path)
 	}
-	testcheck.Write(t, path, "# one")
+	// put writes the file whole, as an agent's Write does (a new file
+	// renamed over it): one written in place is empty for a moment, which
+	// the watch would rightly send too.
+	put := func(text string) {
+		t.Helper()
+		testcheck.Write(t, path+".tmp", text)
+		if err := os.Rename(path+".tmp", path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put("# one")
 	if f := next(); string(f.Data) != "# one" {
 		t.Fatalf("after writing: %q", f.Data)
 	}
-	// A rewrite (as an agent's Write: a new file renamed over it).
-	testcheck.Write(t, path+".tmp", "# two, longer")
-	if err := os.Rename(path+".tmp", path); err != nil {
-		t.Fatal(err)
-	}
+	put("# two, longer")
 	if f := next(); string(f.Data) != "# two, longer" {
 		t.Fatalf("after the rewrite: %q", f.Data)
 	}
