@@ -135,7 +135,7 @@ func run() error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // a folder: 0700 is owner-only
+	if err := ownDataFolder(dir); err != nil {
 		return err
 	}
 	token, err := loadToken(filepath.Join(dir, "token"))
