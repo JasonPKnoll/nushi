@@ -58,6 +58,10 @@ class WindowsAppInstall implements AppInstall {
   @override
   String get stopByHand => 'end nushid.exe in Task Manager';
 
+  /// No: see [stop].
+  @override
+  bool get canStop => false;
+
   @override
   Future<void> launch(String dataDir) async {
     final program = daemon;

@@ -5,6 +5,7 @@ import 'package:connectrpc/connect.dart';
 import 'package:flutter/material.dart';
 
 import 'package:nushi/agent_mark.dart';
+import 'package:nushi/app_install.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_menu.dart';
 import 'package:nushi/daemon.dart';
@@ -306,14 +307,14 @@ class _MemoryButton extends StatelessWidget {
         row(
           label('Nushi daemon'),
           m.daemon.toInt(),
-          action: native.install.daemon == null
-              ? null
-              : Button(
+          action: native.install.restartsDaemon
+              ? Button(
                   label: daemon.restarting ? 'Restarting…' : 'Restart',
                   onPressed: daemon.restarting
                       ? null
                       : () => restartDaemonAsking(context, daemon),
-                ),
+                )
+              : null,
         ),
         if (m.other > 0) row(label('Terminals and other'), m.other.toInt()),
         if (asleep > 0)

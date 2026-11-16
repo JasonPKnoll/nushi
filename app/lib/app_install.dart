@@ -25,6 +25,10 @@ abstract interface class AppInstall {
   /// sentence's clause.
   String get stopByHand;
 
+  /// Whether [stop] stops the daemon: where it can't (Windows, so far),
+  /// nothing offers to restart it ([restartsDaemon]).
+  bool get canStop;
+
   /// Starts the packaged [daemon] on [dataDir] in the background, where it
   /// outlives the app, through the user's login shell (`nushid -login`).
   /// It doesn't wait for the daemon to answer.
@@ -33,6 +37,13 @@ abstract interface class AppInstall {
   /// Stops the daemon listening in [dataDir], if one is; it doesn't wait
   /// for it to go.
   Future<void> stop(String dataDir);
+}
+
+/// Restart daemon, where the app offers it.
+extension RestartsDaemon on AppInstall {
+  /// Whether the app can restart its daemon: it has one packaged, and
+  /// [AppInstall.stop] stops the one running.
+  bool get restartsDaemon => daemon != null && canStop;
 }
 
 /// The daemon's environment: the app's, without Nushi's own variables (a

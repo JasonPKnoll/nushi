@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'package:nushi/app_install.dart';
 import 'package:nushi/bundled_daemon.dart';
 import 'package:nushi/commits.dart' show dateTime;
 import 'package:nushi/daemon.dart';
@@ -73,14 +74,14 @@ class LogsSection extends StatelessWidget {
                   if (built != null) 'built ${dateTime(built)}',
                   if (daemon.replaced) 'a newer one is installed',
                 ].join(' · '),
-                control: native.install.daemon == null
-                    ? null
-                    : Button(
+                control: native.install.restartsDaemon
+                    ? Button(
                         label: daemon.restarting ? 'Restarting…' : 'Restart',
                         onPressed: daemon.restarting
                             ? null
                             : () => restartDaemonAsking(context, daemon),
-                      ),
+                      )
+                    : null,
               ),
               if (native.install.version case final v when v.isNotEmpty)
                 SettingsRow('App', description: 'Version $v'),
