@@ -25,8 +25,8 @@ func TestChatsInWorktrees(t *testing.T) {
 		return a.get(id).Chat
 	}
 
-	// Two chats in new worktrees of one repository: each has its own folder
-	// and branch, from main.
+	// Three chats in new worktrees of one repository: each has its own
+	// folder and branch, from main.
 	var ids []string
 	var wts []*nushiv1.Worktree
 	for range 3 {
@@ -38,7 +38,10 @@ func TestChatsInWorktrees(t *testing.T) {
 			t.Fatalf("chat = %v", c)
 		}
 		a.send(id, "pwd")
-		wt = a.settled(id).Chat.Worktree // named after the chat: nushi/pwd, then -2, -3
+		// Its branch keeps Nushi's name: the fake agent names its sessions,
+		// and a first turn without its title leaves the branch as it was
+		// (branch_test.go).
+		wt = a.settled(id).Chat.Worktree
 		ids, wts = append(ids, id), append(wts, wt)
 	}
 	if wts[0].Path == wts[1].Path {

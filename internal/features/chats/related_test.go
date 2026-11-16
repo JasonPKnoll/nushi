@@ -149,6 +149,7 @@ func TestRelatedFoundFromSubagentSteps(t *testing.T) {
 	byAbsolute, _ := addWorktree(t, repo, "by-absolute")
 	untold, _ := addWorktree(t, repo, "untold")
 	byChat, _ := addWorktree(t, repo, "by-chat")
+	byOutput, _ := addWorktree(t, repo, "by-output")
 	svc, c := relatedChat(t, testHarness{Name: "claude"}, repo, &memSessions{})
 
 	startSubagent(t, c, "a1")
@@ -158,6 +159,9 @@ func TestRelatedFoundFromSubagentSteps(t *testing.T) {
 	step(t, c, "a2", "s3", shell(t, "git -C .claude/worktrees/by-relative status"))
 	step(t, c, "a2", "s4", shell(t, "cd "+byAbsolute+" && make"))
 	step(t, c, "a2", "s5", `"kind":"read","rawInput":{"note":"`+untold+`"}`)
+	output, err := json.Marshal(byOutput + " abc123 [by-output]")
+	testcheck.NoErr(t, err)
+	step(t, c, "a2", "s6", shell(t, "git worktree list")+`,"content":[{"type":"content","content":{"type":"text","text":`+string(output)+`}}]`)
 	feed(c, []acp.SessionNotification{note(t, `{"sessionUpdate":"tool_call","toolCallId":"own","title":"x","kind":"execute","status":"completed",
 		"_meta":{"claudeCode":{"toolName":"Bash"}},"rawInput":{"command":"ls `+byChat+`"}}`)})
 
@@ -498,6 +502,17 @@ func TestRelatedDropsWhatWasStored(t *testing.T) {
 	}
 }
 
+// unlisted is a chat's worktrees that fail the test if git lists them.
+type unlisted struct {
+	Worktrees
+	t *testing.T
+}
+
+func (u unlisted) List(ctx context.Context, folder string) ([]model.WorktreeEntry, error) {
+	u.t.Error("git listed the worktrees of a chat with nothing to look at")
+	return u.Worktrees.List(ctx, folder)
+}
+
 // An error of git's isn't a removal, and a chat with nothing to look at
 // runs no git; a folder outside git has nothing to find.
 func TestRelatedKeepsWhatItCantRead(t *testing.T) {
@@ -519,6 +534,13 @@ func TestRelatedKeepsWhatItCantRead(t *testing.T) {
 	step(t, c2, "a1", "s1", shell(t, "ls /tmp"))
 	if got := related(t, svc2, c2); len(got) != 0 {
 		t.Errorf("outside git: %+v", got)
+	}
+	svc3, c3 := relatedChat(t, testHarness{Name: "claude"}, repo, &memSessions{})
+	c3.mu.Lock()
+	c3.worktrees = unlisted{c3.worktrees, t}
+	c3.mu.Unlock()
+	if got := related(t, svc3, c3); len(got) != 0 {
+		t.Errorf("nothing to look at: %+v", got)
 	}
 }
 

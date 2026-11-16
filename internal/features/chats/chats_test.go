@@ -604,4 +604,8 @@ func TestReplayedAgentMessageHasNoTime(t *testing.T) {
 	if !c.items[0].Sent.IsZero() {
 		t.Errorf("replayed message sent at %v", c.items[0].Sent)
 	}
+	sent := time.Date(2026, 11, 1, 9, 30, 0, 0, time.UTC)
+	if got := pick(model.Item{ID: "m1", Kind: model.AgentMessage, Text: "Hello", Sent: sent}, c.items[0]); !got.Sent.Equal(sent) {
+		t.Errorf("merged, sent at %v, want the copy's %v", got.Sent, sent)
+	}
 }

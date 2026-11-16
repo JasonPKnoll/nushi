@@ -98,8 +98,6 @@ func TestReopenShowsWhatBothHaveOnce(t *testing.T) {
 	}
 }
 
-// Claude replays only what follows its last compaction: the copy has the
-// rest, and a mark says where the agent's history starts again.
 // A message Nushi never saw gets its time from the agent's own files, and
 // the copy keeps it; one Nushi saw keeps its own.
 func TestReopenDatesMessagesFromTheAgentsFiles(t *testing.T) {
