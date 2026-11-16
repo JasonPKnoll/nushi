@@ -14,6 +14,7 @@ import 'package:nushi/settings.dart';
 import 'package:nushi/sidebar.dart';
 import 'package:nushi/sidebar_view.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -361,6 +362,7 @@ void main() {
       ]).connect(tester);
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => ToastHost(child: child!),
           debugShowCheckedModeBanner: false,
           theme: NushiTheme(tokens).toThemeData(),
           home: Builder(

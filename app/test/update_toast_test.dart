@@ -6,12 +6,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
-import 'package:nushi/main.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/palette.dart';
+import 'package:nushi/panes.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/settings_rows.dart';
+import 'package:nushi/slides.dart';
 import 'package:nushi/status_bar.dart';
+import 'package:nushi/toast.dart';
+import 'package:nushi/top_notices.dart';
 import 'package:nushi/update_toast.dart';
 
 import 'fake_app_install.dart';
@@ -87,8 +90,8 @@ void main() {
       ('light', Brightness.light),
     ]) {
       for (final width in [1700.0, 720.0]) {
-        testWidgets('the toast ($kind), ${width.toInt()} wide ($name): in '
-            'the bottom right corner', (tester) async {
+        testWidgets('the toast ($kind), ${width.toInt()} wide ($name): at '
+            'the top right, under the header', (tester) async {
           final (found, buttons) =
               toastStates[kind] ?? (newerUpdate('0.1.17'), ['Download']);
           brewCask = kind == 'zip' ? null : 'nushi';
@@ -100,11 +103,11 @@ void main() {
           );
           expect(toastButtons(tester), buttons);
           final box = tester.getRect(updateToast);
-          expect(box.right, width - UpdateToast.inset);
-          // Over the main pane's corner; the agents' counts are in the
-          // sidebar, not under it.
-          final window = tester.getRect(find.byType(NushiApp));
-          expect(box.bottom, window.bottom - UpdateToast.inset);
+          // In the main area's top right corner, under its header and so
+          // clear of the header's buttons (ADR 0128).
+          final main = tester.getRect(find.byType(TopNotices));
+          expect(box.right, main.right - TopNotices.cardInset);
+          expect(box.top, main.top + PaneHeader.height + FloatBar.inset);
           expect(
             tester.getRect(find.byType(StatusBar)).right,
             lessThan(box.left),
@@ -123,7 +126,7 @@ void main() {
             expect(error.height, lessThan(40));
           }
           if (width == 1700) {
-            // Over the details panel's empty bottom, its text's width.
+            // Over the details panel's top, its text's width.
             final text = tester.getRect(find.text('Environment')).left;
             expect(box.left, text);
           }
@@ -203,12 +206,12 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(updateToast, findsOneWidget);
-    // It rises up to 8 px as it fades in.
+    // It comes down up to 8 px as it fades in.
     await tester.pump(Motion.enter ~/ 4);
-    final rising = tester.getRect(updateToast).bottom;
+    final coming = tester.getRect(updateToast).top;
     await tester.pumpAndSettle();
-    final rest = tester.getRect(updateToast).bottom;
-    expect(rising - rest, inExclusiveRange(0, 8));
+    final rest = tester.getRect(updateToast).top;
+    expect(rest - coming, inExclusiveRange(0, 8));
     d.dispose();
   }, variant: macOSOnly);
 
@@ -282,8 +285,8 @@ void main() {
     await check();
     expect(updateToast, findsNothing);
     expect(find.text('Nushi is up to date (0.1.16).'), findsOneWidget);
-    final note = find.descendant(
-      of: find.byType(SnackBar),
+    final note = find.ancestor(
+      of: find.byType(ToastLine),
       matching: find.byType(Material),
     );
     expect(tester.getSize(note.first).width, 420);

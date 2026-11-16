@@ -278,7 +278,7 @@ class PhoneHeading extends StatelessWidget {
 
 /// Shows [message] at the bottom of the screen.
 void phoneSay(BuildContext context, String message) =>
-    showToast(ScaffoldMessenger.maybeOf(context), message, replace: true);
+    showToast(Toasts.maybeOf(context), message, replace: true);
 
 /// A small spinner, for what's on its way.
 class PhoneSpinner extends StatelessWidget {

@@ -1,21 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:nushi/controls.dart';
+import 'package:nushi/motion.dart';
+import 'package:nushi/panes.dart';
+import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
 
 /// A toast's action: its words and what pressing it does (Undo, Go to
 /// chat). Pressing it also takes the toast away.
 typedef ToastAction = ({String label, VoidCallback onPressed});
 
-/// Shows the app's one toast in [messenger]: [text], after [icon] when
-/// given (the failure's color when [failed]), then [action] as a compact
-/// button and, when [closable], a × (docs/design.md's Toasts). It stays
-/// [duration]; with [replace], it takes the place of the one showing,
-/// else it waits its turn. Its look is the theme's snack bar: `lifted`
-/// with a hairline, 420 wide on the Mac. [margin] places it (above a
-/// bar).
+/// Shows the app's one toast in [toasts] (`Toasts.maybeOf(context)`):
+/// [text], after [icon] when given (the failure's color when [failed]),
+/// then [action] as a compact button and, when [closable], a ×
+/// (docs/design.md's Toasts). It stays [duration]; with
+/// [replace], it takes the place of the one showing, else it waits its
+/// turn.
 void showToast(
-  ScaffoldMessengerState? messenger,
+  Toasts? toasts,
   String text, {
   IconData? icon,
   bool failed = false,
@@ -23,33 +27,293 @@ void showToast(
   bool closable = false,
   bool replace = false,
   Duration duration = const Duration(seconds: 4),
-  EdgeInsetsGeometry? margin,
   Key? key,
-}) {
-  if (messenger == null) return;
-  if (replace) messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(
-    SnackBar(
-      key: key,
-      margin: margin,
-      duration: duration,
-      content: ToastLine(
-        text,
-        icon: icon,
-        failed: failed,
-        action: action == null
-            ? null
-            : (
-                label: action.label,
-                onPressed: () {
-                  messenger.hideCurrentSnackBar();
-                  action.onPressed();
-                },
-              ),
-        onClose: closable ? messenger.hideCurrentSnackBar : null,
-      ),
-    ),
+}) => toasts?.show(
+  (close) => ToastLine(
+    text,
+    icon: icon,
+    failed: failed,
+    action: action == null
+        ? null
+        : (
+            label: action.label,
+            onPressed: () {
+              close();
+              action.onPressed();
+            },
+          ),
+    onClose: closable ? close : null,
+  ),
+  key: key,
+  duration: duration,
+  replace: replace,
+  holds: action != null,
+);
+
+/// Where the window's toasts show and their queue ([Toasts]), over
+/// everything in [child] (the app's navigator: its views, Settings, a
+/// dialog), ADR 0128. On the Mac and Linux a toast comes down from the
+/// top, centred under the main area's header where a [ToastAnchor] says;
+/// with none (no main area yet) under where its header would be. On the
+/// phone ([atBottom]) it comes up from the bottom, near the thumb.
+class ToastHost extends StatefulWidget {
+  const new({required this.child, super.key, this.atBottom = false});
+
+  final Widget child;
+  final bool atBottom;
+
+  /// A toast's width on the Mac and Linux; a phone's fills the width.
+  static const width = 420.0;
+
+  @override
+  State<ToastHost> createState() => Toasts();
+}
+
+/// The window's toasts: one shows at a time, the rest wait their turn;
+/// each goes after its duration, or when its action, its × or [hide]
+/// takes it away. [show] is what `showToast` calls.
+class Toasts extends State<ToastHost> with SingleTickerProviderStateMixin {
+  /// The toasts of the window [context] is in, if it has them.
+  static Toasts? maybeOf(BuildContext context) =>
+      context.findAncestorStateOfType<Toasts>();
+
+  /// What a [ToastAnchor] holds and the showing toast follows.
+  final LayerLink anchor = LayerLink();
+
+  late final _run = AnimationController(
+    vsync: this,
+    duration: Motion.enter,
+    reverseDuration: Motion.exit,
+  )..addStatusListener(_ran);
+  late final _curved = CurvedAnimation(
+    parent: _run,
+    curve: Motion.settle,
+    reverseCurve: Motion.leave.flipped,
   );
+  late final _app = OverlayEntry(
+    builder: (_) => widget.child,
+    maintainState: true,
+  );
+  late final _layer = OverlayEntry(builder: _place);
+  final _queue = <_Toast>[];
+  _Toast? _showing;
+  bool _going = false;
+  Timer? _timer;
+
+  /// Shows a toast whose line [line] builds, given what closes it; it
+  /// goes after [duration], unless it [holds] an action and VoiceOver is
+  /// on (as Material's snack bar does). With [replace] it takes the place
+  /// of the one showing at once; else it waits its turn.
+  void show(
+    Widget Function(VoidCallback close) line, {
+    Duration duration = const Duration(seconds: 4),
+    bool replace = false,
+    bool holds = false,
+    Key? key,
+  }) {
+    if (!mounted) return;
+    final toast = _Toast(key, duration, holds: holds);
+    toast.line = line(() => _close(toast));
+    if (replace && _showing != null) {
+      _put(toast);
+    } else {
+      _queue.add(toast);
+      if (_showing == null) _next();
+    }
+  }
+
+  /// Takes the showing toast away; the next waiting comes once it's gone.
+  void hide() => _close(_showing);
+
+  void _close(_Toast? toast) {
+    if (toast == null || _going || toast != _showing) return;
+    _timer?.cancel();
+    if (reduceMotion(context)) {
+      _gone();
+    } else {
+      _going = true;
+      _run.reverse().ignore();
+      _layer.markNeedsBuild();
+    }
+  }
+
+  /// Takes away the showing toast and those waiting, at once.
+  void clear() {
+    _queue.clear();
+    _timer?.cancel();
+    _gone();
+  }
+
+  void _next() {
+    if (_queue.isEmpty) return;
+    _put(_queue.removeAt(0));
+  }
+
+  void _put(_Toast toast) {
+    _timer?.cancel();
+    _showing = toast;
+    _going = false;
+    if (reduceMotion(context)) {
+      _run.value = 1;
+    } else if (!_run.isForwardOrCompleted || _run.isAnimating) {
+      _run.forward().ignore();
+    }
+    final stays = toast.holds && MediaQuery.accessibleNavigationOf(context);
+    if (!stays) _timer = Timer(toast.duration, () => _close(toast));
+    _layer.markNeedsBuild();
+  }
+
+  void _ran(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && _going) _gone();
+  }
+
+  void _gone() {
+    _going = false;
+    _showing = null;
+    _run.value = 0;
+    if (mounted) _layer.markNeedsBuild();
+    _next();
+  }
+
+  @override
+  void didUpdateWidget(ToastHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _app.markNeedsBuild();
+    _layer.markNeedsBuild();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _curved.dispose();
+    _run.dispose();
+    _app
+      ..remove()
+      ..dispose();
+    _layer
+      ..remove()
+      ..dispose();
+    super.dispose();
+  }
+
+  // An overlay of its own over the app, so a toast's tooltips have one.
+  @override
+  Widget build(BuildContext context) => Overlay(initialEntries: [_app, _layer]);
+
+  Widget _place(BuildContext context) {
+    final toast = _showing;
+    if (toast == null) return const SizedBox.shrink();
+    final bottom = widget.atBottom;
+    // It slides in from its edge as it fades in, and only fades as it goes.
+    final card = AnimatedBuilder(
+      animation: _curved,
+      builder: (context, child) => Faded(
+        opacity: _curved.value,
+        child: Transform.translate(
+          offset: Offset(
+            0,
+            _going ? 0 : (bottom ? 12 : -12) * (1 - _curved.value),
+          ),
+          child: child,
+        ),
+      ),
+      child: IgnorePointer(
+        ignoring: _going,
+        child: _ToastCard(key: toast.key, child: toast.line),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (bottom) {
+          final mq = MediaQuery.of(context);
+          return Stack(
+            children: [
+              Positioned(
+                left: 8,
+                right: 8,
+                bottom: mq.padding.bottom + mq.viewInsets.bottom + 8,
+                child: card,
+              ),
+            ],
+          );
+        }
+        // The follower is the stack's own child: it takes pointers where
+        // the anchor puts it, not where it's laid out.
+        return Stack(
+          children: [
+            Positioned(
+              top: PaneHeader.height + FloatBar.inset,
+              left: (box.maxWidth - ToastHost.width) / 2,
+              width: ToastHost.width,
+              child: CompositedTransformFollower(
+                link: anchor,
+                targetAnchor: Alignment.topCenter,
+                followerAnchor: Alignment.topCenter,
+                child: card,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Where the window's toasts show: their top centre. The main area puts it
+/// under its header and the bars there (`TopNotices`); nothing without
+/// [Toasts] above it.
+class ToastAnchor extends StatelessWidget {
+  const new({super.key});
+
+  @override
+  Widget build(BuildContext context) => switch (Toasts.maybeOf(context)) {
+    final toasts? => CompositedTransformTarget(
+      link: toasts.anchor,
+      child: const SizedBox.shrink(),
+    ),
+    null => const SizedBox.shrink(),
+  };
+}
+
+class _Toast {
+  new(this.key, this.duration, {required this.holds});
+
+  final Key? key;
+  final Duration duration;
+  final bool holds;
+  late final Widget line;
+}
+
+/// A toast's card: the lifted fill and a hairline, the app's text, said
+/// to VoiceOver as it comes.
+class _ToastCard extends StatelessWidget {
+  const new({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = NushiTheme.of(context);
+    final t = theme.t;
+    // A layer of its own: it fades over the app as it comes and goes.
+    return RepaintBoundary(
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        child: Material(
+          color: t.lifted,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(NushiTheme.card),
+            side: BorderSide(color: t.line),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: DefaultTextStyle(style: theme.ui(t.text), child: child),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// A toast's line: [icon] (the failure's color when [failed]), [text],

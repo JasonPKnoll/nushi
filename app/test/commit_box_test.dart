@@ -10,6 +10,7 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -73,6 +74,7 @@ Future<(Daemon, ChatState, List<Object?>)> _view(
   addTearDown(() => state.scope = null);
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => ToastHost(child: child!),
       theme: NushiTheme(
         brightness == Brightness.dark ? Tokens.dark : Tokens.light,
       ).toThemeData(),

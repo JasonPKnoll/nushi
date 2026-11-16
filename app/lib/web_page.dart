@@ -37,7 +37,7 @@ Future<void> openInBrowser(Uri url) async {
   }
 }
 
-/// [openInBrowser] for the user's click, saying in a snack bar why the page
+/// [openInBrowser] for the user's click, saying in a toast why the page
 /// didn't open (no default browser, ADR 0104) rather than doing nothing.
 Future<void> openInBrowserOrSay(BuildContext context, Uri url) =>
     openOrSay(context, () => openInBrowser(url));
@@ -49,20 +49,20 @@ Future<void> openLinkOrSay(BuildContext context, Uri url) =>
     openOrSay(context, () => openInDefaultBrowser(url));
 
 /// Runs [open], the default browser opening what the user clicked, and
-/// says in a snack bar under [context] why, when it throws.
+/// says in a toast under [context] why, when it throws.
 Future<void> openOrSay(
   BuildContext context,
   Future<void> Function() open,
 ) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final toasts = Toasts.maybeOf(context);
   try {
     await open();
   } on Object catch (e) {
-    showToast(messenger, _browserFailure(e), replace: true);
+    showToast(toasts, _browserFailure(e), replace: true);
   }
 }
 
-/// What a snack bar says of [e], the default browser's failure to open a
+/// What a toast says of [e], the default browser's failure to open a
 /// page: a [BrowserError]'s own words, else the platform's reason.
 String _browserFailure(Object e) => switch (e) {
   BrowserError(:final message) => message,

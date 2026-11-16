@@ -1,7 +1,7 @@
 // What floats over the window in the look of ADR 0111, each drawn on the
 // whole app at 1700 and 720 in both themes (`make renders
 // TEST=test/overlays_look_test.dart`): a menu with its submenu, a dialog,
-// the palette, a tooltip, the find bar, a snack bar and the update card.
+// the palette, a tooltip, the find bar, a toast and the update card.
 // A render draws their shadows as the app does; a golden can't.
 import 'dart:async';
 
@@ -213,7 +213,7 @@ void main() {
         await closeView(tester, d);
       }, variant: _mac);
 
-      testWidgets('a snack bar and the update card, ${b.name}, $w wide', (
+      testWidgets('a toast and the update card, ${b.name}, $w wide', (
         tester,
       ) async {
         final (d, _) = await _app(
@@ -229,7 +229,7 @@ void main() {
         );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 800));
-        expect(find.byType(SnackBar), findsOneWidget);
+        expect(find.byType(ToastLine), findsOneWidget);
         await shot(tester, 'snack_update');
         await tester.pump(const Duration(seconds: 6));
         await tester.pumpAndSettle();

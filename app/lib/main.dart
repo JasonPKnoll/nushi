@@ -43,11 +43,12 @@ import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/theme_files.dart';
 import 'package:nushi/tool_parts.dart' show plainPath;
+import 'package:nushi/top_notices.dart';
 import 'package:nushi/trust_card.dart';
 import 'package:nushi/type_to_box.dart';
 import 'package:nushi/update_toast.dart';
 import 'package:nushi/view_options.dart';
-import 'package:nushi/widgets.dart' show confirm;
+import 'package:nushi/widgets.dart' show ToastHost, confirm;
 
 void main() => runZonedGuarded(() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -401,6 +402,8 @@ class _NushiAppState extends State<NushiApp> {
       // theme animation, each a rebuild of what reads the theme.
       themeAnimationDuration: Duration.zero,
       scrollBehavior: const NativeScroll(),
+      // The toasts, over every view, Settings and a dialog (ADR 0128).
+      builder: (context, child) => ToastHost(child: child!),
       // The menu's keys don't reach the menu while Flutter has the keys:
       // they're bound here too, and a terminal, which keeps ⌘ and ⌃ keys,
       // passes them on as the same intents.
@@ -544,6 +547,9 @@ class _Shell extends StatelessWidget {
         ],
       ),
     );
+    // Made here, outside the layout's builder, as the bars are: a new
+    // layout (the window resized) leaves it as it was.
+    final card = UpdateToast(daemon);
     final app = LayoutBuilder(
       // The sidebar slides in and out over the view, which keeps its
       // state either way.
@@ -601,19 +607,10 @@ class _Shell extends StatelessWidget {
                               ),
                             },
                     ),
-                    Positioned(
-                      top: PaneHeader.height + FloatBar.inset,
-                      left: 16,
-                      right: 16,
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: FloatBar.width,
-                          ),
-                          child: bars,
-                        ),
-                      ),
+                    // The bars, the newer release's card and where the
+                    // toasts show (ADR 0128).
+                    Positioned.fill(
+                      child: TopNotices(bars: bars, card: card),
                     ),
                   ],
                 ),
@@ -626,21 +623,11 @@ class _Shell extends StatelessWidget {
         ),
       ),
     );
-    // Settings opens over all of it (ADR 0087). A newer release's toast,
-    // in the bottom right corner.
+    // Settings opens over all of it (ADR 0087).
     return SettingsModal(
       daemon: daemon,
       open: daemon.settingsOpen != null,
-      app: Stack(
-        children: [
-          Positioned.fill(child: app),
-          Positioned(
-            right: UpdateToast.inset,
-            bottom: UpdateToast.inset,
-            child: UpdateToast(daemon),
-          ),
-        ],
-      ),
+      app: app,
     );
   }
 }

@@ -119,10 +119,11 @@ void openRelease(BuildContext context, Daemon d) =>
 /// ADR 0108).
 bool isBeta(String version) => version.split('+').first.contains('-');
 
-/// Says a newer release is out, in the window's bottom right corner, out
-/// of the way: not modal, no sound. When Homebrew installed the app and
-/// its cask has the release ([caskWith]), Update has the daemon run
-/// Homebrew's upgrade (ADR 0109; Release notes opens the release's page):
+/// Says a newer release is out, at the main area's top right under its
+/// header (`TopNotices`, ADR 0128), out of the way: not modal, no sound.
+/// When Homebrew installed the app and its cask has the release
+/// ([caskWith]), Update has the daemon run Homebrew's upgrade (ADR 0109;
+/// Release notes opens the release's page):
 /// the card says "Updating…" until Homebrew quits the app and opens the
 /// new one, or why it failed, with Retry and Copy (Homebrew's upgrade on
 /// the clipboard, all a daemon older than [installApi] offers). Without a
@@ -131,14 +132,9 @@ bool isBeta(String version) => version.split('+').first.contains('-');
 class UpdateToast extends StatefulWidget {
   const new(this.daemon, {super.key});
 
-  /// As wide as the details panel's text, over whose empty bottom it sits
-  /// in a wide window: the panel's width inside its side margins.
+  /// As wide as the details panel's text, over whose top it sits in a
+  /// wide window: the panel's width inside its side margins.
   static const width = 288.0;
-
-  /// Its room from the window's right and bottom edges: the window's
-  /// margin and the panel's side margin, so it lines up with the details
-  /// cards' text.
-  static const double inset = NushiTheme.windowPad + 16;
 
   final Daemon daemon;
 
@@ -174,7 +170,7 @@ class _UpdateToastState extends State<UpdateToast> {
     builder: (context, _) {
       final version = updateToShow(widget.daemon);
       return Presence(
-        // It rises 8 px as it fades in, and only fades as it goes.
+        // It comes down 8 px as it fades in, and only fades as it goes.
         builder: (context, run, child) => AnimatedBuilder(
           animation: run,
           builder: (context, child) => Faded(
@@ -182,7 +178,9 @@ class _UpdateToastState extends State<UpdateToast> {
             child: Transform.translate(
               offset: Offset(
                 0,
-                run.status == AnimationStatus.reverse ? 0 : 8 * (1 - run.value),
+                run.status == AnimationStatus.reverse
+                    ? 0
+                    : -8 * (1 - run.value),
               ),
               child: child,
             ),
@@ -325,15 +323,15 @@ class _UpdateToastState extends State<UpdateToast> {
 }
 
 /// Asks the daemon for a newer release now (the palette's Check for
-/// updates): the toast shows a newer one, even one dismissed before;
+/// updates): the card shows a newer one, even one dismissed before;
 /// otherwise a note says the app is up to date.
 Future<void> checkForUpdates(BuildContext context, Daemon d) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final toasts = Toasts.maybeOf(context);
   // From the menu bar or the palette: nothing else shows it's asking.
   final slow = Timer(
     Waits.slow,
     () => showToast(
-      messenger,
+      toasts,
       'Checking for updates…',
       duration: const Duration(minutes: 1),
     ),
@@ -341,13 +339,13 @@ Future<void> checkForUpdates(BuildContext context, Daemon d) async {
   await tryOrShow(context, () async {
     final u = await d.checkForUpdates().whenComplete(() {
       slow.cancel();
-      messenger?.hideCurrentSnackBar();
+      toasts?.hide();
     });
     if (u.version.isNotEmpty && dismissedUpdate.value == u.version) {
       dismissedUpdate.value = null;
     }
     if (updateToShow(d) == null) {
-      showToast(messenger, switch (u.latest) {
+      showToast(toasts, switch (u.latest) {
         '' => 'Nushi has no release yet.',
         final latest when d.daemonVersion.isEmpty =>
           'The latest release is $latest; this is a development build.',

@@ -41,7 +41,7 @@ abstract interface class WebViews {
   /// runner, whose launch gives the browser none of Nushi's variables
   /// (ADR 0104). Linux's opens nothing else. Throws when nothing opened, a
   /// [BrowserError] where the platform has words for why, which the click
-  /// says in a snack bar (`openLinkOrSay`).
+  /// says in a toast (`openLinkOrSay`).
   Future<void> openLink(Uri url);
 
   /// How long ago the user last pressed, let go, or hit Return, Enter or

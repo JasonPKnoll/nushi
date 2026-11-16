@@ -16,22 +16,22 @@ export 'package:nushi/toast.dart';
 
 /// Shows [message] in a toast.
 void showError(BuildContext context, Object message) =>
-    showToast(ScaffoldMessenger.of(context), errorText(message));
+    showToast(Toasts.maybeOf(context), errorText(message));
 
-/// Runs a call, showing its error, if any, in a snack bar: the app's, also
+/// Runs a call, showing its error, if any, in a toast: the app's, also
 /// once the widget that asked is gone (a trust card replaced it).
 Future<void> tryOrShow(
   BuildContext context,
   Future<void> Function() call,
 ) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final toasts = Toasts.maybeOf(context);
   try {
     await call();
   } on Object catch (e) {
     if (context.mounted) {
       showError(context, e);
     } else {
-      showToast(messenger, errorText(e));
+      showToast(toasts, errorText(e));
     }
   }
 }
@@ -45,9 +45,9 @@ Future<void> runAndSay(
   required String running,
   String? done,
 }) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final toasts = Toasts.maybeOf(context);
   void say(String text, {Duration lasts = const Duration(seconds: 4)}) =>
-      showToast(messenger, text, replace: true, duration: lasts);
+      showToast(toasts, text, replace: true, duration: lasts);
   // Said only past a moment: a quick call goes straight to [done].
   var shown = false;
   final slow = Timer(Waits.slow, () {
@@ -65,7 +65,7 @@ Future<void> runAndSay(
   if (done != null) {
     say(done);
   } else if (shown) {
-    messenger?.hideCurrentSnackBar();
+    toasts?.hide();
   }
 }
 
