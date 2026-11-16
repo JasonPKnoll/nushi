@@ -35,7 +35,7 @@ func Open(path string, std bool) (*File, error) {
 }
 
 func (l *File) open() error {
-	f, err := openAppend(l.path)
+	f, err := OpenAppend(l.path)
 	if err != nil {
 		return err
 	}

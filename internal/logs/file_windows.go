@@ -40,11 +40,11 @@ func toStd(f *os.File) error {
 	return nil
 }
 
-// openAppend opens path for appending, made if missing, shared for
+// OpenAppend opens path for appending, made if missing, shared for
 // delete as well as read and write: os.OpenFile's handle doesn't let
 // another rename the file while it's open, and rotate renames the log it
-// writes to.
-func openAppend(path string) (*os.File, error) {
+// writes to (a relaunched daemon's stderr holds it too: hideConsole).
+func OpenAppend(path string) (*os.File, error) {
 	p, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return nil, err

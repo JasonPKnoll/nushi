@@ -19,8 +19,8 @@ func toStd(f *os.File) error {
 	return nil
 }
 
-// openAppend opens path for appending, made 0600 if missing, as the
-// launcher's `>>` does.
-func openAppend(path string) (*os.File, error) {
+// OpenAppend opens path for appending, made 0600 if missing, as the
+// launcher's `>>` does; File opens the log with it.
+func OpenAppend(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600) //nolint:gosec // the daemon's own log, in its data folder
 }
