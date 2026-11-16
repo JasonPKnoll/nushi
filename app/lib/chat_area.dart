@@ -26,12 +26,15 @@ import 'package:nushi/type_to_box.dart';
 /// pane's full height. The header and its buttons stay where they are as
 /// the details show and hide; the rail tucks itself away when the panes
 /// need its room. All of it is laid out by one [Beside], which keeps the
-/// header and the terminal as the tabs change.
+/// header and the terminal as the tabs change. Over it, [notices]: the
+/// bars, the newer release's card and the toasts' place, the card and the
+/// toasts over the transcript (ADR 0128).
 class ChatArea extends StatefulWidget {
-  const new(this.chat, this.daemon, {super.key});
+  const new(this.chat, this.daemon, {super.key, this.notices});
 
   final ChatState chat;
   final Daemon daemon;
+  final ({Widget bars, Widget card})? notices;
 
   @override
   State<ChatArea> createState() => _ChatAreaState();
@@ -422,6 +425,7 @@ class _ChatAreaState extends State<ChatArea> {
       cover: _coverable(_cover.value) ? _cover.value : null,
       panes: panes,
       details: details,
+      notices: widget.notices,
     );
   }
 }

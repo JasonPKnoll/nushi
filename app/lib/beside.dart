@@ -8,6 +8,7 @@ import 'package:nushi/settings.dart';
 import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/top_notices.dart';
 
 part 'beside_layout.dart';
 
@@ -47,6 +48,10 @@ part 'beside_layout.dart';
 /// they were, keeping their state, but draw nothing and take no pointer or
 /// focus, so the pane is the same widget throughout and its page doesn't
 /// load again.
+///
+/// Over it all, [notices]: the bars across it, the newer release's card
+/// and the toasts over [main], what the rail and the panes leave of it
+/// ([NoticesPlace], ADR 0128).
 class Beside extends StatefulWidget {
   const new({
     required this.main,
@@ -61,6 +66,7 @@ class Beside extends StatefulWidget {
     this.cover,
     this.scene,
     this.keep,
+    this.notices,
   }) : railLeast = railLeast ?? least;
 
   final Widget main;
@@ -74,6 +80,7 @@ class Beside extends StatefulWidget {
   final String? cover;
   final Object? scene;
   final FocusNode? keep;
+  final ({Widget bars, Widget card})? notices;
 
   /// What [head]'s trailing part glides by: it changes as the panes beside
   /// it come and go (and the rail and the sidebar), so a [Glide] given it
@@ -407,6 +414,9 @@ class _BesideState extends State<Beside> {
             (c) => c.key == ValueKey((scene, cover)),
           );
           children.add(children.removeAt(top));
+        }
+        if (widget.notices case (:final bars, :final card)) {
+          children.addAll(TopNotices.slots(bars: bars, card: card));
         }
         return FocusTraversalGroup(
           policy: OrderedTraversalPolicy(),

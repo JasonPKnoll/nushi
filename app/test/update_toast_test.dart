@@ -4,6 +4,7 @@ import 'package:connectrpc/connect.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/beside.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/motion.dart';
@@ -105,7 +106,7 @@ void main() {
           final box = tester.getRect(updateToast);
           // In the main area's top right corner, under its header and so
           // clear of the header's buttons (ADR 0128).
-          final main = tester.getRect(find.byType(TopNotices));
+          final main = tester.getRect(find.byType(Beside));
           expect(box.right, main.right - TopNotices.cardInset);
           expect(box.top, main.top + PaneHeader.height + FloatBar.inset);
           expect(

@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/beside.dart';
+import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/phone/ui.dart';
@@ -70,12 +74,15 @@ void main() {
             await render(tester, find.byType(MaterialApp), '${what}_$where');
           }
 
-          // Under the header, 8 points down, centred over the main area.
-          final main = tester.getRect(find.byType(TopNotices));
+          // Under the header, 8 points down, centred over the transcript
+          // (the composer's centre), left of the details rail.
+          final main = tester.getRect(find.byType(Beside));
+          final transcript = tester.getRect(find.byType(ChatView));
           final headerBottom = main.top + PaneHeader.height;
+          expect(transcript.top, headerBottom);
           void under(Rect box) {
             expect(box.top, headerBottom + 8);
-            expect(box.center.dx, closeTo(main.center.dx, 0.5));
+            expect(box.center.dx, closeTo(transcript.center.dx, 0.5));
             expect(box.width, ToastHost.width);
           }
 
@@ -146,6 +153,21 @@ void main() {
           await shot('h_settings');
           expect(toast(tester), both);
           expect(find.text('Undo').hitTestable(), findsOneWidget);
+          d.closeSettings();
+          await tester.pumpAndSettle();
+          // Beside a side pane: over what's left of the transcript.
+          hide(context);
+          toggleFiles(d.chats['c']!);
+          await tester.pumpAndSettle();
+          say(context, 'Committed 3f2a9c1');
+          await shot('i_side_pane');
+          final left = tester.getRect(find.byType(ChatView));
+          final files = tester.getRect(find.byType(FilesPane));
+          expect(
+            toast(tester).center.dx,
+            closeTo((left.left + min(left.right, files.left)) / 2, 0.5),
+          );
+          toggleFiles(d.chats['c']!);
           await closeView(tester, d);
         }, variant: macOSOnly);
       }

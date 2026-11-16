@@ -550,6 +550,8 @@ class _Shell extends StatelessWidget {
     // Made here, outside the layout's builder, as the bars are: a new
     // layout (the window resized) leaves it as it was.
     final card = UpdateToast(daemon);
+    final inChat =
+        daemon.trustAsk == null && daemon.place is ChatPlace && chat != null;
     final app = LayoutBuilder(
       // The sidebar slides in and out over the view, which keeps its
       // state either way.
@@ -604,14 +606,17 @@ class _Shell extends StatelessWidget {
                                 key: ValueKey(chat!.id),
                                 chat,
                                 daemon,
+                                notices: (bars: bars, card: card),
                               ),
                             },
                     ),
                     // The bars, the newer release's card and where the
-                    // toasts show (ADR 0128).
-                    Positioned.fill(
-                      child: TopNotices(bars: bars, card: card),
-                    ),
+                    // toasts show; a chat places them itself, the card
+                    // and the toasts over its transcript (ADR 0128).
+                    if (!inChat)
+                      Positioned.fill(
+                        child: TopNotices(bars: bars, card: card),
+                      ),
                   ],
                 ),
               ),
