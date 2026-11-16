@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/afrase/claude-acp-go/claudeacp"
 	"github.com/afrase/claude-acp-go/claudeagent"
@@ -23,7 +24,9 @@ func runClaudeAgent() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt)
+	// SIGTERM is how Go delivers a console's close, a logoff and a
+	// shutdown; os.Interrupt, Ctrl+Break (Ctrl+C is off in its group).
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigs)
 	go func() {
 		select {
