@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -189,7 +188,7 @@ func TestNoWorkflowFiles(t *testing.T) {
 func TestWorkflowFilesStayInside(t *testing.T) {
 	outside := t.TempDir()
 	testcheck.Write(t, filepath.Join(outside, "journal.jsonl"), launchedLine+startA)
-	for name, mk := range map[string]func(run string){
+	cases := map[string]func(run string){
 		"a linked journal": func(run string) {
 			testcheck.NoErr(t, os.MkdirAll(run, 0o700))
 			testcheck.NoErr(t, os.Symlink(filepath.Join(outside, "journal.jsonl"), filepath.Join(run, "journal.jsonl")))
@@ -198,12 +197,16 @@ func TestWorkflowFilesStayInside(t *testing.T) {
 			testcheck.NoErr(t, os.MkdirAll(filepath.Dir(run), 0o700))
 			testcheck.NoErr(t, os.Symlink(outside, run))
 		},
-		"a fifo": func(run string) {
-			testcheck.NoErr(t, os.MkdirAll(run, 0o700))
-			testcheck.NoErr(t, syscall.Mkfifo(filepath.Join(run, "journal.jsonl"), 0o600))
-		},
 		"a folder": func(run string) { testcheck.NoErr(t, os.MkdirAll(filepath.Join(run, "journal.jsonl"), 0o700)) },
-	} {
+	}
+	// A FIFO only where there are FIFOs (workflows_unix_test.go).
+	if makeFifo != nil {
+		cases["a fifo"] = func(run string) {
+			testcheck.NoErr(t, os.MkdirAll(run, 0o700))
+			testcheck.NoErr(t, makeFifo(filepath.Join(run, "journal.jsonl")))
+		}
+	}
+	for name, mk := range cases {
 		l, id, folder, session := fakeRun(t, "", "")
 		mk(filepath.Join(session, "subagents", "workflows", "wf_abc"))
 		done := make(chan struct{})
