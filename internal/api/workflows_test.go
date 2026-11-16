@@ -29,6 +29,9 @@ func TestWorkflowProto(t *testing.T) {
 	if itemProto(&model.Item{ID: "c"}, false).Workflow != nil {
 		t.Error("a workflow on a plain item")
 	}
+	if itemProto(&model.Item{ID: "c", Workflow: &model.Workflow{RunID: "wf_1", TaskID: "t1"}}, false).Workflow != nil {
+		t.Error("a run not followed: no workflow, as the proto says")
+	}
 	a := workflowAgentProto(model.WorkflowAgent{ID: "a1", Label: "l", Phase: "p", State: "done", Model: "m", Started: start, Tokens: 1 << 40, ToolCalls: 3, Prompt: "q", Result: "r"})
 	if a.Id != "a1" || a.Started != 1794798436066 || a.Ended != 0 || a.Tokens != 1<<31-1 || a.ToolCalls != 3 || a.Prompt != "q" || a.Result != "r" {
 		t.Errorf("agent %+v", a)

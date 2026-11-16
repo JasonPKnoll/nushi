@@ -107,7 +107,7 @@ func itemProto(it *model.Item, refs bool) *nushiv1.Item {
 	if sh := it.BackgroundCommand; sh != nil {
 		out.BackgroundCommand = &nushiv1.BackgroundCommand{Id: sh.ID, State: sh.State, Started: unixMs(sh.Started), Ended: unixMs(sh.Ended), Output: sh.Output, End: sh.End}
 	}
-	if w := it.Workflow; w != nil {
+	if w := it.Workflow; w != nil && w.State != "" { // unset until the run is followed, as the proto says
 		out.Workflow = workflowProto(*w)
 	}
 	if sa := it.Subagent; sa != nil {
