@@ -464,18 +464,38 @@ func TestALongWorkflowKeepsRunning(t *testing.T) {
 }
 
 // An own turn of the agent's starting (a workflow's notification) has the
-// run read at once: its end shows without waiting for a poll.
+// run read at once: its end shows without waiting for a poll. The turn
+// shows as the chat's own work from its first update to its result's
+// usage, not between its model calls.
 func TestAnOwnTurnPokesTheWorkflow(t *testing.T) {
 	f := workflowChat(t, Timing{WorkflowPoll: time.Hour}, runningAs)
-	f.files.waitReads(t, 1)
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+	for len(f.events) > 0 { // launch's own statuses
+		<-f.events
+	}
 	f.files.set(endedAs("done", "completed"))
-	_ = f.c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(f.c.sid), Update: acp.SessionUpdate{
-		SessionUpdate: "agent_message_chunk", AgentMessageChunk: &acp.ContentChunk{Content: acp.ContentBlock{Type: "text", Text: &acp.TextContent{Text: "Done."}}}}})
-	f.waitStatus(t, func(st model.Status) bool { return st.OwnTurn })
+	send := func(u acp.SessionUpdate) {
+		_ = f.c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(f.c.sid), Update: u})
+	}
+	ownTurns := func() []bool {
+		var out []bool
+		for len(f.events) > 0 {
+			if e := <-f.events; e.Status != nil {
+				out = append(out, e.Status.OwnTurn)
+			}
+		}
+		return out
+	}
+	send(acp.SessionUpdate{SessionUpdate: "agent_message_chunk", AgentMessageChunk: &acp.ContentChunk{Content: acp.ContentBlock{Type: "text", Text: &acp.TextContent{Text: "Done."}}}})
 	eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.State == "done" })
-	_ = f.c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(f.c.sid), Update: acp.SessionUpdate{
-		SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2, Cost: &acp.Cost{Amount: 0.1, Currency: "USD"}}}})
-	f.waitStatus(t, func(st model.Status) bool { return !st.OwnTurn })
+	send(acp.SessionUpdate{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2}}) // a model call's
+	if got := ownTurns(); len(got) == 0 || slices.Contains(got, false) {
+		t.Errorf("in the turn: own turn %v", got)
+	}
+	send(acp.SessionUpdate{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2, Cost: &acp.Cost{Amount: 0.1, Currency: "USD"}}})
+	if got := ownTurns(); !slices.Equal(got, []bool{false}) {
+		t.Errorf("its end: own turn %v", got)
+	}
 }
 
 // A rewind past the call ends its follower.
