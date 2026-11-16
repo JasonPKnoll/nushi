@@ -2,6 +2,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
+import 'package:nushi/controls.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/items.dart';
 import 'package:nushi/motion.dart';
@@ -204,8 +205,20 @@ void main() {
     await tester.pumpWidget(
       themed(WorkflowCard(workflowCall('running'), chat, still: true)),
     );
+    final t = NushiTheme.of(tester.element(find.byType(WorkflowCard))).t;
+    Color? fill() => tester
+        .widget<Tap>(
+          find.descendant(
+            of: find.byType(WorkflowCard),
+            matching: find.byType(Tap),
+          ),
+        )
+        .fill;
+    expect(fill(), t.subagentTint);
     await tester.tap(find.byType(WorkflowCard));
+    await tester.pump();
     expect(chat.pane.value, 'wf');
+    expect(fill(), t.accentSoft); // lit while its pane is open
   });
 
   for (final (name, tokens) in [
