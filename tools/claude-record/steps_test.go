@@ -193,11 +193,12 @@ func TestStopBelow(t *testing.T) {
 	if err := target.Wait(); err == nil || !strings.Contains(err.Error(), "terminated") {
 		t.Errorf("the target ended with %v", err)
 	}
-	if other.ProcessState != nil {
-		t.Error("the other ended")
+	// The target's group was sent SIGTERM before stopBelow returned, so had
+	// the other's been too, it ends terminated, not by this kill.
+	_ = syscall.Kill(-other.Process.Pid, syscall.SIGKILL)
+	if err := other.Wait(); err == nil || !strings.Contains(err.Error(), "killed") {
+		t.Errorf("the other ended with %v, not by the test's kill", err)
 	}
-	_ = other.Process.Kill()
-	_ = other.Wait()
 	if err := stopBelow(t.Context(), os.Getpid(), "echo nobody", 200*time.Millisecond); err == nil {
 		t.Error("stopped a process no one runs")
 	}
