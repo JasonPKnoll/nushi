@@ -370,7 +370,9 @@ void main() {
       findsNothing,
     ); // Claude tells
     expect(find.textContaining('open in a terminal'), findsOneWidget);
-    expect(find.textContaining('relay'), findsWidgets); // each one's folder
+    // Each one's folder, after its time.
+    expect(find.textContaining('· nushi', findRichText: true), findsWidgets);
+    expect(find.textContaining('· relay', findRichText: true), findsOneWidget);
     await tester.tap(find.textContaining('folder gone'));
     await tester.pumpAndSettle();
     expect(find.text('Claude sessions'), findsOneWidget); // nothing happened
