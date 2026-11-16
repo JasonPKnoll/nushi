@@ -179,7 +179,7 @@ class _BrowserPaneState extends State<BrowserPane>
 
   /// Says [text] under the pane, in place of what it said last.
   void _note(String text) =>
-      showToast(ScaffoldMessenger.maybeOf(context), text, replace: true);
+      showToast(Toasts.maybeOf(context), text, replace: true);
 
   /// The field's text on Return: a page loads here (and, without the app's
   /// own web views, opens in the browser too: the user asked for it, ADR

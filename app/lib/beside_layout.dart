@@ -66,7 +66,7 @@ enum _Slot { main, head, foot }
 /// only further left. Those [going] stay where they were ([at], which it
 /// keeps up to date), laid out as they were; so does the rail while it's
 /// tucked away.
-class _Beside extends MultiChildLayoutDelegate {
+class _Beside extends MultiChildLayoutDelegate with NoticesPlace {
   new({
     required this.panes,
     required this.rail,
@@ -166,6 +166,16 @@ class _Beside extends MultiChildLayoutDelegate {
     }
     layoutChild(_Slot.main, BoxConstraints.tight(Size(main, band)));
     positionChild(_Slot.main, Offset(0, head));
+    // The notices over it all; the card and the toasts over the
+    // transcript, what the rail and the panes leave of it (ADR 0128).
+    if (hasChild(NoticeSlot.card)) {
+      placeNotices(
+        width: width,
+        top: head + FloatBar.inset,
+        left: 0,
+        right: cover != null ? width : min(main, x),
+      );
+    }
   }
 
   @override

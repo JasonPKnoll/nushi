@@ -10,6 +10,7 @@ import 'package:nushi/main.dart';
 import 'package:nushi/open_session.dart';
 import 'package:nushi/sidebar.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -28,6 +29,7 @@ Future<(FakeDaemon, Daemon)> _sidebar(
   final d = await fake.connect(tester);
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => ToastHost(child: child!),
       debugShowCheckedModeBanner: false,
       theme: NushiTheme(tokens).toThemeData(),
       home: Scaffold(

@@ -16,7 +16,7 @@ void main() {
     expect(errorText(StateError('no')), 'Bad state: no');
   });
 
-  testWidgets('a snack bar says the message, not its code', (tester) async {
+  testWidgets('a toast says the message, not its code', (tester) async {
     await tester.pumpWidget(
       themed(
         Builder(

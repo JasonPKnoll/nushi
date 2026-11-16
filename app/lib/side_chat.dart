@@ -136,7 +136,7 @@ Future<void> endSide(
   if (side == null) return;
   String? why; // why it couldn't be archived
   if (daemon.daemonApi >= archiveSideApi) {
-    final toast = ScaffoldMessenger.maybeOf(context);
+    final toast = Toasts.maybeOf(context);
     try {
       final archived = await daemon.archiveSide(chat);
       if (archived.isNotEmpty && toast != null) {

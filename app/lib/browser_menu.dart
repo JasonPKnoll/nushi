@@ -149,7 +149,7 @@ String screenshotName(DateTime at) {
 /// Save screenshot: the page in sight, as it is when picked ([host]'s
 /// snapshot, WebKit's), saved as a PNG where the save panel says.
 Future<void> saveScreenshot(BuildContext context, BrowserHost host) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final toasts = Toasts.maybeOf(context);
   try {
     final png = await host.snapshot();
     final path = await screenshotPath(screenshotName(clock()));
@@ -157,7 +157,7 @@ Future<void> saveScreenshot(BuildContext context, BrowserHost host) async {
     await File(path).writeAsBytes(png, flush: true);
   } on Object catch (e) {
     showToast(
-      messenger,
+      toasts,
       'Couldn’t save the screenshot: ${errorText(e)}',
       replace: true,
     );

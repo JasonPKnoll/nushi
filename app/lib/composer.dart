@@ -319,7 +319,7 @@ class _ComposerState extends State<Composer> {
       _draft.toSubagent.value = (m.toSubagent, m.toSubagentName);
     } else if (m.toSubagentName.isNotEmpty) {
       // After the frame: one taken back while the box was away comes from
-      // initState, where the messenger can't be looked up yet.
+      // initState, where the toasts can't be looked up yet.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         showError(

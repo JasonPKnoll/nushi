@@ -435,24 +435,6 @@ class NushiTheme extends ThemeExtension<NushiTheme> {
         textStyle: ui(t.textSecondary, size: 12),
         waitDuration: const Duration(milliseconds: 500),
       ),
-      snackBarTheme: SnackBarThemeData(
-        // The lifted fill and a hairline, no shadow: Flutter clips a snack
-        // bar to its own box, which cuts a shadow off hard at its sides.
-        backgroundColor: t.lifted,
-        contentTextStyle: ui(t.text),
-        // An action's words in the accent's ink, as a link's: Material's
-        // default, its inverse primary, all but vanished on a light set's
-        // lifted fill.
-        actionTextColor: t.accentInk,
-        behavior: SnackBarBehavior.floating,
-        // Its own size on the Mac, not the window's; a phone's fills the width.
-        width: kIsWeb ? null : 420,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(card),
-          side: BorderSide(color: t.line),
-        ),
-      ),
       extensions: [this],
     );
   }

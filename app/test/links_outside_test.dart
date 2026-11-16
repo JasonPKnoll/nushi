@@ -5,6 +5,7 @@ import 'package:nushi/markdown.dart' show openWeb, openWebLink;
 import 'package:nushi/native.dart';
 import 'package:nushi/terminal_find.dart' show openLink;
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 import 'package:nushi/web_page.dart' show openInBrowser, openLinkOrSay;
 import 'package:nushi/web_views.dart';
 import 'package:nushi/web_views_linux.dart';
@@ -15,8 +16,8 @@ import 'outside_fixture.dart';
 // terminal's, the update card's, the agents' and an account's page) and
 // mail: on the Mac through url_launcher, as always; on Linux through the
 // runner's nushi/browser, whose launch leaves Nushi's variables out of the
-// app it starts (ADR 0104). A click that opens nothing says why in a snack
-// bar, as a page's Open in browser does.
+// app it starts (ADR 0104). A click that opens nothing says why in a toast,
+// as a page's Open in browser does.
 
 /// What url_launcher was asked to open while the test runs, answering
 /// [opens]: its default platform's channel, as a test host has it (no app
@@ -36,13 +37,14 @@ List<String> _launched({bool opens = true}) {
   return urls;
 }
 
-/// A context under a window with a scaffold, where a snack bar shows.
+/// A context under a window with its toasts.
 Future<BuildContext> _window(WidgetTester tester) async {
   late BuildContext context;
   await tester.pumpWidget(
     MaterialApp(
       // The app's theme, which its toasts are drawn in.
       theme: const NushiTheme(Tokens.dark).toThemeData(),
+      builder: (context, child) => ToastHost(child: child!),
       home: Scaffold(
         body: Builder(
           builder: (c) {
@@ -56,10 +58,10 @@ Future<BuildContext> _window(WidgetTester tester) async {
   return context;
 }
 
-/// What the window's snack bars say, the last one first shown.
+/// What the window's toast says.
 List<String> _said(WidgetTester tester) => [
   for (final t in tester.widgetList<Text>(
-    find.descendant(of: find.byType(SnackBar), matching: find.byType(Text)),
+    find.descendant(of: find.byType(ToastLine), matching: find.byType(Text)),
   ))
     t.data!,
 ];
@@ -95,7 +97,7 @@ void main() {
     await openLinkOrSay(context, Uri.parse('https://example.com'));
     await tester.pump();
     expect(_said(tester), ['Couldn’t open your browser.']);
-    ScaffoldMessenger.of(context).clearSnackBars();
+    Toasts.maybeOf(context)!.clear();
     await tester.pumpAndSettle();
     await openWebLink(context, Uri.parse('https://example.com'));
     await tester.pump();
@@ -119,7 +121,7 @@ void main() {
       expect(_said(tester), isEmpty);
     });
 
-    testWidgets('a link that opens nothing says why in a snack bar, each '
+    testWidgets('a link that opens nothing says why in a toast, each '
         'way; only http and https go to the browser', (tester) async {
       final runner = answerBrowser(
         (_) => throw PlatformException(code: 'no-browser'),
@@ -136,7 +138,7 @@ void main() {
         await click();
         await tester.pump();
         expect(_said(tester), [none]);
-        ScaffoldMessenger.of(context).clearSnackBars();
+        Toasts.maybeOf(context)!.clear();
         await tester.pumpAndSettle();
       }
       expect(runner, hasLength(3));

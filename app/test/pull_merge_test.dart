@@ -11,6 +11,7 @@ import 'package:nushi/pull_merge.dart';
 import 'package:nushi/pull_merge_state.dart';
 import 'package:nushi/pull_rows.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/toast.dart';
 
 import 'fake_daemon.dart';
 import 'pull_fixture.dart';
@@ -324,7 +325,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       // In the dialog, and the toast.
       expect(find.text(words), findsNWidgets(2));
-      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.byType(ToastLine), findsOneWidget);
       d.dispose();
     }, variant: _mac);
 
