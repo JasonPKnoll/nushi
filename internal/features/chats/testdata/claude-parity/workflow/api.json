@@ -1,0 +1,101 @@
+{
+ "turns": [
+  {
+   "match": {
+    "lastUserText": "run the workflow",
+    "tools": true
+   },
+   "content": [
+    {
+     "type": "tool_use",
+     "name": "Workflow",
+     "input": {
+      "script": "export const meta = {\n  name: 'two-phases',\n  description: 'Ask four helpers in two phases',\n  phases: [\n    { title: 'Map', detail: 'two helpers' },\n    { title: 'Review', detail: 'two more' },\n  ],\n}\nphase('Map')\nconst a = await parallel([\n  () => agent('Reply with one word: alpha.', { label: 'map:alpha', phase: 'Map' }),\n  () => agent('Reply with one word: beta.', { label: 'map:beta', phase: 'Map' }),\n])\nphase('Review')\nconst b = await parallel([\n  () => agent('Reply with one word: gamma.', { label: 'review:gamma', phase: 'Review' }),\n  () => agent('Reply with one word: delta.', { label: 'review:delta', phase: 'Review', schema: { type: 'object', properties: { word: { type: 'string' } }, required: ['word'] } }),\n])\nreturn { a, b }\n"
+     }
+    }
+   ]
+  },
+  {
+   "match": {
+    "toolResult": "Workflow"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "The workflow runs in the background."
+    }
+   ]
+  }
+ ],
+ "side": [
+  {
+   "match": {
+    "toolResult": "StructuredOutput"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "done"
+    }
+   ]
+  },
+  {
+   "match": {
+    "lastUserText": "Reply with one word: alpha."
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "alpha"
+    }
+   ]
+  },
+  {
+   "match": {
+    "lastUserText": "Reply with one word: beta."
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "beta"
+    }
+   ]
+  },
+  {
+   "match": {
+    "lastUserText": "Reply with one word: gamma."
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "gamma"
+    }
+   ]
+  },
+  {
+   "match": {
+    "lastUserText": "Reply with one word: delta."
+   },
+   "content": [
+    {
+     "type": "tool_use",
+     "name": "StructuredOutput",
+     "input": {
+      "word": "delta"
+     }
+    }
+   ]
+  },
+  {
+   "match": {
+    "lastUserText": "task-notification"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "The workflow finished."
+    }
+   ]
+  }
+ ]
+}

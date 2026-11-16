@@ -1,0 +1,33 @@
+{
+ "timeout": "120s",
+ "steps": [
+  {
+   "initialize": {}
+  },
+  {
+   "new": "s1",
+   "meta": {
+    "claudeCode": {
+     "options": {
+      "settings": {
+       "permissions": {
+        "allow": [
+         "Workflow",
+         "TaskStop"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "prompt": "run the workflow",
+   "session": "s1"
+  },
+  {
+   "prompt": "Stop background task (the workflow): call TaskStop with its task id, then reply only \"stopped\" or \"not running\".",
+   "session": "s1"
+  }
+ ]
+}

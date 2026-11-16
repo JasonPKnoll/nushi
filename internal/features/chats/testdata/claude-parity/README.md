@@ -71,6 +71,8 @@ Every scenario is recorded (2026-10-30, Claude Code 2.1.312 through claude-agent
 | `refusal` | a refusal of the retry too: the turn ends `refusal` | |
 | `findings` | a `ReportFindings` call | |
 | `plan` | three `TaskCreate`s, then `TaskUpdate`s through the steps; `session/close`, `session/load`, a prompt after | the `plan` updates (`docs/facts/claude.md`) |
+| `workflow` | a Workflow call (two phases, four agents, one with a schema) that ends; claude's turn on its own after (2026-11-16, 2.1.325, through the Go agent) | the call's `toolResponse`, the run's files, the prompt answered while the run goes |
+| `workflow-stop` | a running workflow stopped by `TaskStop` with its task id | the `killed` snapshot |
 | `ultracode` | ultracode on, then an effort change | |
 | `models` | `availableModels` in the session's settings | `initialize`'s models are already filtered |
 | `mcp` | a tool of a stdio MCP server (`mcp-echo`), asked about | |
