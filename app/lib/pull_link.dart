@@ -19,6 +19,11 @@ import 'package:nushi/widgets.dart';
 /// LinkChatPull, Chat.pull).
 const chatPullApi = 81;
 
+/// The daemon links a pull request found by the branch's head only for a
+/// branch the chat pushed, and says the branch's otherwise when asked
+/// (FindChatPullRequest.suggest, FindChatPullResponse.branch_pull).
+const branchPullApi = 119;
+
 /// How often a chat's pull request is asked for while the chat is open:
 /// an open one, or a branch without one yet, each minute; one merged or
 /// closed every 15 minutes (as Orca does).
@@ -185,7 +190,9 @@ List<GitHubLink> orderPulls(
 /// details panel shows or not: at once, then on [pullWidgetPoll] (quietly),
 /// 3 s after a tool call pushed or opened one and after a turn ends, and
 /// when the window comes to the front. Each ask that finds one links it
-/// (the daemon's FindChatPull); only Unlink keeps that one off.
+/// (the daemon's FindChatPull; from API 119 only for a branch a tool call
+/// of the chat pushed, and GitHub isn't asked for another); only Unlink
+/// keeps that one off.
 class ChatPull extends ChangeNotifier {
   /// The one of [chat].
   factory of(Daemon daemon, ChatState chat) =>

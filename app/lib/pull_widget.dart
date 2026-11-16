@@ -17,9 +17,9 @@ import 'package:nushi/widgets.dart';
 /// or more; folded, one as a line ([pullSummary]), several as their
 /// count by state and the worst checks. A row opens the Pull request tab
 /// on it ([onShow]). Without one, on a branch of a GitHub repository: "No
-/// pull request for `branch`" and Link…. Null (no widget) for a folder
-/// that isn't a GitHub repository's clone on a host signed in to, or on
-/// its default branch.
+/// pull request linked for `branch`" and Link…. Null (no widget) for a
+/// folder that isn't a GitHub repository's clone on a host signed in to,
+/// or on its default branch.
 PanelWidget? pullWidget(ChatPull cp, {VoidCallback? onShow}) {
   final f = cp.found;
   final links = cp.links;
@@ -117,7 +117,7 @@ class _Rows extends StatelessWidget {
           Text.rich(
             TextSpan(
               children: [
-                const TextSpan(text: 'No pull request for '),
+                const TextSpan(text: 'No pull request linked for '),
                 TextSpan(
                   text: cp.found?.branch ?? '',
                   style: theme.code(t.textSecondary, size: 11.5),

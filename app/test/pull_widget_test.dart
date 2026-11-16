@@ -252,10 +252,10 @@ void main() {
     );
   });
 
-  testWidgets('no pull request yet: the branch, and Link…', (tester) async {
+  testWidgets('no pull request linked: the branch, and Link…', (tester) async {
     final (d, fake) = await _app(tester);
     expect(
-      _inPull(find.text('No pull request for subtract', findRichText: true)),
+      _inPull(find.text('No pull request linked for subtract', findRichText: true)),
       findsOneWidget,
     );
     expect(_inPull(find.text('Link…')), findsOneWidget);
