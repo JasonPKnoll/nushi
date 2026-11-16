@@ -9,6 +9,7 @@ import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/replies.dart';
 import 'package:nushi/review.dart';
+import 'package:nushi/review_cards.dart';
 import 'package:nushi/settings.dart';
 
 import 'fake_daemon.dart';
@@ -328,7 +329,16 @@ void main() {
     await settle(tester);
     // Branch shows sub.go too, but not Uncommitted's comment on it.
     expect(find.text('Check for overflow.'), findsOne);
-    expect(find.textContaining('Uncommitted'), findsWidgets);
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Check for overflow.'),
+          matching: find.byType(CommentCard),
+        ),
+        matching: find.textContaining('Uncommitted', findRichText: true),
+      ),
+      findsOne,
+    );
     await hover(tester, 'Check for overflow.');
     await tester.tap(find.byTooltip('Remove'));
     await settle(tester);
