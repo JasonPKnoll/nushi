@@ -389,11 +389,17 @@ void main() {
     paged.hold = null;
     hold.complete();
     await load;
+    final landed = _scroll(tester).maxScrollExtent;
     for (var i = 0; i < 8; i++) {
       await chunk();
     }
     watching = false;
     expect(c.older, lessThan(paged.items.length - 200), reason: 'it came');
+    // The lines streamed in, the list growing under them, and every frame
+    // at its bottom.
+    expect('And one more line.'.allMatches(c.items.last.text), hasLength(9));
+    expect(_scroll(tester).maxScrollExtent, greaterThan(landed));
+    expect(painted, isNotEmpty);
     expect(painted, everyElement(moreOrLessEquals(0)));
     await closeView(tester, d);
   }, variant: _mac);

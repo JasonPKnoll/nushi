@@ -201,8 +201,10 @@ void main() {
     // What the drag scrolls (a layout's correction doesn't notify).
     var px = p.pixels;
     var user = 0.0;
+    var dragged = 0.0; // over every move: the thumb was caught
     void moved() {
       user += p.pixels - px;
+      dragged += p.pixels - px;
       px = p.pixels;
     }
 
@@ -225,6 +227,7 @@ void main() {
       expect(by + user, closeTo(0, 1), reason: 'move $i');
     }
     p.removeListener(moved);
+    expect(dragged, lessThan(0), reason: 'the drag scrolled up');
     expect(_chat(d).older, lessThan(1000));
     await mouse.up();
     await _settle(tester, 20);
