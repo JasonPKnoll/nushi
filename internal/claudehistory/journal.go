@@ -15,7 +15,6 @@ import (
 const (
 	maxJournalLine = 8 << 20  // a line longer is passed over: results can be large
 	maxJournal     = 64 << 20 // the most of a journal read: thousands of agents fit
-	journalChunk   = 64 << 10
 )
 
 // errJournalTooBig says the journal grew past maxJournal: the rows read so
@@ -30,8 +29,7 @@ type journalRow struct {
 	Key, AgentID, Label, Phase, State string
 }
 
-// journal reads a workflow's journal incrementally: off is how far it read,
-// carry the start of a line not yet ended. Rows are in start order, found
+// journal reads a workflow's journal incrementally (lines). Rows are in start order, found
 // by their key (a failed line has an empty agentId). The journal is one
 // for every run of the same id, as Claude's own reader takes it: a resume
 // appends a resumed line (a launched one only for a hidden script's), keeps
@@ -39,12 +37,9 @@ type journalRow struct {
 // or launched line ends the rows still running, stopped with the run
 // before; one started again runs again.
 type journal struct {
-	off      int64
-	carry    []byte
-	skipping bool // within a line past maxJournalLine
-	rows     []journalRow
-	byKey    map[string]int
-	skipped  int // lines passed over
+	lines
+	rows  []journalRow
+	byKey map[string]int
 }
 
 // read reads what was added to the journal since the last read; a journal
@@ -54,48 +49,13 @@ func (j *journal) read(r io.ReaderAt, size int64) error {
 	if size < j.off {
 		*j = journal{}
 	}
-	end := min(size, maxJournal)
-	buf := make([]byte, journalChunk)
-	for j.off < end {
-		n, err := r.ReadAt(buf[:min(int64(len(buf)), end-j.off)], j.off)
-		if n == 0 && err != nil {
-			return err
-		}
-		j.off += int64(n)
-		j.take(buf[:n])
+	if err := j.lines.read(r, min(size, maxJournal), maxJournalLine, j.line); err != nil {
+		return err
 	}
 	if size > maxJournal {
 		return errJournalTooBig
 	}
 	return nil
-}
-
-// take takes a piece of the journal: each line it ends, and what follows
-// its last newline as carry.
-func (j *journal) take(b []byte) {
-	for len(b) > 0 {
-		i := bytes.IndexByte(b, '\n')
-		if i < 0 {
-			if !j.skipping && len(j.carry)+len(b) <= maxJournalLine {
-				j.carry = append(j.carry, b...)
-			} else {
-				j.carry, j.skipping = nil, true
-			}
-			return
-		}
-		line := b[:i]
-		b = b[i+1:]
-		if j.skipping || len(j.carry)+len(line) > maxJournalLine {
-			j.carry, j.skipping = nil, false
-			j.skipped++
-			continue
-		}
-		if len(j.carry) > 0 {
-			line = append(j.carry, line...)
-			j.carry = nil
-		}
-		j.line(line)
-	}
 }
 
 // line applies one journal line; a line that isn't one of the known kinds,
