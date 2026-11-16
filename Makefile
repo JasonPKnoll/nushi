@@ -42,7 +42,7 @@ BUILD := $(or $(shell git rev-list --count HEAD 2>/dev/null),1)
 MACOS_MIN := 13.0
 MACOS_CGO := -O2 -g -mmacosx-version-min=$(MACOS_MIN)
 
-.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-web lint lint-go lint-dart lint-linux lint-windows check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
+.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-timings test-web lint lint-go lint-dart lint-linux lint-windows check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
 
 # Starts the daemon in the background (unless one is running), then the app.
 run: daemon app
@@ -280,13 +280,25 @@ test-packages:
 	cd packages/markdown && flutter test
 	cd packages/svg_path && flutter test
 
-# The app's widget tests and goldens (macOS: the goldens are drawn with its
-# text rendering, and the end-to-end tests run nushid). SHARD=i/n runs
-# every nth test file from the ith, as CI's shards do (each file compiles
-# once, in one shard); FLUTTER_TEST_FLAGS adds flags (CI's --concurrency).
-APP_TESTS = $(if $(SHARD),$(shell cd app && find test -name '*_test.dart' ! -path 'test/web/*' | LC_ALL=C sort | awk -v s='$(SHARD)' 'BEGIN { split(s, a, "/") } (NR - 1) % a[2] == a[1] - 1'))
+# The app's widget tests and goldens, the files tools/test-shards gives
+# (ADR 0128): SET=macos the files that need a Mac (goldens), SET=linux the
+# rest, all of them by default; SHARD=i/n the ith of n shards split by
+# app/test/timings.tsv, as CI's jobs run them. Each shard's files go
+# slowest first, so none is left running at the end. FLUTTER_TEST_FLAGS
+# adds flags (CI's --concurrency). A tool that fails stops it: flutter
+# test given no file would run them all.
+APP_SET = $(or $(SET),all)
+APP_SHARD = $(or $(SHARD),1/1)
 test-app:
-	cd app && flutter test $(FLUTTER_TEST_FLAGS) $(APP_TESTS)
+	@files=$$(go run ./tools/test-shards -set '$(APP_SET)' -shard '$(APP_SHARD)') || exit 2; \
+	echo "flutter test $(FLUTTER_TEST_FLAGS): $$(echo "$$files" | wc -l | tr -d ' ') files, set $(APP_SET), shard $(APP_SHARD)"; \
+	cd app && flutter test $(FLUTTER_TEST_FLAGS) $$files
+
+# app/test/timings.tsv anew from the test times the last make check-app
+# wrote, when the suite's times have changed (test-shards -check says when
+# many files are missing from it).
+test-timings:
+	go run ./tools/test-shards -timings bin/check-app-logs/test-app.json
 
 # The Mac window's placement maths (app/macos/Runner/Placement.swift, ADR
 # 0093), what ⌘V attaches (Clipboard.swift, on a pasteboard of its own)
