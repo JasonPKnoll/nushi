@@ -230,3 +230,31 @@ func TestRemoveWorktreeHoldsTheChat(t *testing.T) {
 		t.Errorf("prompts %q, removed %q, asleep %v, removing %v", agent.prompts, wts.removed, c.asleep, c.removing)
 	}
 }
+
+// A chat whose agent isn't running (it quit) isn't reopened by a look at it
+// while its worktree is being removed: its agent would start in a folder
+// about to go.
+func TestRemoveWorktreeKeepsAStoppedChatFromReopening(t *testing.T) {
+	svc, agent, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
+	wts := &inspectingWorktrees{inspecting: make(chan struct{}), goOn: make(chan struct{})}
+	svc.worktrees = wts
+	c.mu.Lock()
+	c.record.Worktree = &model.Worktree{Path: c.record.Folder}
+	c.mu.Unlock()
+	agent.quit()
+	eventually(t, c, func() bool { return c.agent == nil })
+	launches, _, _ := agent.count()
+	removed := make(chan error, 1)
+	go func() { removed <- svc.RemoveWorktree(context.Background(), c.id, false) }()
+	<-wts.inspecting
+	_, err := svc.Get(c.id)
+	testcheck.NoErr(t, err)
+	c.mu.Lock()
+	busy := c.busy // a reopen would have set it before Get returned
+	c.mu.Unlock()
+	close(wts.goOn)
+	testcheck.NoErr(t, <-removed)
+	if again, _, _ := agent.count(); busy || again != launches {
+		t.Errorf("a look reopened the chat during the removal: busy %v, %d agents started", busy, again-launches)
+	}
+}
