@@ -1,7 +1,7 @@
 // The hero's orrery: the mark (docs/brand/mark.svg) in 3D. Its amber sun at the centre, its broken rings (four
 // arcs each) lying in a plane, and on them the agents Nushi runs as planets, lit from the sun's side and named
-// when the cursor comes near. It's drawn on three stacked canvases, far, in focus and near, the far one a little
-// blurred and the near one more (CSS filters), so it has a depth of field. The cursor tilts the view at once;
+// when the cursor comes near. It's drawn on five stacked canvases by depth, each blurred by its distance from
+// the focal plane (CSS filters), and everything is faded across the two nearest, so focus changes smoothly. The cursor tilts the view at once;
 // scrolling turns the camera to look down on the plane, until it's the mark seen flat, and moves stars at
 // every depth at their own speed. Plain canvas, no library. One still frame under Reduce Motion; paused off screen.
 (() => {
@@ -13,9 +13,28 @@
     box.append(c);
     return c.getContext('2d');
   };
-  const far = layer('far'), mid = layer('mid'), near = layer('near');
-  if (!mid) return;
-  const all = [far, mid, near];
+  // Five depths of focus, far to near: each canvas blurred as much as its depth is from the focal plane.
+  const DEPTHS = [[1, 2.2], [0.5, 0.9], [0, 0], [-0.5, 2.6], [-1, 6.5]];
+  const all = DEPTHS.map(([, blur]) => {
+    const c = layer('depth');
+    if (c && blur) c.canvas.style.filter = `blur(${blur}px)`;
+    return c;
+  });
+  if (!all[0]) return;
+  const mid = all[2];
+  // Draws with fn on the two canvases either side of depth z, each faded by how near z is to it, so the blur
+  // changes smoothly along a ring instead of stepping.
+  function at(z, fn) {
+    z = Math.max(-1, Math.min(1, z));
+    const i = Math.min(3, Math.floor((1 - z) * 2));
+    const f = (DEPTHS[i][0] - z) * 2;
+    for (const [c, wgt] of [[all[i], 1 - f], [all[i + 1], f]]) {
+      if (wgt < 0.02) continue;
+      c.globalAlpha = wgt;
+      fn(c);
+      c.globalAlpha = 1;
+    }
+  }
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const MIST = '238,241,245';
   const AMBER = '245,165,36';
@@ -71,7 +90,6 @@
     const p = 2.4 / (2.4 + z);
     return { x: cx + x0 * S * p, y: cy + y * S * p, z, p };
   }
-  const layerOf = (z) => (z > 0.3 ? far : z < -0.4 ? near : mid);
 
   function step(dt) {
     t += dt;
@@ -91,13 +109,15 @@
     for (let k = 0; k < 4; k++) {
       const from = g.turn * 0.5 + k * (Math.PI / 2) + 0.16, span = Math.PI / 2 - 0.32;
       let prev = place(g.r, from);
-      for (let i = 1; i <= 30; i++) {
-        const q = place(g.r, from + (span * i) / 30);
-        const c = layerOf((q.z + prev.z) / 2);
-        c.strokeStyle = `rgba(${MIST},${0.07 + 0.12 * (1 - q.z) / 2})`;
-        c.lineWidth = 1.8 * q.p;
-        c.lineCap = 'round';
-        c.beginPath(); c.moveTo(prev.x, prev.y); c.lineTo(q.x, q.y); c.stroke();
+      for (let i = 1; i <= 48; i++) {
+        const q = place(g.r, from + (span * i) / 48);
+        const p0 = prev;
+        at((q.z + p0.z) / 2, (c) => {
+          c.strokeStyle = `rgba(${MIST},${0.08 + 0.14 * (1 - q.z) / 2})`;
+          c.lineWidth = 1.8 * q.p;
+          c.lineCap = 'butt';
+          c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(q.x, q.y); c.stroke();
+        });
         prev = q;
       }
     }
@@ -123,18 +143,23 @@
     glow.addColorStop(1, `rgba(${AMBER},0)`);
     mid.fillStyle = glow;
     mid.beginPath(); mid.arc(cx, cy, R, 0, 6.2832); mid.fill();
-    mid.fillStyle = `rgba(${AMBER},0.9)`;
-    mid.beginPath(); mid.arc(cx, cy, Math.max(6, S * 0.045), 0, 6.2832); mid.fill();
+    const r = Math.max(6, S * 0.045);
+    const core = mid.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+    core.addColorStop(0, 'rgba(255,214,140,0.95)');
+    core.addColorStop(1, `rgba(${AMBER},0.85)`);
+    mid.fillStyle = core;
+    mid.beginPath(); mid.arc(cx, cy, r, 0, 6.2832); mid.fill();
   }
 
   function draw() {
     for (const c of all) c.clearRect(0, 0, w, h);
     for (const s of stars) {
-      const c = s.z > 0.55 ? far : s.z < 0.2 ? near : mid;
       const x = s.x * w - yaw * (1 - s.z) * 120;
       const y = s.y * h * 0.8 - scrolled * (1 - s.z) * 0.5 - (tilt - 0.42) * (1 - s.z) * 60;
-      c.fillStyle = `rgba(${MIST},${0.08 + 0.22 * s.z})`;
-      c.beginPath(); c.arc(x, y, 0.7 + (1 - s.z) * 2.2, 0, 6.2832); c.fill();
+      at(s.z * 2 - 1, (c) => {
+        c.fillStyle = `rgba(${MIST},${0.08 + 0.22 * s.z})`;
+        c.beginPath(); c.arc(x, y, 0.7 + (1 - s.z) * 2.2, 0, 6.2832); c.fill();
+      });
     }
     for (const g of rings) ring(g);
     // Planets far to near; the sun among them by depth, so it hides what passes behind it.
@@ -147,7 +172,7 @@
     let sunDrawn = false;
     for (const b of bodies) {
       if (!sunDrawn && b.q.z <= 0) { sun(); sunDrawn = true; }
-      planet(layerOf(b.q.z), b.q, b.r);
+      at(b.q.z, (c) => planet(c, b.q, b.r));
     }
     if (!sunDrawn) sun();
     mid.font = '500 13px Inter, ui-sans-serif, system-ui, sans-serif';
