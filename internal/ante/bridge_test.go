@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -340,9 +339,7 @@ func TestWritesOldText(t *testing.T) {
 	small, big, fifo := dir+"/small", dir+"/big", dir+"/fifo"
 	testcheck.NoErr(t, os.WriteFile(small, []byte("before"), 0o600))
 	testcheck.NoErr(t, os.WriteFile(big, make([]byte, toolcall.MaxOld+1), 0o600))
-	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	testcheck.Fifo(t, fifo)
 	testcheck.NoErr(t, os.Symlink(small, dir+"/link"))
 	s := &session{cwd: dir}
 	done := make(chan map[string]toolcall.Old)

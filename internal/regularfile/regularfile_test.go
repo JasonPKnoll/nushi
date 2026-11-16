@@ -20,7 +20,7 @@ func files(t *testing.T) string {
 	testcheck.Write(t, filepath.Join(dir, "file"), "text")
 	testcheck.NoErr(t, os.Symlink("file", filepath.Join(dir, "link")))
 	testcheck.NoErr(t, os.Symlink("/dev/zero", filepath.Join(dir, "zero")))
-	testcheck.NoErr(t, syscall.Mkfifo(filepath.Join(dir, "fifo"), 0o600))
+	testcheck.Fifo(t, filepath.Join(dir, "fifo"))
 	testcheck.NoErr(t, os.Mkdir(filepath.Join(dir, "folder"), 0o700))
 	return dir
 }

@@ -3,7 +3,6 @@ package git
 import (
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ func TestTrustRootOnGitFilesThatAreNotFiles(t *testing.T) {
 		}},
 		{"a .git fifo", func(t *testing.T, dir string) {
 			t.Helper()
-			testcheck.NoErr(t, syscall.Mkfifo(filepath.Join(dir, ".git"), 0o600))
+			testcheck.Fifo(t, filepath.Join(dir, ".git"))
 		}},
 		{"a gitdir record to /dev/zero", func(t *testing.T, dir string) {
 			t.Helper()
@@ -37,7 +36,7 @@ func TestTrustRootOnGitFilesThatAreNotFiles(t *testing.T) {
 			t.Helper()
 			rec := filepath.Join(dir, "sub", ".git", "worktrees", "w")
 			testcheck.NoErr(t, os.MkdirAll(rec, 0o700))
-			testcheck.NoErr(t, syscall.Mkfifo(filepath.Join(rec, "gitdir"), 0o600))
+			testcheck.Fifo(t, filepath.Join(rec, "gitdir"))
 			testcheck.Write(t, filepath.Join(dir, ".git"), "gitdir: sub/.git/worktrees/w\n")
 		}},
 	} {
