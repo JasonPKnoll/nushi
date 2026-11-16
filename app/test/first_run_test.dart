@@ -1,4 +1,5 @@
 import 'package:fixnum/fixnum.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
@@ -81,7 +82,13 @@ void main() {
     await tester.tap(find.text('site'));
     await tester.pumpAndSettle();
     // The New chat dialog, on that folder.
-    expect(find.textContaining('site', findRichText: true), findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('New chat in site', findRichText: true),
+      ),
+      findsOne,
+    );
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     d.dispose();
