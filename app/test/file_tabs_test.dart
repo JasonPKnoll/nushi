@@ -149,7 +149,7 @@ void main() {
         ..showTab(one)
         ..hide();
       expect(b.shown.value, isNull);
-      expect(b.tabs.value, isEmpty);
+      expect(b.tabs.value, [one, two]);
       b.show();
       expect(b.shown.value, one);
       expect(b.tabs.value, [one, two]);
@@ -164,6 +164,11 @@ void main() {
         ..openBrowserTab('http://localhost:3000');
       c.pane.value = 'agent';
       expect(c.browser.shown.value, isNull);
+      // Its tab stays, to come back with the globe.
+      expect(
+        [for (final b in c.browser.tabs.value) b.address.value],
+        ['http://localhost:3000'],
+      );
       expect(c.shownFile, 'a.md');
       // A browser tab takes the subagent's place again.
       c.openBrowserTab();
