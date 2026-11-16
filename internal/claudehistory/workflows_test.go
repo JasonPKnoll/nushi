@@ -332,6 +332,18 @@ func TestWorkflowSnapshotTextMasked(t *testing.T) {
 	}
 }
 
+// The summary on the item, sent with every change, masks what a running
+// agent's label and its phase's title say: not only the pane's rows.
+func TestWorkflowSummaryMasked(t *testing.T) {
+	const tok = "ghp_abcdefghijklmnopqrstuvwxyz0123"
+	l, id, folder, _ := fakeRun(t, launchedLine+`{"type":"started","key":"k1","agentId":"a1","label":"run `+tok+`","phase":"P `+tok+`"}`+"\n", "")
+	got, err := l.ReadWorkflow(id, folder, model.Workflow{RunID: "wf_abc"})
+	testcheck.NoErr(t, err)
+	if len(got.Running) != 1 || len(got.Phases) != 1 || strings.Contains(string(testcheck.JSON(t, got)), "abcdefghijklmnop") {
+		t.Errorf("got %+v", got)
+	}
+}
+
 // The summary on the item stays small whatever the run: phases, running
 // labels and their length capped, a secret's shape masked.
 func TestWorkflowSummaryBounds(t *testing.T) {
