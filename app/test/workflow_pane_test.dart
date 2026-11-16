@@ -6,7 +6,9 @@ import 'package:nushi/background_commands.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
+import 'package:nushi/main.dart';
 import 'package:nushi/motion.dart';
+import 'package:nushi/settings.dart';
 import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/task_pane.dart';
 import 'package:nushi/theme/theme.dart';
@@ -146,6 +148,37 @@ Future<Daemon> _pane(
 }
 
 int _asked<T>(FakeDaemon fake) => fake.calls.whereType<T>().length;
+
+/// The app at 1700 on [workflowChat]'s chat, its pane open, with the
+/// pane widths [widths].
+Future<(FakeDaemon, Daemon)> _app(
+  WidgetTester tester, {
+  Map<String, double> widths = const {},
+}) async {
+  viewport(tester, const Size(1700, 900));
+  showDetails.value = false;
+  paneWidths.value = widths;
+  final fake = workflowFake();
+  final answer = fake.answer;
+  fake.answer = (input) => input is GetChatRequest
+      ? GetChatResponse(
+          chat: chat('c', 'claude', 'Review'),
+          items: [
+            Item(id: 'u', kind: ItemKind.ITEM_KIND_USER_MESSAGE, text: 'Go'),
+            workflowCall('running'),
+          ],
+        )
+      : answer?.call(input);
+  final d = await fake.connect(tester);
+  d.select('c');
+  await tester.pumpWidget(NushiApp(daemon: d));
+  await tester.pumpAndSettle();
+  d.chats['c']!.pane.value = 'wf';
+  await tester.pumpAndSettle();
+  return (fake, d);
+}
+
+final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
 void main() {
   setUpAll(loadFonts);
@@ -311,6 +344,23 @@ void main() {
     expect(_asked<GetWorkflowRequest>(old), 0);
     await closeView(tester, d);
   });
+
+  testWidgets("the pane has its own width, apart from a subagent's", (
+    tester,
+  ) async {
+    var (_, d) = await _app(tester);
+    double width() => tester.getSize(find.byType(WorkflowPane)).width;
+    expect(width(), closeTo(420, 1));
+    d.dispose();
+    (_, d) = await _app(tester, widths: {'subagent': 300});
+    expect(width(), closeTo(420, 1));
+    d.dispose();
+    (_, d) = await _app(tester, widths: {'workflow': 500});
+    expect(width(), closeTo(500, 1));
+    paneWidths.value = {};
+    showDetails.value = true;
+    d.dispose();
+  }, variant: _mac);
 
   for (final (name, tokens) in [
     ('dark', Tokens.dark),
