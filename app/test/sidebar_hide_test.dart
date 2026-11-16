@@ -367,8 +367,14 @@ void main() {
                 cleared(tester, 'Jira');
               case 'github':
                 cleared(tester, 'GitHub');
-              case 'settings':
-                cleared(tester, 'Settings');
+              case 'nothing' || 'trust':
+                // A plain header, with no title to clear.
+                expect(
+                  find.descendant(of: header, matching: find.byType(Text)),
+                  findsNothing,
+                );
+              default:
+                fail('no check for $name');
             }
             // The empty window, wide, is its window golden; the rest are
             // renders.

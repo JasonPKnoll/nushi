@@ -155,8 +155,10 @@ void main() {
     ('light', Brightness.light),
   ]) {
     Future<void> shot(WidgetTester tester, String name) async {
-      // The bar's trailing buttons at its edge, in the Changes tab.
-      if (find.byTooltip('Reload').evaluate().isNotEmpty) {
+      // The bar's trailing buttons at its edge, in the Changes tab (every
+      // shot's but the chat's).
+      if (!name.startsWith('related_chat_')) {
+        expect(find.byTooltip('Reload'), findsOne);
         final right = tester.getTopRight(find.byTooltip('Reload')).dx;
         expect(right, greaterThan(tester.view.physicalSize.width - 40));
       }

@@ -177,6 +177,7 @@ void main() {
         find.textContaining('iPhone app · notifications off'),
         findsOneWidget,
       );
+      expect(find.text('Revoke'), findsNWidgets(2)); // a device's each
       for (final revoke in tester.widgetList(find.text('Revoke'))) {
         expect(
           tester.getRect(find.byWidget(revoke)).right,

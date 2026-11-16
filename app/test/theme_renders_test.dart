@@ -190,10 +190,9 @@ void main() {
           d.chats[heroChat.id]!.tab.value = ChatTab.changes;
           await _pump(tester, 10);
           final file = find.textContaining('cursor.go', findRichText: true);
-          if (file.evaluate().isNotEmpty) {
-            await tester.tap(file.first);
-            await _pump(tester, 10);
-          }
+          expect(file, findsWidgets);
+          await tester.tap(file.first);
+          await _pump(tester, 10);
           expect(tester.takeException(), isNull);
           await render(tester, find.byType(NushiApp), 'theme_${name}_changes');
           await closeView(tester, d);

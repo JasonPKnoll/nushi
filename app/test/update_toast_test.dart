@@ -114,10 +114,11 @@ void main() {
           );
           final last = tester.getRect(find.text(buttons.last));
           expect(last.right, lessThan(box.right - 10)); // not clipped
-          if (find
-              .byKey(const ValueKey('update-error'))
-              .evaluate()
-              .isNotEmpty) {
+          expect(
+            find.byKey(const ValueKey('update-error')),
+            kind == 'failed' ? findsOne : findsNothing,
+          );
+          if (kind == 'failed') {
             // The whole sentence, inside the card.
             final error = tester.getRect(
               find.byKey(const ValueKey('update-error')),
