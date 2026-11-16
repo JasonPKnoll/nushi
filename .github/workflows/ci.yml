@@ -33,9 +33,12 @@ on:
 permissions:
   contents: read
 
+# A pull request's newer push cancels its older run: each run tests the whole branch. Main's pushes don't cancel
+# each other: each run tests only what its own push changed (ADR 0128), so a docs-only push cancelling a run would
+# leave the code before it untested.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # The Flutter every job builds with; release.yml names the same one (the release builds with CI's, ADR 0055).
