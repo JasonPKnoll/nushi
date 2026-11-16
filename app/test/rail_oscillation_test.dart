@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/browser_pane.dart';
+import 'package:nushi/chat_panes.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/details_panel.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
@@ -308,8 +309,8 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('the window resized a point at a time across both lines and '
-      'back: each flips at each crossing', (tester) async {
+  testWidgets('the window resized across both lines and back, a point at '
+      'a time near each: each flips at each crossing', (tester) async {
     final (d, _) = await panesApp(
       tester,
       width: 900,
@@ -317,15 +318,27 @@ void main() {
       open: _preview,
     );
     final watch = _Watch(tester);
-    for (final (from, to, step) in [(900, 1600, 1), (1600, 900, -1)]) {
-      for (var w = from; w != to; w += step) {
-        viewport(tester, Size(w.toDouble(), 900));
-        await tester.pump();
-        watch.frame();
-      }
+    // The rail's line at 1508, the panes' at 928 and where the preview
+    // narrows, 1188: every point near each, where a flip could flicker,
+    // and every 20th between, where the layout only glides.
+    final lines = [
+      line,
+      windowFor(besideFrom([ChatPanes.browser])!, sidebar: true),
+      windowFor(narrowFrom([ChatPanes.browser])!, sidebar: true),
+    ];
+    expect(lines, [1508, 928, 1188]);
+    final widths = {
+      for (var w = 900; w < 1600; w += 20) w,
+      for (final at in lines)
+        for (var w = at.toInt() - 8; w <= at.toInt() + 8; w++) w,
+      1599,
+    }.toList()..sort();
+    for (final w in [...widths, ...widths.reversed.skip(1)]) {
+      viewport(tester, Size(w.toDouble(), 900));
+      await tester.pump();
+      watch.frame();
     }
-    // The rail's line at 1508, the panes' at 928, each crossed twice; the
-    // preview narrows under 1188, which flips nothing.
+    // Each line crossed twice; the preview's narrowing flips nothing.
     expect(watch.railFlips, 2);
     expect(watch.overFlips, 2);
     await closeView(tester, d);
