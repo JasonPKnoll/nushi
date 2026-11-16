@@ -1,7 +1,7 @@
 # What make check runs, as parallel jobs (one job of 12 minutes before, until 2026-10-27). macOS for what needs it, in four
 # jobs (the account runs five macOS jobs at once, and a release or another repository's CI needs one too): the
-# daemon (proc_info, sandbox-exec, launchd, the keychain's cgo), so Go's tests, and its lint with the window's placement
-# maths (swiftc), each a job; and the app's test files that need a Mac, in two shards: those with goldens, drawn with
+# daemon (proc_info, sandbox-exec, launchd, the keychain's cgo), so Go's lint and tests side by side, with the window's
+# placement maths (swiftc); and the app's test files that need a Mac, in two shards: those with goldens, drawn with
 # macOS's text rendering (on Linux a third of them differ by 1-4%), and those reading the Mac's own fonts. Linux for the
 # rest: the protos' and Dart's lint, the Dart packages' tests, the web app's end-to-end test (nushid with Chrome), and
 # the daemon on Linux (ADR 0101): every Go package's tests, and its lint, build and vet without cgo for Linux and
@@ -13,7 +13,7 @@
 # github.com/afrase/acp-go, has its own CI. Actions are pinned by commit.
 #
 # A push or a pull request runs only the jobs its change can affect (the changes job, tools/ci-changes.sh): a docs-only
-# change none, a Go-only one all but the golden shards, an app-only one all but Go's five jobs. Anything else, and any
+# change none, a Go-only one all but the golden shards, an app-only one all but Go's four jobs. Anything else, and any
 # path it can't place, runs everything; the release counts only a run that skipped nothing (release.yml).
 #
 # Each job's timeout is two to three times its longest recent run with warm caches (2026-11-16: Go's tests on macOS 4.1
@@ -76,7 +76,7 @@ jobs:
         run: tools/ci-changes.sh "$EVENT" "$BASE" "$HEAD" | tee -a "$GITHUB_OUTPUT"
 
   go:
-    name: Go tests (macOS)
+    name: Go lint and tests (macOS)
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: macos-latest
@@ -84,27 +84,6 @@ jobs:
     # The tests in a new order each run: one that passes only after another shows (the log has the seed).
     env:
       GOTESTFLAGS: -shuffle=on
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.ref }}
-          persist-credentials: false
-      # The lint job's key: the cache it reads was filled by the tests and the lint together.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: |
-            go.sum
-            tools/lint/go.sum
-      - run: make test-go
-
-  # Beside the tests, not before them (2026-11-16): a macOS slot the web job left.
-  go-lint:
-    name: Go lint (macOS)
-    needs: changes
-    if: needs.changes.outputs.go == 'true'
-    runs-on: macos-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -138,15 +117,14 @@ jobs:
           path: ~/Library/Caches/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-${{ steps.week.outputs.week }}
           restore-keys: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-
-      - run: make lint-go
+      # The lint and the tests side by side (the tests wait on processes and timers much of their time), each one's
+      # output whole when it ends; -k runs the rest after a failure, to see them all. Then the window's placement maths.
+      - run: make -k -j2 --output-sync=target lint-go test-go test-window
       - if: ${{ !cancelled() && github.event_name == 'push' && steps.lint-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/Library/Caches/golangci-lint
           key: ${{ steps.lint-cache.outputs.cache-primary-key }}
-      # The window's placement maths, when the lint fails too.
-      - if: ${{ !cancelled() }}
-        run: make test-window
 
   lint:
     name: Proto and Dart lint (Linux)
