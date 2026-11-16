@@ -230,7 +230,12 @@ func TestReloadLeavesNothingOfTheOldAgent(t *testing.T) {
 func TestANewAgentClearsTheMCPChange(t *testing.T) {
 	svc, agent, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
 	turn(t, svc, c, "one")
-	svc.MCPChanged("fake", func(string) bool { return true })
+	c.mu.Lock()
+	c.mcpChanged = true // as MCPChanged leaves a chat of an agent with MCP servers
+	c.mu.Unlock()
+	if !svc.Status(model.ChatRecord{ID: c.id}).MCPChanged {
+		t.Fatal("no banner to clear")
+	}
 	agent.quit()
 	eventually(t, c, func() bool { return c.agent == nil })
 	turn(t, svc, c, "two")
