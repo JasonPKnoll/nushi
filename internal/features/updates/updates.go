@@ -71,6 +71,10 @@ type Service struct {
 	Beta func() bool
 	// Brew installs the newer version (Install); nil: nothing does.
 	Brew Homebrew
+	// Fresh marks a check someone asked for (Check), whose answer must be
+	// GitHub's as it stands now, not a cache's from before a release was
+	// published (internal/githubapi); nil: Check asks as Run does.
+	Fresh func(context.Context) context.Context
 
 	checking sync.Mutex // one check at a time
 	mu       sync.Mutex
@@ -134,8 +138,12 @@ func (s *Service) SetOn(on bool) error {
 	return nil
 }
 
-// Check asks GitHub now, whatever the setting, and says what it found.
+// Check asks GitHub now, whatever the setting, for its answer as it
+// stands (Fresh), and says what it found.
 func (s *Service) Check(ctx context.Context) (model.Update, error) {
+	if s.Fresh != nil {
+		ctx = s.Fresh(ctx)
+	}
 	return s.check(ctx, false)
 }
 

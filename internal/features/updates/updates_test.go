@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/afrase/nushi/internal/githubapi"
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/testcheck"
 )
 
 // prefs is the setting, kept as the store keeps it: under a lock.
@@ -278,4 +280,25 @@ func TestOffDuringACheck(t *testing.T) {
 		cancel()
 		synctest.Wait()
 	})
+}
+
+// A check someone asked for (Check) is marked Fresh, so GitHub answers as
+// it stands and not from a cache older than a release; Run's own aren't,
+// as each fresh question costs one of the address's hourly 60.
+func TestOnlyCheckIsFresh(t *testing.T) {
+	type mark struct{}
+	var fresh []bool
+	ask := func(ctx context.Context) (string, error) {
+		fresh = append(fresh, ctx.Value(mark{}) != nil)
+		return "v0.1.17", nil
+	}
+	s := New(ask, &prefs{on: true}, "0.1.16", "https://github.com/afrase/nushi", (&events{}).publish)
+	s.Fresh = func(ctx context.Context) context.Context { return context.WithValue(ctx, mark{}, true) }
+	_, err := s.check(t.Context(), true)
+	testcheck.NoErr(t, err)
+	_, err = s.Check(t.Context())
+	testcheck.NoErr(t, err)
+	if !slices.Equal(fresh, []bool{false, true}) {
+		t.Fatalf("fresh %v", fresh)
+	}
 }

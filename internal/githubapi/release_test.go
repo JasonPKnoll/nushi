@@ -1,10 +1,13 @@
 package githubapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
+	"time"
 )
 
 // TestLatestRelease: the latest release, asked without a token and with
@@ -79,5 +82,40 @@ func TestReleaseTags(t *testing.T) {
 	want := []string{"/repos/afrase/nushi/releases/latest ", "/repos/afrase/nushi/releases?per_page=10 ", `/repos/afrase/nushi/releases?per_page=10 "list"`}
 	if len(asked) != 3 || asked[0] != want[0] || asked[1] != want[1] || asked[2] != want[2] {
 		t.Fatalf("asked %q", asked)
+	}
+}
+
+// TestFreshRelease: a question someone asked (Fresh) sends no ETag and a
+// query no cache has seen, to the API and to the feed alike, so a release
+// published a minute ago is in the answer; a plain one is as before.
+func TestFreshRelease(t *testing.T) {
+	var asked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.RequestURI()+" "+r.Header.Get("If-None-Match"))
+		if r.Header.Get("If-None-Match") == `"list"` {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", `"list"`)
+		_, _ = w.Write([]byte(`[{"tag_name": "v0.29.0-beta.1"}]`))
+	}))
+	defer srv.Close()
+	at := time.Unix(1700000000, 5)
+	r := &Releases{Repo: "afrase/nushi", Base: srv.URL, now: func() time.Time { return at }}
+	for _, ctx := range []context.Context{t.Context(), t.Context(), Fresh(t.Context())} {
+		if got, err := r.Tags(ctx); err != nil || !slices.Equal(got, []string{"v0.29.0-beta.1"}) {
+			t.Fatalf("%q %v", got, err)
+		}
+	}
+	want := []string{
+		"/repos/afrase/nushi/releases?per_page=10 ",
+		`/repos/afrase/nushi/releases?per_page=10 "list"`,
+		"/repos/afrase/nushi/releases?per_page=10&_=1700000000000000005 ",
+	}
+	if !slices.Equal(asked, want) {
+		t.Fatalf("asked %q", asked)
+	}
+	if got := uncached(Fresh(t.Context()), "https://github.com/afrase/nushi/releases.atom", at); got != "https://github.com/afrase/nushi/releases.atom?_=1700000000000000005" {
+		t.Fatalf("the feed's: %s", got)
 	}
 }
