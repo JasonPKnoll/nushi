@@ -1,7 +1,8 @@
 // Package secrets masks what looks like a key or token in text: the shapes
-// both the log (internal/logs) and tool calls' input (the chats feature)
-// mask. Each keeps its own rule for NAME=value pairs: the log's is broad,
-// and a tool call's input holds code, which that rule would mask.
+// both the log (internal/logs) and tool calls' input (MaskInput: a chat's
+// transcript, a workflow agent's steps) mask. Each keeps its own rule for
+// NAME=value pairs: the log's is broad, and a tool call's input holds
+// code, which that rule would mask.
 package secrets
 
 import (

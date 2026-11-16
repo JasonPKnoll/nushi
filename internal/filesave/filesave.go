@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 
 	"github.com/afrase/nushi/internal/atomicfile"
 	"github.com/afrase/nushi/internal/regularfile"
@@ -139,14 +138,14 @@ func current(r *os.Root, name string) ([]byte, os.FileMode, error) {
 		return nil, 0, err
 	}
 	defer f.Close() //nolint:errcheck // read-only
-	st, ok := fi.Sys().(*syscall.Stat_t)
+	links, uid, ok := regularfile.Owner(fi)
 	if !ok {
 		return nil, 0, ErrReadOnly
 	}
-	if st.Nlink > 1 {
+	if links > 1 {
 		return nil, 0, ErrLinked
 	}
-	if !Writable(fi.Mode(), st.Uid) {
+	if !Writable(fi.Mode(), uid) {
 		return nil, 0, ErrReadOnly
 	}
 	b, err := regularfile.ReadAll(f, fi, MaxSize)

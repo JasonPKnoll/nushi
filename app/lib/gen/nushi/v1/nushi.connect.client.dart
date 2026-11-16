@@ -432,6 +432,44 @@ extension type NushiServiceClient(connect.Transport _transport) {
     );
   }
 
+  /// A workflow a tool call launched (Item.workflow), with its agents, as
+  /// the agent's files say now (API 120). The Mac's only: the phone has no
+  /// Workflow pane.
+  Future<nushiv1nushi.GetWorkflowResponse> getWorkflow(
+    nushiv1nushi.GetWorkflowRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.NushiService.getWorkflow,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// One agent of a workflow: its last steps (API 120). The Mac's only.
+  Future<nushiv1nushi.GetWorkflowAgentResponse> getWorkflowAgent(
+    nushiv1nushi.GetWorkflowAgentRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.NushiService.getWorkflowAgent,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
   /// Opens a side chat: a session the agent forks from the chat's (ACP
   /// session/fork, when status.can_fork). It knows the conversation so far
   /// but doesn't add to it, isn't listed or stored, and ends with

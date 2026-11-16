@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:nushi/chat.dart';
+import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/menu.dart' show openMenus;
 import 'package:nushi/run_state.dart';
@@ -11,8 +12,9 @@ import 'package:nushi/run_state.dart';
 // the focus, as if typed there, so `/` opens the commands' list. Keys
 // with ⌘, Control or Option, Esc, the arrows, Tab, Enter and Space keep
 // their meaning; so does what the focused part does with a key first (the
-// transcript's R replies to its selection). The Mac's and Linux's window
-// only: the phone has its own box to tap.
+// transcript's R replies to its selection). On Windows Control and Alt
+// together are AltGr, which types (`@` on a Spanish keyboard). The
+// desktop's window only: the phone has its own box to tap.
 
 /// The focus nodes a typed character goes on from to the chat's box,
 /// besides the window's own: the transcript's (`TranscriptSelection`).
@@ -27,11 +29,11 @@ KeyEventResult typeIntoBox(Daemon d, FocusNode root, KeyEvent e) {
   if (e is KeyUpEvent) return KeyEventResult.ignored;
   final c = e.character;
   final keys = HardwareKeyboard.instance;
+  final altGr = conventions.altGr && keys.isControlPressed && keys.isAltPressed;
   if (c == null ||
       !_typed(c) ||
       keys.isMetaPressed ||
-      keys.isControlPressed ||
-      keys.isAltPressed) {
+      !altGr && (keys.isControlPressed || keys.isAltPressed)) {
     return KeyEventResult.ignored;
   }
   final focus = FocusManager.instance.primaryFocus;

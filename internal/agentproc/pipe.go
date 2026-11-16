@@ -6,8 +6,9 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/afrase/nushi/internal/procgroup"
 )
 
 // waitDelay is how long Pipe's program's stderr is read after it exits,
@@ -25,14 +26,16 @@ type Piped struct {
 	Out io.Reader
 	Pid int
 
+	group  *procgroup.Group
 	said   lastLine
 	exited chan struct{}
 	err    error // how it exited; set before exited closes
 }
 
 // Pipe starts bin with args in dir and env (nil: this process's), in a
-// process group of its own, so what it starts goes with it on Kill. Its
-// stderr goes to stderr (nil: dropped), its last line kept for Said.
+// group of its own (procgroup.Start: a process group on Unix, a job
+// object on Windows), so what it starts goes with it on Kill. Its stderr goes to stderr (nil: dropped), its last line kept for
+// Said.
 func Pipe(bin string, args []string, dir string, env []string, stderr io.Writer) (*Piped, error) {
 	cmd := exec.Command(bin, args...) //nolint:gosec,noctx // lives until Kill, not a context; the program its caller chose
 	cmd.Dir, cmd.Env = dir, env
@@ -41,7 +44,6 @@ func Pipe(bin string, args []string, dir string, env []string, stderr io.Writer)
 	if stderr != nil {
 		cmd.Stderr = io.MultiWriter(stderr, &p.said)
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.WaitDelay = waitDelay
 	var err error
 	if p.In, err = cmd.StdinPipe(); err != nil {
@@ -54,7 +56,7 @@ func Pipe(bin string, args []string, dir string, env []string, stderr io.Writer)
 		return nil, err
 	}
 	cmd.Stdout = w
-	err = cmd.Start()
+	p.group, err = procgroup.Start(cmd)
 	_ = w.Close() // the program has its own copy
 	if err != nil {
 		_ = r.Close()
@@ -90,9 +92,12 @@ func (s *stdout) Read(b []byte) (int, error) {
 	return n, err
 }
 
-// Kill kills its process group and waits for it to exit.
+// Kill kills its group (procgroup.Group's Kill) and waits for it to
+// exit. Pi and Ante call it on every stop, often after the program has
+// exited: what it left in its group goes then, and on Windows nothing is
+// killed by a pid that may be another's by now.
 func (p *Piped) Kill() {
-	_ = syscall.Kill(-p.Pid, syscall.SIGKILL) // the group may be gone already
+	_ = p.group.Kill() // the group may be gone already
 	<-p.exited
 }
 

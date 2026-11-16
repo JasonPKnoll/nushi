@@ -108,6 +108,7 @@ func (c *chat) itemsBackLocked() {
 	}
 	c.inCopy, c.aside = false, nil
 	c.mirrored = err == nil && !changed // an item ended here differs from the copy's
+	c.followWorkflowsLocked()
 }
 
 // splice puts the items set aside back among items, each after the item it

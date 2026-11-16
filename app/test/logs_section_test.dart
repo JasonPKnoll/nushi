@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/app_actions.dart';
 import 'package:nushi/bundled_daemon.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/logs_section.dart';
 
+import 'fake_app_install.dart';
 import 'fake_daemon.dart';
 import 'harness.dart';
 import 'settings_harness.dart';
@@ -95,6 +97,42 @@ void main() {
       ),
     );
     expect(find.text('Version 1.2.0 · API $apiVersion'), findsOneWidget);
+    d.dispose();
+  });
+
+  testWidgets('Restart shows for a packaged daemon the app can stop, and '
+      'not where it can’t (Windows): here nor in the palette', (tester) async {
+    fakeInstall.daemon = '/opt/nushi/lib/nushid';
+    final d = await FakeDaemon([]).connect(tester);
+    late BuildContext context;
+    Future<void> show() async {
+      await tester.pumpWidget(
+        themed(
+          Builder(
+            builder: (c) {
+              context = c;
+              return LogsSection(
+                daemon: d,
+                debug: null,
+                onDebug: ({required on}) async {},
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    bool restartRow() =>
+        appActions(context, d).any((a) => a.act == Act.restart && a.enabled);
+
+    await show();
+    expect(find.text('Restart'), findsOneWidget);
+    expect(restartRow(), isTrue);
+    fakeInstall.canStop = false;
+    await show();
+    expect(find.text('Restart'), findsNothing);
+    expect(restartRow(), isFalse);
     d.dispose();
   });
 

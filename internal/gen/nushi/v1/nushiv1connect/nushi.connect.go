@@ -84,6 +84,12 @@ const (
 	NushiServiceCancelTurnProcedure = "/nushi.v1.NushiService/CancelTurn"
 	// NushiServiceStopTaskProcedure is the fully-qualified name of the NushiService's StopTask RPC.
 	NushiServiceStopTaskProcedure = "/nushi.v1.NushiService/StopTask"
+	// NushiServiceGetWorkflowProcedure is the fully-qualified name of the NushiService's GetWorkflow
+	// RPC.
+	NushiServiceGetWorkflowProcedure = "/nushi.v1.NushiService/GetWorkflow"
+	// NushiServiceGetWorkflowAgentProcedure is the fully-qualified name of the NushiService's
+	// GetWorkflowAgent RPC.
+	NushiServiceGetWorkflowAgentProcedure = "/nushi.v1.NushiService/GetWorkflowAgent"
 	// NushiServiceForkChatProcedure is the fully-qualified name of the NushiService's ForkChat RPC.
 	NushiServiceForkChatProcedure = "/nushi.v1.NushiService/ForkChat"
 	// NushiServiceCloseSideChatProcedure is the fully-qualified name of the NushiService's
@@ -545,6 +551,12 @@ type NushiServiceClient interface {
 	// the user's (Item.to_subagent_stop) that waits for its next chance. It
 	// shows as stopped once the agent says so.
 	StopTask(context.Context, *connect.Request[v1.StopTaskRequest]) (*connect.Response[v1.StopTaskResponse], error)
+	// A workflow a tool call launched (Item.workflow), with its agents, as
+	// the agent's files say now (API 120). The Mac's only: the phone has no
+	// Workflow pane.
+	GetWorkflow(context.Context, *connect.Request[v1.GetWorkflowRequest]) (*connect.Response[v1.GetWorkflowResponse], error)
+	// One agent of a workflow: its last steps (API 120). The Mac's only.
+	GetWorkflowAgent(context.Context, *connect.Request[v1.GetWorkflowAgentRequest]) (*connect.Response[v1.GetWorkflowAgentResponse], error)
 	// Opens a side chat: a session the agent forks from the chat's (ACP
 	// session/fork, when status.can_fork). It knows the conversation so far
 	// but doesn't add to it, isn't listed or stored, and ends with
@@ -1107,6 +1119,18 @@ func NewNushiServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+NushiServiceStopTaskProcedure,
 			connect.WithSchema(nushiServiceMethods.ByName("StopTask")),
+			connect.WithClientOptions(opts...),
+		),
+		getWorkflow: connect.NewClient[v1.GetWorkflowRequest, v1.GetWorkflowResponse](
+			httpClient,
+			baseURL+NushiServiceGetWorkflowProcedure,
+			connect.WithSchema(nushiServiceMethods.ByName("GetWorkflow")),
+			connect.WithClientOptions(opts...),
+		),
+		getWorkflowAgent: connect.NewClient[v1.GetWorkflowAgentRequest, v1.GetWorkflowAgentResponse](
+			httpClient,
+			baseURL+NushiServiceGetWorkflowAgentProcedure,
+			connect.WithSchema(nushiServiceMethods.ByName("GetWorkflowAgent")),
 			connect.WithClientOptions(opts...),
 		),
 		forkChat: connect.NewClient[v1.ForkChatRequest, v1.ForkChatResponse](
@@ -1927,6 +1951,8 @@ type nushiServiceClient struct {
 	unqueue                 *connect.Client[v1.UnqueueRequest, v1.UnqueueResponse]
 	cancelTurn              *connect.Client[v1.CancelTurnRequest, v1.CancelTurnResponse]
 	stopTask                *connect.Client[v1.StopTaskRequest, v1.StopTaskResponse]
+	getWorkflow             *connect.Client[v1.GetWorkflowRequest, v1.GetWorkflowResponse]
+	getWorkflowAgent        *connect.Client[v1.GetWorkflowAgentRequest, v1.GetWorkflowAgentResponse]
 	forkChat                *connect.Client[v1.ForkChatRequest, v1.ForkChatResponse]
 	closeSideChat           *connect.Client[v1.CloseSideChatRequest, v1.CloseSideChatResponse]
 	forkAsChat              *connect.Client[v1.ForkAsChatRequest, v1.ForkAsChatResponse]
@@ -2164,6 +2190,16 @@ func (c *nushiServiceClient) CancelTurn(ctx context.Context, req *connect.Reques
 // StopTask calls nushi.v1.NushiService.StopTask.
 func (c *nushiServiceClient) StopTask(ctx context.Context, req *connect.Request[v1.StopTaskRequest]) (*connect.Response[v1.StopTaskResponse], error) {
 	return c.stopTask.CallUnary(ctx, req)
+}
+
+// GetWorkflow calls nushi.v1.NushiService.GetWorkflow.
+func (c *nushiServiceClient) GetWorkflow(ctx context.Context, req *connect.Request[v1.GetWorkflowRequest]) (*connect.Response[v1.GetWorkflowResponse], error) {
+	return c.getWorkflow.CallUnary(ctx, req)
+}
+
+// GetWorkflowAgent calls nushi.v1.NushiService.GetWorkflowAgent.
+func (c *nushiServiceClient) GetWorkflowAgent(ctx context.Context, req *connect.Request[v1.GetWorkflowAgentRequest]) (*connect.Response[v1.GetWorkflowAgentResponse], error) {
+	return c.getWorkflowAgent.CallUnary(ctx, req)
 }
 
 // ForkChat calls nushi.v1.NushiService.ForkChat.
@@ -2915,6 +2951,12 @@ type NushiServiceHandler interface {
 	// the user's (Item.to_subagent_stop) that waits for its next chance. It
 	// shows as stopped once the agent says so.
 	StopTask(context.Context, *connect.Request[v1.StopTaskRequest]) (*connect.Response[v1.StopTaskResponse], error)
+	// A workflow a tool call launched (Item.workflow), with its agents, as
+	// the agent's files say now (API 120). The Mac's only: the phone has no
+	// Workflow pane.
+	GetWorkflow(context.Context, *connect.Request[v1.GetWorkflowRequest]) (*connect.Response[v1.GetWorkflowResponse], error)
+	// One agent of a workflow: its last steps (API 120). The Mac's only.
+	GetWorkflowAgent(context.Context, *connect.Request[v1.GetWorkflowAgentRequest]) (*connect.Response[v1.GetWorkflowAgentResponse], error)
 	// Opens a side chat: a session the agent forks from the chat's (ACP
 	// session/fork, when status.can_fork). It knows the conversation so far
 	// but doesn't add to it, isn't listed or stored, and ends with
@@ -3473,6 +3515,18 @@ func NewNushiServiceHandler(svc NushiServiceHandler, opts ...connect.HandlerOpti
 		NushiServiceStopTaskProcedure,
 		svc.StopTask,
 		connect.WithSchema(nushiServiceMethods.ByName("StopTask")),
+		connect.WithHandlerOptions(opts...),
+	)
+	nushiServiceGetWorkflowHandler := connect.NewUnaryHandler(
+		NushiServiceGetWorkflowProcedure,
+		svc.GetWorkflow,
+		connect.WithSchema(nushiServiceMethods.ByName("GetWorkflow")),
+		connect.WithHandlerOptions(opts...),
+	)
+	nushiServiceGetWorkflowAgentHandler := connect.NewUnaryHandler(
+		NushiServiceGetWorkflowAgentProcedure,
+		svc.GetWorkflowAgent,
+		connect.WithSchema(nushiServiceMethods.ByName("GetWorkflowAgent")),
 		connect.WithHandlerOptions(opts...),
 	)
 	nushiServiceForkChatHandler := connect.NewUnaryHandler(
@@ -4311,6 +4365,10 @@ func NewNushiServiceHandler(svc NushiServiceHandler, opts ...connect.HandlerOpti
 			nushiServiceCancelTurnHandler.ServeHTTP(w, r)
 		case NushiServiceStopTaskProcedure:
 			nushiServiceStopTaskHandler.ServeHTTP(w, r)
+		case NushiServiceGetWorkflowProcedure:
+			nushiServiceGetWorkflowHandler.ServeHTTP(w, r)
+		case NushiServiceGetWorkflowAgentProcedure:
+			nushiServiceGetWorkflowAgentHandler.ServeHTTP(w, r)
 		case NushiServiceForkChatProcedure:
 			nushiServiceForkChatHandler.ServeHTTP(w, r)
 		case NushiServiceCloseSideChatProcedure:
@@ -4666,6 +4724,14 @@ func (UnimplementedNushiServiceHandler) CancelTurn(context.Context, *connect.Req
 
 func (UnimplementedNushiServiceHandler) StopTask(context.Context, *connect.Request[v1.StopTaskRequest]) (*connect.Response[v1.StopTaskResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nushi.v1.NushiService.StopTask is not implemented"))
+}
+
+func (UnimplementedNushiServiceHandler) GetWorkflow(context.Context, *connect.Request[v1.GetWorkflowRequest]) (*connect.Response[v1.GetWorkflowResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nushi.v1.NushiService.GetWorkflow is not implemented"))
+}
+
+func (UnimplementedNushiServiceHandler) GetWorkflowAgent(context.Context, *connect.Request[v1.GetWorkflowAgentRequest]) (*connect.Response[v1.GetWorkflowAgentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nushi.v1.NushiService.GetWorkflowAgent is not implemented"))
 }
 
 func (UnimplementedNushiServiceHandler) ForkChat(context.Context, *connect.Request[v1.ForkChatRequest]) (*connect.Response[v1.ForkChatResponse], error) {

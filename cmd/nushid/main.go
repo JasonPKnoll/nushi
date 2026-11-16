@@ -21,10 +21,6 @@ import (
 	"sync"
 	"syscall"
 
-	"golang.org/x/sys/unix"
-
-	"github.com/afrase/claude-acp-go/claudeacp"
-
 	"github.com/afrase/nushi/internal/ante"
 	"github.com/afrase/nushi/internal/api"
 	"github.com/afrase/nushi/internal/claude"
@@ -54,6 +50,7 @@ import (
 )
 
 func main() {
+	noCurrentDirPrograms()
 	if len(os.Args) > 1 && os.Args[1] == ante.Command { // the bridge Nushi runs Ante through
 		ante.Main()
 		return
@@ -65,7 +62,7 @@ func main() {
 		}
 	}
 	if len(os.Args) > 1 && os.Args[1] == claude.AgentCommand { // and Claude, through its Go agent (ADR 0066)
-		if claudeacp.Main() != nil {
+		if runClaudeAgent() != nil {
 			os.Exit(1) // Main logged why
 		}
 		return
@@ -86,6 +83,12 @@ func main() {
 	// Until the daemon holds its socket, its lines go to stderr, which the
 	// launcher points at nushid.log.
 	slog.SetDefault(slog.New(logs.Handler(os.Stderr)))
+	switch relaunched, err := hideConsole(); {
+	case relaunched:
+		return // the daemon started again with a console of no window takes over
+	case err != nil:
+		slog.Warn("console not hidden; a program the daemon starts may open a window", "err", err)
+	}
 	if login {
 		fatal(execLogin())
 	}
@@ -132,7 +135,7 @@ func run() error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // a folder: 0700 is owner-only
+	if err := ownDataFolder(dir); err != nil {
 		return err
 	}
 	token, err := loadToken(filepath.Join(dir, "token"))
@@ -248,7 +251,7 @@ func serve(srv *http.Server, ln net.Listener, stop <-chan os.Signal, restartDue 
 		var w string
 		select {
 		case sig := <-stop:
-			w = unix.SignalName(sig.(syscall.Signal)) //nolint:forcetypeassert // signal.Notify sends syscall.Signals
+			w = signalName(sig)
 		case <-deleted:
 			w = "its app was deleted"
 		case <-restartDue:

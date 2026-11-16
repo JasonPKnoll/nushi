@@ -278,6 +278,7 @@ func (s *Service) watch(c *chat, agent Agent) {
 // prompts and questions no agent waits on, "cancelled".
 func (c *chat) orphanLocked(stopped bool) {
 	c.ownTurn = false
+	c.pokeWorkflowsLocked() // they went with the agent
 	for i, it := range c.items {
 		running := it.Status == "pending" || it.Status == "in_progress" || it.Subagent != nil && it.Subagent.State == "running"
 		if it.Kind == model.ToolCall && running {

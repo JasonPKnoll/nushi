@@ -16408,6 +16408,7 @@ class Item extends $pb.GeneratedMessage {
     $core.bool? steered,
     $core.Iterable<$core.String>? files,
     $core.String? serverCommand,
+    Workflow? workflow,
   }) {
     final result = Item._();
     if (id != null) result.id = id;
@@ -16447,6 +16448,7 @@ class Item extends $pb.GeneratedMessage {
     if (steered != null) result.steered = steered;
     if (files != null) result.files.addAll(files);
     if (serverCommand != null) result.serverCommand = serverCommand;
+    if (workflow != null) result.workflow = workflow;
     return result;
   }
 
@@ -16509,6 +16511,8 @@ class Item extends $pb.GeneratedMessage {
     ..aOB(37, _omitFieldNames ? '' : 'steered')
     ..pPS(38, _omitFieldNames ? '' : 'files')
     ..aOS(39, _omitFieldNames ? '' : 'serverCommand')
+    ..aOM<Workflow>(40, _omitFieldNames ? '' : 'workflow',
+        subBuilder: Workflow.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16884,6 +16888,893 @@ class Item extends $pb.GeneratedMessage {
   $core.bool hasServerCommand() => $_has(36);
   @$pb.TagNumber(39)
   void clearServerCommand() => $_clearField(39);
+
+  /// For a call that launched a workflow (Claude's Workflow, API 120, ADR
+  /// 0127): its run, as the daemon follows it; unset while it isn't (the
+  /// call then shows as a plain one).
+  @$pb.TagNumber(40)
+  Workflow get workflow => $_getN(37);
+  @$pb.TagNumber(40)
+  set workflow(Workflow value) => $_setField(40, value);
+  @$pb.TagNumber(40)
+  $core.bool hasWorkflow() => $_has(37);
+  @$pb.TagNumber(40)
+  void clearWorkflow() => $_clearField(40);
+  @$pb.TagNumber(40)
+  Workflow ensureWorkflow() => $_ensure(37);
+}
+
+/// A workflow: a run a tool call launched, a script of the agent's running
+/// many subagents in phases, on past the call (ADR 0127). A summary small
+/// enough to ride on its item; GetWorkflow has its agents.
+class Workflow extends $pb.GeneratedMessage {
+  factory Workflow({
+    $core.String? runId,
+    $core.String? taskId,
+    $core.String? name,
+    $core.String? description,
+    $core.String? state,
+    $core.String? end,
+    $fixnum.Int64? started,
+    $fixnum.Int64? ended,
+    $fixnum.Int64? active,
+    $core.Iterable<WorkflowPhase>? phases,
+    $core.int? agents,
+    $core.int? done,
+    $core.int? failed,
+    $core.Iterable<$core.String>? running,
+    $core.int? runningCount,
+    $core.String? summary,
+    $core.bool? stalled,
+  }) {
+    final result = Workflow._();
+    if (runId != null) result.runId = runId;
+    if (taskId != null) result.taskId = taskId;
+    if (name != null) result.name = name;
+    if (description != null) result.description = description;
+    if (state != null) result.state = state;
+    if (end != null) result.end = end;
+    if (started != null) result.started = started;
+    if (ended != null) result.ended = ended;
+    if (active != null) result.active = active;
+    if (phases != null) result.phases.addAll(phases);
+    if (agents != null) result.agents = agents;
+    if (done != null) result.done = done;
+    if (failed != null) result.failed = failed;
+    if (running != null) result.running.addAll(running);
+    if (runningCount != null) result.runningCount = runningCount;
+    if (summary != null) result.summary = summary;
+    if (stalled != null) result.stalled = stalled;
+    return result;
+  }
+
+  Workflow._();
+
+  factory Workflow.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Workflow()..mergeFromBuffer(data, registry);
+  factory Workflow.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Workflow()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Workflow',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'nushi.v1'),
+      createEmptyInstance: Workflow.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'runId')
+    ..aOS(2, _omitFieldNames ? '' : 'taskId')
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..aOS(5, _omitFieldNames ? '' : 'state')
+    ..aOS(6, _omitFieldNames ? '' : 'end')
+    ..aInt64(7, _omitFieldNames ? '' : 'started')
+    ..aInt64(8, _omitFieldNames ? '' : 'ended')
+    ..aInt64(9, _omitFieldNames ? '' : 'active')
+    ..pPM<WorkflowPhase>(10, _omitFieldNames ? '' : 'phases',
+        subBuilder: WorkflowPhase.$_createMessage)
+    ..aI(11, _omitFieldNames ? '' : 'agents')
+    ..aI(12, _omitFieldNames ? '' : 'done')
+    ..aI(13, _omitFieldNames ? '' : 'failed')
+    ..pPS(14, _omitFieldNames ? '' : 'running')
+    ..aI(15, _omitFieldNames ? '' : 'runningCount')
+    ..aOS(16, _omitFieldNames ? '' : 'summary')
+    ..aOB(17, _omitFieldNames ? '' : 'stalled')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Workflow clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Workflow copyWith(void Function(Workflow) updates) =>
+      super.copyWith((message) => updates(message as Workflow)) as Workflow;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Workflow() / Workflow.new instead')
+  static Workflow create() => Workflow._();
+  static $pb.GeneratedMessage $_createMessage() => Workflow._();
+  @$core.override
+  Workflow createEmptyInstance() => Workflow._();
+  @$core.pragma('dart2js:noInline')
+  static Workflow getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Workflow>(Workflow.$_createMessage);
+  static Workflow? _defaultInstance;
+
+  /// The agent's ids for the run and its task (Stop goes by the task's).
+  @$pb.TagNumber(1)
+  $core.String get runId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set runId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRunId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRunId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get taskId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set taskId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTaskId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTaskId() => $_clearField(2);
+
+  /// Its name and what it does, in the agent's words.
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get description => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set description($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDescription() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDescription() => $_clearField(4);
+
+  /// "running", then "done", "failed", "stopped" or "unknown" (it ended and
+  /// the agent's word for how is in end).
+  @$pb.TagNumber(5)
+  $core.String get state => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set state($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasState() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearState() => $_clearField(5);
+
+  /// How it ended: the agent's word ("completed", "killed"…), or Nushi's
+  /// when the agent gave none ("Claude quit while it ran").
+  @$pb.TagNumber(6)
+  $core.String get end => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set end($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasEnd() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEnd() => $_clearField(6);
+
+  /// When it started and ended, and when its files last changed, in Unix
+  /// milliseconds; 0 when not known.
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get started => $_getI64(6);
+  @$pb.TagNumber(7)
+  set started($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasStarted() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStarted() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get ended => $_getI64(7);
+  @$pb.TagNumber(8)
+  set ended($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasEnded() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearEnded() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get active => $_getI64(8);
+  @$pb.TagNumber(9)
+  set active($fixnum.Int64 value) => $_setInt64(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasActive() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearActive() => $_clearField(9);
+
+  /// Its phases, in the order reached (32 at most).
+  @$pb.TagNumber(10)
+  $pb.PbList<WorkflowPhase> get phases => $_getList(9);
+
+  /// How many agents it ran, and of those how many ended well and failed.
+  @$pb.TagNumber(11)
+  $core.int get agents => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set agents($core.int value) => $_setSignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasAgents() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearAgents() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get done => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set done($core.int value) => $_setSignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasDone() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearDone() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.int get failed => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set failed($core.int value) => $_setSignedInt32(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasFailed() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearFailed() => $_clearField(13);
+
+  /// The labels of up to 8 agents running now, and how many run.
+  @$pb.TagNumber(14)
+  $pb.PbList<$core.String> get running => $_getList(13);
+
+  @$pb.TagNumber(15)
+  $core.int get runningCount => $_getIZ(14);
+  @$pb.TagNumber(15)
+  set runningCount($core.int value) => $_setSignedInt32(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasRunningCount() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearRunningCount() => $_clearField(15);
+
+  /// How a failed run ended, in the agent's words (its error's first line).
+  @$pb.TagNumber(16)
+  $core.String get summary => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set summary($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasSummary() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearSummary() => $_clearField(16);
+
+  /// Nothing of it changed for so long (an hour) that it no longer counts as
+  /// the chat's work, though nothing says it ended.
+  @$pb.TagNumber(17)
+  $core.bool get stalled => $_getBF(16);
+  @$pb.TagNumber(17)
+  set stalled($core.bool value) => $_setBool(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasStalled() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearStalled() => $_clearField(17);
+}
+
+/// A phase of a workflow: its title, the agent's line on it, and how many
+/// of its agents started, ended well and failed.
+class WorkflowPhase extends $pb.GeneratedMessage {
+  factory WorkflowPhase({
+    $core.String? title,
+    $core.String? detail,
+    $core.int? started,
+    $core.int? done,
+    $core.int? failed,
+  }) {
+    final result = WorkflowPhase._();
+    if (title != null) result.title = title;
+    if (detail != null) result.detail = detail;
+    if (started != null) result.started = started;
+    if (done != null) result.done = done;
+    if (failed != null) result.failed = failed;
+    return result;
+  }
+
+  WorkflowPhase._();
+
+  factory WorkflowPhase.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorkflowPhase()..mergeFromBuffer(data, registry);
+  factory WorkflowPhase.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorkflowPhase()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WorkflowPhase',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'nushi.v1'),
+      createEmptyInstance: WorkflowPhase.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'title')
+    ..aOS(2, _omitFieldNames ? '' : 'detail')
+    ..aI(3, _omitFieldNames ? '' : 'started')
+    ..aI(4, _omitFieldNames ? '' : 'done')
+    ..aI(5, _omitFieldNames ? '' : 'failed')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorkflowPhase clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorkflowPhase copyWith(void Function(WorkflowPhase) updates) =>
+      super.copyWith((message) => updates(message as WorkflowPhase))
+          as WorkflowPhase;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WorkflowPhase() / WorkflowPhase.new instead')
+  static WorkflowPhase create() => WorkflowPhase._();
+  static $pb.GeneratedMessage $_createMessage() => WorkflowPhase._();
+  @$core.override
+  WorkflowPhase createEmptyInstance() => WorkflowPhase._();
+  @$core.pragma('dart2js:noInline')
+  static WorkflowPhase getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<WorkflowPhase>(
+          WorkflowPhase.$_createMessage);
+  static WorkflowPhase? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get title => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set title($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTitle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTitle() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get detail => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set detail($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDetail() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDetail() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get started => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set started($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStarted() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStarted() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get done => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set done($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDone() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDone() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get failed => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set failed($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFailed() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFailed() => $_clearField(5);
+}
+
+/// One agent of a workflow: its id, label and phase, "running", "done",
+/// "failed" or "stopped", the model it ran on, when it started and ended
+/// (Unix milliseconds, 0 when not known), what it spent, and the starts of
+/// its task and its answer, as the agent kept them.
+class WorkflowAgent extends $pb.GeneratedMessage {
+  factory WorkflowAgent({
+    $core.String? id,
+    $core.String? label,
+    $core.String? phase,
+    $core.String? state,
+    $core.String? model,
+    $fixnum.Int64? started,
+    $fixnum.Int64? ended,
+    $core.int? tokens,
+    $core.int? toolCalls,
+    $core.String? prompt,
+    $core.String? result,
+  }) {
+    final result$ = WorkflowAgent._();
+    if (id != null) result$.id = id;
+    if (label != null) result$.label = label;
+    if (phase != null) result$.phase = phase;
+    if (state != null) result$.state = state;
+    if (model != null) result$.model = model;
+    if (started != null) result$.started = started;
+    if (ended != null) result$.ended = ended;
+    if (tokens != null) result$.tokens = tokens;
+    if (toolCalls != null) result$.toolCalls = toolCalls;
+    if (prompt != null) result$.prompt = prompt;
+    if (result != null) result$.result = result;
+    return result$;
+  }
+
+  WorkflowAgent._();
+
+  factory WorkflowAgent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorkflowAgent()..mergeFromBuffer(data, registry);
+  factory WorkflowAgent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorkflowAgent()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WorkflowAgent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'nushi.v1'),
+      createEmptyInstance: WorkflowAgent.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'label')
+    ..aOS(3, _omitFieldNames ? '' : 'phase')
+    ..aOS(4, _omitFieldNames ? '' : 'state')
+    ..aOS(5, _omitFieldNames ? '' : 'model')
+    ..aInt64(6, _omitFieldNames ? '' : 'started')
+    ..aInt64(7, _omitFieldNames ? '' : 'ended')
+    ..aI(8, _omitFieldNames ? '' : 'tokens')
+    ..aI(9, _omitFieldNames ? '' : 'toolCalls')
+    ..aOS(10, _omitFieldNames ? '' : 'prompt')
+    ..aOS(11, _omitFieldNames ? '' : 'result')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorkflowAgent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorkflowAgent copyWith(void Function(WorkflowAgent) updates) =>
+      super.copyWith((message) => updates(message as WorkflowAgent))
+          as WorkflowAgent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WorkflowAgent() / WorkflowAgent.new instead')
+  static WorkflowAgent create() => WorkflowAgent._();
+  static $pb.GeneratedMessage $_createMessage() => WorkflowAgent._();
+  @$core.override
+  WorkflowAgent createEmptyInstance() => WorkflowAgent._();
+  @$core.pragma('dart2js:noInline')
+  static WorkflowAgent getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<WorkflowAgent>(
+          WorkflowAgent.$_createMessage);
+  static WorkflowAgent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get label => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set label($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLabel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLabel() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get phase => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set phase($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPhase() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPhase() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get state => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set state($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasState() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearState() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get model => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set model($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasModel() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearModel() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get started => $_getI64(5);
+  @$pb.TagNumber(6)
+  set started($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStarted() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStarted() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get ended => $_getI64(6);
+  @$pb.TagNumber(7)
+  set ended($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasEnded() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearEnded() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get tokens => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set tokens($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasTokens() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTokens() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get toolCalls => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set toolCalls($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasToolCalls() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearToolCalls() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get prompt => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set prompt($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasPrompt() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearPrompt() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get result => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set result($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasResult() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearResult() => $_clearField(11);
+}
+
+class GetWorkflowRequest extends $pb.GeneratedMessage {
+  factory GetWorkflowRequest({
+    $core.String? chatId,
+    $core.String? callId,
+  }) {
+    final result = GetWorkflowRequest._();
+    if (chatId != null) result.chatId = chatId;
+    if (callId != null) result.callId = callId;
+    return result;
+  }
+
+  GetWorkflowRequest._();
+
+  factory GetWorkflowRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowRequest()..mergeFromBuffer(data, registry);
+  factory GetWorkflowRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetWorkflowRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'nushi.v1'),
+      createEmptyInstance: GetWorkflowRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'chatId')
+    ..aOS(2, _omitFieldNames ? '' : 'callId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowRequest copyWith(void Function(GetWorkflowRequest) updates) =>
+      super.copyWith((message) => updates(message as GetWorkflowRequest))
+          as GetWorkflowRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use GetWorkflowRequest() / GetWorkflowRequest.new instead')
+  static GetWorkflowRequest create() => GetWorkflowRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetWorkflowRequest._();
+  @$core.override
+  GetWorkflowRequest createEmptyInstance() => GetWorkflowRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetWorkflowRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetWorkflowRequest>(
+          GetWorkflowRequest.$_createMessage);
+  static GetWorkflowRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get chatId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set chatId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChatId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChatId() => $_clearField(1);
+
+  /// The call that launched it.
+  @$pb.TagNumber(2)
+  $core.String get callId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set callId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCallId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCallId() => $_clearField(2);
+}
+
+class GetWorkflowResponse extends $pb.GeneratedMessage {
+  factory GetWorkflowResponse({
+    Workflow? workflow,
+    $core.Iterable<WorkflowAgent>? agents,
+    $core.bool? more,
+  }) {
+    final result = GetWorkflowResponse._();
+    if (workflow != null) result.workflow = workflow;
+    if (agents != null) result.agents.addAll(agents);
+    if (more != null) result.more = more;
+    return result;
+  }
+
+  GetWorkflowResponse._();
+
+  factory GetWorkflowResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowResponse()..mergeFromBuffer(data, registry);
+  factory GetWorkflowResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetWorkflowResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'nushi.v1'),
+      createEmptyInstance: GetWorkflowResponse.$_createMessage)
+    ..aOM<Workflow>(1, _omitFieldNames ? '' : 'workflow',
+        subBuilder: Workflow.$_createMessage)
+    ..pPM<WorkflowAgent>(2, _omitFieldNames ? '' : 'agents',
+        subBuilder: WorkflowAgent.$_createMessage)
+    ..aOB(3, _omitFieldNames ? '' : 'more')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowResponse copyWith(void Function(GetWorkflowResponse) updates) =>
+      super.copyWith((message) => updates(message as GetWorkflowResponse))
+          as GetWorkflowResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use GetWorkflowResponse() / GetWorkflowResponse.new instead')
+  static GetWorkflowResponse create() => GetWorkflowResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetWorkflowResponse._();
+  @$core.override
+  GetWorkflowResponse createEmptyInstance() => GetWorkflowResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetWorkflowResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetWorkflowResponse>(
+          GetWorkflowResponse.$_createMessage);
+  static GetWorkflowResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Workflow get workflow => $_getN(0);
+  @$pb.TagNumber(1)
+  set workflow(Workflow value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasWorkflow() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearWorkflow() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Workflow ensureWorkflow() => $_ensure(0);
+
+  /// Its agents in the order they started, 500 at most: more says there
+  /// are others.
+  @$pb.TagNumber(2)
+  $pb.PbList<WorkflowAgent> get agents => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.bool get more => $_getBF(2);
+  @$pb.TagNumber(3)
+  set more($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMore() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMore() => $_clearField(3);
+}
+
+class GetWorkflowAgentRequest extends $pb.GeneratedMessage {
+  factory GetWorkflowAgentRequest({
+    $core.String? chatId,
+    $core.String? callId,
+    $core.String? agentId,
+    $core.int? limit,
+  }) {
+    final result = GetWorkflowAgentRequest._();
+    if (chatId != null) result.chatId = chatId;
+    if (callId != null) result.callId = callId;
+    if (agentId != null) result.agentId = agentId;
+    if (limit != null) result.limit = limit;
+    return result;
+  }
+
+  GetWorkflowAgentRequest._();
+
+  factory GetWorkflowAgentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowAgentRequest()..mergeFromBuffer(data, registry);
+  factory GetWorkflowAgentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowAgentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetWorkflowAgentRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'nushi.v1'),
+      createEmptyInstance: GetWorkflowAgentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'chatId')
+    ..aOS(2, _omitFieldNames ? '' : 'callId')
+    ..aOS(3, _omitFieldNames ? '' : 'agentId')
+    ..aI(4, _omitFieldNames ? '' : 'limit')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowAgentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowAgentRequest copyWith(
+          void Function(GetWorkflowAgentRequest) updates) =>
+      super.copyWith((message) => updates(message as GetWorkflowAgentRequest))
+          as GetWorkflowAgentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetWorkflowAgentRequest() / GetWorkflowAgentRequest.new instead')
+  static GetWorkflowAgentRequest create() => GetWorkflowAgentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetWorkflowAgentRequest._();
+  @$core.override
+  GetWorkflowAgentRequest createEmptyInstance() => GetWorkflowAgentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetWorkflowAgentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetWorkflowAgentRequest>(
+          GetWorkflowAgentRequest.$_createMessage);
+  static GetWorkflowAgentRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get chatId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set chatId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChatId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChatId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get callId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set callId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCallId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCallId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get agentId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set agentId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAgentId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAgentId() => $_clearField(3);
+
+  /// The most of its last steps to send; 0: 400.
+  @$pb.TagNumber(4)
+  $core.int get limit => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set limit($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLimit() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLimit() => $_clearField(4);
+}
+
+class GetWorkflowAgentResponse extends $pb.GeneratedMessage {
+  factory GetWorkflowAgentResponse({
+    $core.Iterable<Item>? items,
+    $core.int? earlier,
+    WorkflowAgent? agent,
+  }) {
+    final result = GetWorkflowAgentResponse._();
+    if (items != null) result.items.addAll(items);
+    if (earlier != null) result.earlier = earlier;
+    if (agent != null) result.agent = agent;
+    return result;
+  }
+
+  GetWorkflowAgentResponse._();
+
+  factory GetWorkflowAgentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowAgentResponse()..mergeFromBuffer(data, registry);
+  factory GetWorkflowAgentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetWorkflowAgentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetWorkflowAgentResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'nushi.v1'),
+      createEmptyInstance: GetWorkflowAgentResponse.$_createMessage)
+    ..pPM<Item>(1, _omitFieldNames ? '' : 'items',
+        subBuilder: Item.$_createMessage)
+    ..aI(2, _omitFieldNames ? '' : 'earlier')
+    ..aOM<WorkflowAgent>(3, _omitFieldNames ? '' : 'agent',
+        subBuilder: WorkflowAgent.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowAgentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetWorkflowAgentResponse copyWith(
+          void Function(GetWorkflowAgentResponse) updates) =>
+      super.copyWith((message) => updates(message as GetWorkflowAgentResponse))
+          as GetWorkflowAgentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetWorkflowAgentResponse() / GetWorkflowAgentResponse.new instead')
+  static GetWorkflowAgentResponse create() => GetWorkflowAgentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetWorkflowAgentResponse._();
+  @$core.override
+  GetWorkflowAgentResponse createEmptyInstance() =>
+      GetWorkflowAgentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetWorkflowAgentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetWorkflowAgentResponse>(
+          GetWorkflowAgentResponse.$_createMessage);
+  static GetWorkflowAgentResponse? _defaultInstance;
+
+  /// Its steps, oldest first, as transcript items (ids "wf/<agent>/…").
+  @$pb.TagNumber(1)
+  $pb.PbList<Item> get items => $_getList(0);
+
+  /// How many steps came before those.
+  @$pb.TagNumber(2)
+  $core.int get earlier => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set earlier($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEarlier() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEarlier() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  WorkflowAgent get agent => $_getN(2);
+  @$pb.TagNumber(3)
+  set agent(WorkflowAgent value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAgent() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAgent() => $_clearField(3);
+  @$pb.TagNumber(3)
+  WorkflowAgent ensureAgent() => $_ensure(2);
 }
 
 /// A code review's result: the effort level it ran at ("medium"; "" when
@@ -17732,6 +18623,8 @@ class ChatStatus extends $pb.GeneratedMessage {
     $core.bool? canWriteCommit,
     TurnEnd? ended,
     $core.String? failure,
+    $core.int? workflows,
+    $core.bool? ownTurn,
   }) {
     final result = ChatStatus._();
     if (busy != null) result.busy = busy;
@@ -17750,6 +18643,8 @@ class ChatStatus extends $pb.GeneratedMessage {
     if (canWriteCommit != null) result.canWriteCommit = canWriteCommit;
     if (ended != null) result.ended = ended;
     if (failure != null) result.failure = failure;
+    if (workflows != null) result.workflows = workflows;
+    if (ownTurn != null) result.ownTurn = ownTurn;
     return result;
   }
 
@@ -17783,6 +18678,8 @@ class ChatStatus extends $pb.GeneratedMessage {
     ..aE<TurnEnd>(16, _omitFieldNames ? '' : 'ended',
         enumValues: TurnEnd.values)
     ..aOS(17, _omitFieldNames ? '' : 'failure')
+    ..aI(18, _omitFieldNames ? '' : 'workflows')
+    ..aOB(19, _omitFieldNames ? '' : 'ownTurn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -17932,8 +18829,9 @@ class ChatStatus extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearSessionGone() => $_clearField(13);
 
-  /// How many subagents and background commands the chat's agent started
-  /// still run (API 84): a turn can end while they do.
+  /// How many subagents, background commands and workflows the chat's
+  /// agent started still run (API 84; workflows API 120): a turn can end
+  /// while they do.
   @$pb.TagNumber(14)
   $core.int get background => $_getIZ(12);
   @$pb.TagNumber(14)
@@ -17974,6 +18872,28 @@ class ChatStatus extends $pb.GeneratedMessage {
   $core.bool hasFailure() => $_has(15);
   @$pb.TagNumber(17)
   void clearFailure() => $_clearField(17);
+
+  /// How many of background are workflows that run (API 120): the chat
+  /// counts as working while one does.
+  @$pb.TagNumber(18)
+  $core.int get workflows => $_getIZ(16);
+  @$pb.TagNumber(18)
+  set workflows($core.int value) => $_setSignedInt32(16, value);
+  @$pb.TagNumber(18)
+  $core.bool hasWorkflows() => $_has(16);
+  @$pb.TagNumber(18)
+  void clearWorkflows() => $_clearField(18);
+
+  /// The agent works on its own, outside a turn of the user's (after a
+  /// background task's end; API 120): the chat counts as working.
+  @$pb.TagNumber(19)
+  $core.bool get ownTurn => $_getBF(17);
+  @$pb.TagNumber(19)
+  set ownTurn($core.bool value) => $_setBool(17, value);
+  @$pb.TagNumber(19)
+  $core.bool hasOwnTurn() => $_has(17);
+  @$pb.TagNumber(19)
+  void clearOwnTurn() => $_clearField(19);
 }
 
 /// A shell the user runs beside a chat, in the daemon.
@@ -33196,6 +34116,20 @@ class NushiServiceApi {
           $pb.ClientContext? ctx, StopTaskRequest request) =>
       _client.invoke<StopTaskResponse>(
           ctx, 'NushiService', 'StopTask', request, StopTaskResponse());
+
+  /// A workflow a tool call launched (Item.workflow), with its agents, as
+  /// the agent's files say now (API 120). The Mac's only: the phone has no
+  /// Workflow pane.
+  $async.Future<GetWorkflowResponse> getWorkflow(
+          $pb.ClientContext? ctx, GetWorkflowRequest request) =>
+      _client.invoke<GetWorkflowResponse>(
+          ctx, 'NushiService', 'GetWorkflow', request, GetWorkflowResponse());
+
+  /// One agent of a workflow: its last steps (API 120). The Mac's only.
+  $async.Future<GetWorkflowAgentResponse> getWorkflowAgent(
+          $pb.ClientContext? ctx, GetWorkflowAgentRequest request) =>
+      _client.invoke<GetWorkflowAgentResponse>(ctx, 'NushiService',
+          'GetWorkflowAgent', request, GetWorkflowAgentResponse());
 
   /// Opens a side chat: a session the agent forks from the chat's (ACP
   /// session/fork, when status.can_fork). It knows the conversation so far

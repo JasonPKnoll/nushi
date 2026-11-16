@@ -224,6 +224,24 @@ abstract final class NushiService {
     nushiv1nushi.StopTaskResponse.new,
   );
 
+  /// A workflow a tool call launched (Item.workflow), with its agents, as
+  /// the agent's files say now (API 120). The Mac's only: the phone has no
+  /// Workflow pane.
+  static const getWorkflow = connect.Spec(
+    '/$name/GetWorkflow',
+    connect.StreamType.unary,
+    nushiv1nushi.GetWorkflowRequest.new,
+    nushiv1nushi.GetWorkflowResponse.new,
+  );
+
+  /// One agent of a workflow: its last steps (API 120). The Mac's only.
+  static const getWorkflowAgent = connect.Spec(
+    '/$name/GetWorkflowAgent',
+    connect.StreamType.unary,
+    nushiv1nushi.GetWorkflowAgentRequest.new,
+    nushiv1nushi.GetWorkflowAgentResponse.new,
+  );
+
   /// Opens a side chat: a session the agent forks from the chat's (ACP
   /// session/fork, when status.can_fork). It knows the conversation so far
   /// but doesn't add to it, isn't listed or stored, and ends with

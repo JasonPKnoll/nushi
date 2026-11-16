@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/afrase/nushi/internal/testcheck"
@@ -19,7 +18,7 @@ func TestReadOld(t *testing.T) {
 	testcheck.Write(t, path("empty"), "")
 	testcheck.Write(t, path("large"), strings.Repeat("x", MaxOld+1))
 	testcheck.NoErr(t, os.Symlink("file", path("link")))
-	testcheck.NoErr(t, syscall.Mkfifo(path("fifo"), 0o600))
+	testcheck.Fifo(t, path("fifo"))
 	notRegular := Old{Note: "Not shown: what this replaces isn't a regular file.", Exists: true}
 	for name, want := range map[string]Old{
 		"":      {},

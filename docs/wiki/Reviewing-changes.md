@@ -88,4 +88,4 @@ When a chat's pull request is merged or closed, the details panel's **Pull reque
 - If something else staged files after you looked (the agent, for example), **Commit** refuses so you can check them first.
 - If you remove a comment's card from the message box before sending, the comment is gone for good.
 - When the agent's helpers (subagents) work in their own worktrees, a menu at the left of the bar lets you look at those too. You can comment there, but not commit.
-- On Linux, use Ctrl where the Mac uses ⌘. ⌃⌘2 is Ctrl+Alt+2.
+- On Linux and Windows, use Ctrl where the Mac uses ⌘. ⌃⌘2 is Ctrl+Alt+2 on Linux and Ctrl+Shift+2 on Windows.

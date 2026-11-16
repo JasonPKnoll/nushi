@@ -108,21 +108,38 @@ const previousTabKey = SingleActivator(
 );
 
 /// ⌃⌘1–⌃⌘3 show Chat, Changes and Pull request (⌘⇧3 is macOS's
-/// screenshot, so not ⌘⇧); on Linux Ctrl+Alt+1–3.
+/// screenshot, so not ⌘⇧); on Linux Ctrl+Alt+1–3, and on Windows
+/// Ctrl+Shift+1–3: Ctrl+Alt is AltGr there, which types a Spanish
+/// keyboard's `|`, `@` and `#` with 1–3.
 const chatTabKey = Cmd(
   LogicalKeyboardKey.digit1,
   ctrl: true,
   linux: SingleActivator(LogicalKeyboardKey.digit1, control: true, alt: true),
+  windows: SingleActivator(
+    LogicalKeyboardKey.digit1,
+    control: true,
+    shift: true,
+  ),
 );
 const changesTabKey = Cmd(
   LogicalKeyboardKey.digit2,
   ctrl: true,
   linux: SingleActivator(LogicalKeyboardKey.digit2, control: true, alt: true),
+  windows: SingleActivator(
+    LogicalKeyboardKey.digit2,
+    control: true,
+    shift: true,
+  ),
 );
 const pullTabKey = Cmd(
   LogicalKeyboardKey.digit3,
   ctrl: true,
   linux: SingleActivator(LogicalKeyboardKey.digit3, control: true, alt: true),
+  windows: SingleActivator(
+    LogicalKeyboardKey.digit3,
+    control: true,
+    shift: true,
+  ),
 );
 
 /// ⌘W: closes the preview tab showing, and with the last the pane. A focused

@@ -55,6 +55,8 @@ The **Chats** screen lists your chats. Those waiting on you come first, under **
 
 Tap a chat to see its transcript. When the agent asks a question or asks for permission, answer it with a tap.
 
+A chat running one of Claude's workflows says **working**, and the workflow's card shows its progress. To stop it, open the chat's **⋯** menu and tap **Stop Workflow: …** (with other tasks running, **Stop N background tasks**).
+
 ## Send a message or stop the agent
 
 The buttons beside the message box are icons. Press and hold one to see its name.

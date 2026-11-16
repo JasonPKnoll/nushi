@@ -1,6 +1,6 @@
 # 0121. Typing anywhere in the chat writes in its box
 
-Status: accepted, 2026-11-14.
+Status: accepted, 2026-11-14. Amended by [0125](0125-the-app-runs-on-windows.md): on Windows a character typed with Control and Alt (AltGr, which Windows reports as both) goes into the box, and the rule holds in Windows's window as in the Mac's and Linux's.
 
 ## Context
 A key typed with the transcript focused (after a click on a message, or on the empty pane) did nothing: the box had to be clicked first. Claude's desktop app and Claude Code's take it into the message box. The owner approved the same.

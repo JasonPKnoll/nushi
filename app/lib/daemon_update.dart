@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/native.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/status_bar.dart';
 import 'package:nushi/theme/theme.dart';
@@ -7,8 +8,8 @@ import 'package:nushi/widgets.dart';
 
 /// Over the app while the daemon is older than the bundled one and
 /// restarts into it by itself once nothing runs (Daemon.updatesWhenIdle),
-/// with a way to restart now. A daemon too old for that gets
-/// [OutdatedScreen].
+/// with a way to restart now where the app can stop it. A daemon too old
+/// for that gets [OutdatedScreen].
 class DaemonUpdateBar extends StatelessWidget {
   const new(this.daemon, {super.key});
 
@@ -26,16 +27,17 @@ class DaemonUpdateBar extends StatelessWidget {
               builder: (context, _) => _Waiting(daemon),
             ),
           ),
-          ListenableBuilder(
-            listenable: daemon,
-            builder: (context, _) => Button(
-              label: daemon.restarting ? 'Restarting…' : 'Restart now',
-              // What it stops is asked first.
-              onPressed: daemon.restarting
-                  ? null
-                  : () => restartDaemonAsking(context, daemon),
+          if (native.install.canStop)
+            ListenableBuilder(
+              listenable: daemon,
+              builder: (context, _) => Button(
+                label: daemon.restarting ? 'Restarting…' : 'Restart now',
+                // What it stops is asked first.
+                onPressed: daemon.restarting
+                    ? null
+                    : () => restartDaemonAsking(context, daemon),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -92,7 +94,8 @@ class _Waiting extends StatelessWidget {
 }
 
 /// Says the daemon is older than the app and doesn't restart by itself,
-/// with a way to restart it: the app shows nothing else until it has.
+/// with a way to restart it (where the app can't stop it, how to): the
+/// app shows nothing else until it has.
 class OutdatedScreen extends StatelessWidget {
   const new(this.daemon, {super.key});
 
@@ -116,7 +119,7 @@ class OutdatedScreen extends StatelessWidget {
               style: theme.ui(t.textSecondary),
             ),
             const SizedBox(height: 14),
-            if (daemon.bundled != null)
+            if (daemon.bundled != null && native.install.canStop)
               ListenableBuilder(
                 listenable: daemon,
                 builder: (context, _) => Button(
@@ -126,6 +129,13 @@ class OutdatedScreen extends StatelessWidget {
                       ? null
                       : () => tryOrShow(context, daemon.restartDaemon),
                 ),
+              )
+            else if (daemon.bundled != null)
+              Text(
+                'To restart it, ${native.install.stopByHand}: Nushi starts '
+                'the new one.',
+                textAlign: TextAlign.center,
+                style: theme.ui(t.textSecondary),
               )
             else
               Text('make stop daemon', style: theme.code(t.textMuted)),

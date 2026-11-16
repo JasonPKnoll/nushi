@@ -126,13 +126,16 @@ func UserSettings() string { return filepath.Join(ConfigDir(), "settings.json") 
 
 // SignedIn asks the CLI whether it's signed in (`claude auth status`,
 // JSON): "yes" or "no", or "" when it can't say. Claude reads its own
-// login for that; Nushi sees only the answer's loggedIn.
+// login for that; Nushi sees only the answer's loggedIn. Signed out, it
+// exits 1 after printing its answer (docs/facts/claude.md), so the answer
+// is read whatever the exit; one that didn't start or was stopped printed
+// none.
 func SignedIn(run func(args ...string) ([]byte, error)) string {
-	out, err := run("auth", "status", "--json")
+	out, _ := run("auth", "status", "--json")
 	var st struct {
 		LoggedIn *bool `json:"loggedIn"`
 	}
-	if err != nil || json.Unmarshal(out, &st) != nil || st.LoggedIn == nil {
+	if json.Unmarshal(out, &st) != nil || st.LoggedIn == nil {
 		return ""
 	}
 	if *st.LoggedIn {
@@ -191,8 +194,8 @@ func claudeCode(meta map[string]any, key string) string {
 // the model it ran on and the worktree it had once it has ended, and for a subagent's SubagentHandback, which ends it,
 // the report it hands back as its text (Report): true then, since the
 // call's own output is only an acknowledgement; for ReportFindings the
-// review's findings; for TaskStop the task it stops. Claude may send the
-// input in a later update than the name.
+// review's findings; for TaskStop the task it stops; for Workflow the run
+// it launched. Claude may send the input in a later update than the name.
 func (h Harness) ToolCall(it *model.Item, meta map[string]any, input json.RawMessage) (ownText bool) {
 	it.Parent, it.Tool = cmp.Or(it.Parent, h.Parent(meta)), cmp.Or(claudeCode(meta, "toolName"), it.Tool)
 	var in struct {
@@ -236,6 +239,10 @@ func (h Harness) ToolCall(it *model.Item, meta map[string]any, input json.RawMes
 	case "ReportFindings":
 		if f := findings(input); f != nil {
 			it.Findings = f
+		}
+	case "Workflow": // a run in the background (ADR 0127); chats follows it
+		if w := workflowCall(resp); w != nil && it.Workflow == nil {
+			it.Workflow, it.TaskID = w, w.TaskID
 		}
 	}
 	return false

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:nushi/background_commands.dart';
 import 'package:nushi/beside.dart';
 import 'package:nushi/beside_fit.dart';
 import 'package:nushi/browser_pane.dart';
@@ -16,13 +15,14 @@ import 'package:nushi/fork_chat.dart';
 import 'package:nushi/preview.dart' show previewApi;
 import 'package:nushi/settings.dart' show filesTree;
 import 'package:nushi/side_chat.dart';
-import 'package:nushi/subagent_pane.dart';
+import 'package:nushi/task_pane.dart';
 
 /// The panes that open beside a chat's transcript, left to right, each at
 /// the width it opens at until dragged and its least and most: the side
 /// chat, the Files pane (its viewer and tree, ADR 0123), a subagent's or a
 /// background command's pane (named as the old Wider one was, so a width
-/// dragged then stays), and the browser, in that one's place.
+/// dragged then stays) or a workflow's, and the browser, in that one's
+/// place.
 abstract final class ChatPanes {
   static const side = PaneSpec(
     'side',
@@ -65,6 +65,16 @@ abstract final class ChatPanes {
     cap: double.infinity,
     wide: true,
   );
+
+  /// A workflow's tree wants more room than a subagent's steps, and keeps
+  /// its own width (ADR 0127).
+  static const workflow = PaneSpec(
+    'workflow',
+    initial: 420,
+    min: 280,
+    cap: double.infinity,
+    wide: true,
+  );
   static const browser = PaneSpec(
     'browser',
     initial: 560,
@@ -85,7 +95,8 @@ List<PaneSpec> openPanes(
   bool files = false,
   bool browser = false,
 }) {
-  final pane = chat.pane.value != null;
+  final id = chat.pane.value;
+  final pane = id != null;
   final api = daemon.daemonApi;
   return [
     if (chat.side.value != null && !chat.archived && !chat.sideHidden.value)
@@ -95,7 +106,11 @@ List<PaneSpec> openPanes(
         ChatPanes.files
       else
         ChatPanes.filesNoTree,
-    if (pane && !browser) ChatPanes.subagent,
+    if (pane && !browser)
+      if (workflowPaneOpen(chat, id))
+        ChatPanes.workflow
+      else
+        ChatPanes.subagent,
     if (browser || !pane && chat.browser.shown.value != null) ChatPanes.browser,
   ];
 }
@@ -163,7 +178,14 @@ List<SidePane> chatPanes(
             expanded: cover == spec.name,
             onExpand: () => onExpand(spec.name),
           ),
-          'subagent' => _taskPane(chat, daemon, id!),
+          // Keyed by its id: another subagent's pane is its own, its unsent
+          // text too.
+          'subagent' || 'workflow' => taskPane(
+            chat: chat,
+            daemon: daemon,
+            id: id!,
+            onClose: () => chat.pane.value = null,
+          ),
           _ => BrowserPane(
             key: ObjectKey(chat.browser.shown.value),
             chat: chat,
@@ -177,25 +199,4 @@ List<SidePane> chatPanes(
         },
       ),
   ];
-}
-
-/// A subagent's or background command's pane. Keyed: another subagent's
-/// pane is its own, its unsent text too.
-Widget _taskPane(ChatState chat, Daemon daemon, String id) {
-  void onClose() => chat.pane.value = null;
-  return chat.withRunning.any((it) => it.id == id && it.hasBackgroundCommand())
-      ? BackgroundCommandPane(
-          key: ValueKey(id),
-          chat: chat,
-          daemon: daemon,
-          id: id,
-          onClose: onClose,
-        )
-      : SubagentPane(
-          key: ValueKey(id),
-          chat: chat,
-          daemon: daemon,
-          id: id,
-          onClose: onClose,
-        );
 }

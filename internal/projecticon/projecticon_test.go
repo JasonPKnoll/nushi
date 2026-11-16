@@ -125,7 +125,7 @@ func TestIconSetNotAFolder(t *testing.T) {
 	dir := t.TempDir()
 	fifo := filepath.Join(dir, "Assets.xcassets", "AppIcon.appiconset")
 	testcheck.NoErr(t, os.MkdirAll(filepath.Dir(fifo), 0o700))
-	testcheck.NoErr(t, syscall.Mkfifo(fifo, 0o600))
+	testcheck.Fifo(t, fifo)
 	put(t, dir, "icons/app_icon_64.png", pngOf(t, 64, 64, false))
 	link := filepath.Join(dir, "macos", "Runner", "Assets.xcassets", "AppIcon.appiconset")
 	testcheck.NoErr(t, os.MkdirAll(filepath.Dir(link), 0o700))

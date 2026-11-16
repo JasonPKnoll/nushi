@@ -25,6 +25,10 @@ abstract interface class AppInstall {
   /// sentence's clause.
   String get stopByHand;
 
+  /// Whether [stop] stops the daemon: where it can't (Windows, so far),
+  /// nothing offers to restart it ([restartsDaemon]).
+  bool get canStop;
+
   /// Starts the packaged [daemon] on [dataDir] in the background, where it
   /// outlives the app, through the user's login shell (`nushid -login`).
   /// It doesn't wait for the daemon to answer.
@@ -34,3 +38,29 @@ abstract interface class AppInstall {
   /// for it to go.
   Future<void> stop(String dataDir);
 }
+
+/// Restart daemon, where the app offers it.
+extension RestartsDaemon on AppInstall {
+  /// Whether the app can restart its daemon: it has one packaged, and
+  /// [AppInstall.stop] stops the one running.
+  bool get restartsDaemon => daemon != null && canStop;
+}
+
+/// The daemon's environment: the app's, without Nushi's own variables (a
+/// `NUSHID_DATA` or token the app inherited), the data folder for the
+/// daemon to keep (`NUSHID_DATA`), and the app's `NUSHI_DATA` when it has
+/// one (development), which the daemon's dev mode follows, as the Mac's
+/// `openHelper` passes it.
+Map<String, String> launchEnvironment(Map<String, String> env, String dir) => {
+  ...withoutNushi(env),
+  'NUSHID_DATA': dir,
+  'NUSHI_DATA': ?env['NUSHI_DATA'],
+};
+
+/// [env] without Nushi's own variables, every `NUSHI_*` and `NUSHID_*`:
+/// what a program the app starts gets, so a development run's data folder
+/// or token never reaches it.
+Map<String, String> withoutNushi(Map<String, String> env) => {
+  for (final MapEntry(:key, :value) in env.entries)
+    if (!key.startsWith('NUSHI_') && !key.startsWith('NUSHID_')) key: value,
+};

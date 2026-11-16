@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"syscall"
 	"testing"
 
 	"github.com/afrase/nushi/internal/testcheck"
@@ -100,7 +99,7 @@ func TestSaveRefuses(t *testing.T) {
 	testcheck.NoErr(t, os.Symlink("nowhere.md", filepath.Join(folder, "dangling.md")))
 	testcheck.NoErr(t, os.Symlink(dir, filepath.Join(folder, "up")))
 	testcheck.NoErr(t, os.MkdirAll(filepath.Join(folder, "sub"), 0o700))
-	testcheck.NoErr(t, syscall.Mkfifo(filepath.Join(folder, "fifo"), 0o600))
+	testcheck.Fifo(t, filepath.Join(folder, "fifo"))
 	testcheck.Write(t, filepath.Join(folder, "locked.txt"), "locked")
 	testcheck.NoErr(t, os.Chmod(filepath.Join(folder, "locked.txt"), 0o444))
 	var s Saver

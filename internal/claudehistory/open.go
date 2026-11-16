@@ -2,13 +2,11 @@ package claudehistory
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/afrase/nushi/internal/claude"
@@ -28,14 +26,14 @@ func (Local) OpenElsewhere(_ []string) map[string]string {
 	if _, err := os.UserHomeDir(); err != nil {
 		return nil
 	}
-	return open(filepath.Join(claude.ConfigDir(), "sessions"), started)
+	return open(filepath.Join(claude.ConfigDir(), "sessions"), domain(), started)
 }
 
 var record = regexp.MustCompile(`^(\d+)\.json$`)
 
-func open(dir string, startedAt func(pid int) (time.Time, bool)) map[string]string {
+// open reads the records in dir, here being this host's pidDomain.
+func open(dir, here string, startedAt func(pid int) (time.Time, bool)) map[string]string {
 	names, _ := os.ReadDir(dir)
-	here := domain()
 	out := map[string]string{}
 	for _, n := range names {
 		m := record.FindStringSubmatch(n.Name())
@@ -44,25 +42,26 @@ func open(dir string, startedAt func(pid int) (time.Time, bool)) map[string]stri
 		}
 		pid, _ := strconv.Atoi(m[1])
 		var r struct {
-			Pid        int    `json:"pid"`
-			SessionID  string `json:"sessionId"`
-			ProcStart  string `json:"procStart"`
-			Entrypoint string `json:"entrypoint"`
-			Domain     string `json:"pidDomain"`
-			Updated    int64  `json:"updatedAt"`
-			Started    int64  `json:"startedAt"`
-			StatusTime int64  `json:"statusUpdatedAt"`
+			Pid         int    `json:"pid"`
+			SessionID   string `json:"sessionId"`
+			ProcStart   string `json:"procStart"`
+			ProcStartFt string `json:"procStartFt"`
+			Entrypoint  string `json:"entrypoint"`
+			Domain      string `json:"pidDomain"`
+			Updated     int64  `json:"updatedAt"`
+			Started     int64  `json:"startedAt"`
+			StatusTime  int64  `json:"statusUpdatedAt"`
 		}
 		b, err := os.ReadFile(filepath.Join(dir, n.Name()))
 		if err != nil || json.Unmarshal(b, &r) != nil || r.Pid != pid || r.SessionID == "" || r.Domain != "" && r.Domain != here || !alive(pid) {
 			continue
 		}
 		start, known := startedAt(pid)
-		recorded, err := time.ParseInLocation("Mon Jan 2 15:04:05 2006", strings.Join(strings.Fields(r.ProcStart), " "), time.UTC)
+		recorded, unit, ok := recordedStart(r.ProcStart, r.ProcStartFt)
 		switch {
-		case err == nil && known && recorded.Sub(start.Truncate(time.Second)).Abs() > stepSlack:
+		case ok && known && recorded.Sub(start.Truncate(unit)).Abs() > stepSlack:
 			continue // another process has the pid now
-		case err != nil && time.Since(time.UnixMilli(max(r.Updated, r.Started, r.StatusTime))) > 24*time.Hour:
+		case !ok && time.Since(time.UnixMilli(max(r.Updated, r.Started, r.StatusTime))) > 24*time.Hour:
 			continue
 		}
 		out[r.SessionID] = "another app"
@@ -73,9 +72,30 @@ func open(dir string, startedAt func(pid int) (time.Time, bool)) map[string]stri
 	return out
 }
 
-// alive says whether a process runs with pid (one of another user's
-// counts).
-func alive(pid int) bool {
-	err := syscall.Kill(pid, 0)
-	return err == nil || errors.Is(err, syscall.EPERM)
+// fileTimeEpoch is 1601-01-01 UTC, where a Windows FILETIME counts from,
+// in 100 ns ticks before the Unix epoch.
+const fileTimeEpoch = 116444736000000000
+
+// fileTimeLimit is where Claude stops reading a procStartFt as a FILETIME:
+// it takes a token past it for another unit and calls such a pair the
+// same process, unable to tell (docs/facts/claude.md). Today's FILETIME
+// is about 1.34e17.
+const fileTimeLimit = 300000000000000000
+
+// recordedStart is when a record says its process started, to the unit
+// the record gives it in: procStart, ps's lstart to the second (macOS and
+// Linux), or procStartFt, the process's creation time as a FILETIME in
+// decimal (Windows). A record with neither, or one it can't read, has
+// none.
+func recordedStart(procStart, procStartFt string) (time.Time, time.Duration, bool) {
+	if procStartFt != "" {
+		ticks, err := strconv.ParseInt(procStartFt, 10, 64)
+		if err != nil || ticks < fileTimeEpoch || ticks >= fileTimeLimit {
+			return time.Time{}, 0, false
+		}
+		ticks -= fileTimeEpoch
+		return time.Unix(ticks/1e7, ticks%1e7*100).UTC(), 100 * time.Nanosecond, true
+	}
+	t, err := time.ParseInLocation("Mon Jan 2 15:04:05 2006", strings.Join(strings.Fields(procStart), " "), time.UTC)
+	return t, time.Second, err == nil
 }

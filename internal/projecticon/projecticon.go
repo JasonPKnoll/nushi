@@ -12,9 +12,9 @@ import (
 	"io/fs"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/afrase/nushi/internal/imagesize"
+	"github.com/afrase/nushi/internal/openflag"
 	"github.com/afrase/nushi/internal/regularfile"
 )
 
@@ -115,7 +115,7 @@ func largest(root *os.Root, dir string) (Icon, bool) {
 	if fi, err := root.Lstat(dir); err != nil || !fi.IsDir() {
 		return Icon{}, false
 	}
-	d, err := root.OpenFile(dir, os.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NONBLOCK, 0)
+	d, err := root.OpenFile(dir, os.O_RDONLY|openflag.Directory|openflag.NonBlock, 0)
 	if err != nil {
 		return Icon{}, false
 	}

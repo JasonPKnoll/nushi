@@ -25,6 +25,7 @@ import 'package:nushi/jira_view.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/native_linux.dart';
 import 'package:nushi/native_macos.dart';
+import 'package:nushi/native_windows.dart';
 import 'package:nushi/nothing_open.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/panes.dart';
@@ -52,7 +53,11 @@ void main() => runZonedGuarded(() {
   WidgetsFlutterBinding.ensureInitialized();
   // The machine's native edge, the app's one test of the platform (ADR
   // 0097, 0104), before anything that may reach it.
-  native = Platform.isLinux ? linuxNative() : macosNative();
+  native = Platform.isLinux
+      ? linuxNative()
+      : Platform.isWindows
+      ? windowsNative()
+      : macosNative();
   limitImageCache();
   catchErrors();
   themeFiles

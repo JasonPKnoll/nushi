@@ -4,6 +4,7 @@ import 'dart:ui' show AppExitResponse, AppExitType;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:nushi/agents.dart';
+import 'package:nushi/app_install.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_files.dart';
 import 'package:nushi/chat_keys.dart';
@@ -451,7 +452,7 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
     AppAction(
       .restart,
       'Restart daemon',
-      enabled: native.install.daemon != null,
+      enabled: native.install.restartsDaemon,
       run: () => unawaited(restartDaemonAsking(context, d)),
     ),
     AppAction(

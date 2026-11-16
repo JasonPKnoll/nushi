@@ -133,6 +133,7 @@ func (c *chat) restoreLocked(replayed []model.Item, times map[string]time.Time) 
 	c.showLocked(items)
 	clear(c.unsaved)
 	c.saveCopyLocked(copied, items)
+	c.followWorkflowsLocked()
 	c.logLocked().Info("transcript restored", "copy", len(copied), "replay", len(replayed), "shown", len(items), "compacted", compacted, "differs", differs)
 }
 

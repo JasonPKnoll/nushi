@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/afrase/nushi/internal/secrets"
 )
 
 // A tool call's input loses what looks secret before it is kept (and
@@ -35,7 +37,7 @@ func TestSecretsMaskedInInput(t *testing.T) {
 			if strings.Contains(got, core) {
 				t.Errorf("%s: kept in %s", name, got)
 			}
-			if !strings.Contains(got, secretMask) || !strings.Contains(got, "Call the API && print") {
+			if !strings.Contains(got, secrets.InputMask) || !strings.Contains(got, "Call the API && print") {
 				t.Errorf("%s: %s", name, got)
 			}
 		}

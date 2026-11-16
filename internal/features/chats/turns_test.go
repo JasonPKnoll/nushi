@@ -260,7 +260,9 @@ func TestAPermissionWhileTheSessionChanges(t *testing.T) {
 
 // The agent working on its own (after a background task) starts with a
 // notice, once per such turn; a late update to a call it made before
-// doesn't count.
+// doesn't count. Its turn ends with the usage_update that has a cost (its
+// result's); the ones Claude sends after each model call in it don't, so
+// the chat stays working between its steps.
 func TestTheAgentsOwnTurnIsMarked(t *testing.T) {
 	svc, agent, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
 	agent.updates = []acp.SessionUpdate{
@@ -271,10 +273,24 @@ func TestTheAgentsOwnTurnIsMarked(t *testing.T) {
 	update(c, acp.SessionUpdate{SessionUpdate: "tool_call_update", ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: "t1", Status: "completed"}})
 	update(c, chunk("m2", "The build "))
 	update(c, chunk("m2", "passed."))
-	update(c, acp.SessionUpdate{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2}})
+	update(c, acp.SessionUpdate{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2}}) // a model call's
+	c.mu.Lock()
+	own := c.ownTurn
+	c.mu.Unlock()
+	if !own {
+		t.Error("a model call's usage ended the agent's own turn")
+	}
+	update(c, chunk("m2b", " Now the tests."))
+	update(c, acp.SessionUpdate{SessionUpdate: "usage_update", UsageUpdate: &acp.UsageUpdate{Used: 1, Size: 2, Cost: &acp.Cost{Amount: 0.1, Currency: "USD"}}})
+	c.mu.Lock()
+	own = c.ownTurn
+	c.mu.Unlock()
+	if own {
+		t.Error("its result's usage didn't end it")
+	}
 	update(c, chunk("m3", "And the tests."))
 	want := []string{"user:build it", ":", "agent:Building in the background.",
-		"notice:On its own, after a background task", "agent:The build passed.",
+		"notice:On its own, after a background task", "agent:The build passed.", "agent: Now the tests.",
 		"notice:On its own, after a background task", "agent:And the tests."}
 	if got := texts(c); !slices.Equal(got, want) {
 		t.Errorf("the transcript: %q", got)

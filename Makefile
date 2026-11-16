@@ -42,7 +42,7 @@ BUILD := $(or $(shell git rev-list --count HEAD 2>/dev/null),1)
 MACOS_MIN := 13.0
 MACOS_CGO := -O2 -g -mmacosx-version-min=$(MACOS_MIN)
 
-.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-web lint lint-go lint-dart lint-linux check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
+.PHONY: run daemon stop app package package-linux install gen gen-tools test test-go test-packages test-app test-web lint lint-go lint-dart lint-linux lint-windows check check-app golden-diff renders lines relay relay-web icons adapters web web-fonts web-cut mermaid screenshots gallery claude-record
 
 # Starts the daemon in the background (unless one is running), then the app.
 run: daemon app
@@ -206,7 +206,7 @@ $(GOVULNCHECK): tools/lint/go.mod tools/lint/go.sum
 # (govulncheck asks vuln.go.dev, so this needs the network). CI runs the
 # parts as jobs of their own (.github/workflows/ci.yml); make check runs
 # everything they do.
-lint: lint-go lint-dart lint-linux
+lint: lint-go lint-dart lint-linux lint-windows
 
 # Go's: on macOS (the keychain's cgo needs its SDK).
 lint-go: $(GOLANGCI) $(GOVULNCHECK)
@@ -226,10 +226,24 @@ lint-linux: $(GOLANGCI)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GOLANGCI) run ./...
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOLANGCI) run ./...
 
+# Every package built, vetted and linted for Windows without cgo (ADR
+# 0124): what it lacks answers errors.ErrUnsupported, code macOS and Linux
+# share is in a _unix.go file, and a test of Unix's behaviour in a
+# _unix_test.go one, so the _windows.go files and their tests are checked
+# anywhere. unused is off: what only Unix's files call (the terminal's
+# reading, which Windows's stand-in never starts) is unused there, and
+# lint-go and lint-linux run it. amd64 only: Windows's types don't differ
+# by architecture as Linux's do.
+lint-windows: $(GOLANGCI)
+	GOOS=windows CGO_ENABLED=0 go build ./...
+	GOOS=windows CGO_ENABLED=0 go vet ./...
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 $(GOLANGCI) run --disable unused ./...
+
 # The protos' and Dart's, and the native code of the app and its Dart
-# packages only in a platform's *_macos.dart or *_linux.dart files
-# (tools/native-edge, ADR 0097, 0104), and the app's views built from the
-# shared controls and tokens (tools/design-check, docs/design.md): anywhere.
+# packages only in a platform's *_macos.dart, *_linux.dart or
+# *_windows.dart files (tools/native-edge, ADR 0097, 0104, 0125), and the
+# app's views built from the shared controls and tokens
+# (tools/design-check, docs/design.md): anywhere.
 lint-dart:
 	go run ./tools/native-edge $(addsuffix /lib,$(DART_DIRS))
 	go run ./tools/design-check app/lib
