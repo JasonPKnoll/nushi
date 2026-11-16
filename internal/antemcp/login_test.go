@@ -6,12 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/afrase/nushi/internal/ante"
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/testcheck"
 )
 
 const gateway = `{"mcp_servers": {"example-gateway": {"url": "https://mcp.example.com/mcp"}, "local-tools": {"command": "tools-mcp"}}}`
@@ -128,19 +130,27 @@ func TestLoginFailure(t *testing.T) {
 }
 
 // A sign-in never finished ends with its context, and so does the wait.
-// The context also covers the version check before it, which a loaded
-// machine can take past a few hundred milliseconds, so it's given 2 s.
+// The context also covers the version check before it, which takes what
+// a loaded machine gives it, so it ends once the sign-in itself runs
+// rather than after a time.
 func TestLoginGivesUp(t *testing.T) {
 	home(t, gateway)
-	run, _ := fakeAnte(t, "0.3", `exec sleep 60`)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	run, calls := fakeAnte(t, "0.3", `exec sleep 60`)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	start := time.Now()
+	ended := make(chan time.Time, 1)
+	go func() {
+		if !testcheck.Eventually(func() bool { return slices.Contains(calls(), "auth login -- example-gateway") }) {
+			t.Error("the sign-in never ran")
+		}
+		ended <- time.Now()
+		cancel()
+	}()
 	err := Ante{Run: run}.Login(ctx, "/f", "example-gateway")
 	if err == nil || !strings.Contains(err.Error(), "in time") {
 		t.Errorf("err = %v", err)
 	}
-	if d := time.Since(start); d > 10*time.Second {
+	if d := time.Since(<-ended); d > 30*time.Second {
 		t.Errorf("waited %v", d)
 	}
 }
