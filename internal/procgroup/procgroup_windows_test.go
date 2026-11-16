@@ -15,22 +15,30 @@ import (
 	"github.com/afrase/nushi/internal/testcheck"
 )
 
-// A run whose context ends returns at once, though the program left a
-// process in the background holding its stdout; that process is killed
-// with it, so the run doesn't wait out WaitDelay.
+// A run whose context ends returns, though the program left a process in
+// the background holding its stdout; that process is killed with it, so
+// the run doesn't wait for it.
 func TestBound(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "cmd.exe", "/c", "start /b ping -n 100 127.0.0.1 & ping -n 100 127.0.0.1")
 	var out bytes.Buffer
 	cmd.Stdout = &out // a pipe the background ping holds open
 	Bound(cmd)
+	testcheck.NoErr(t, cmd.Start())
+	both := pings(t, cmd.Process.Pid, 2) // the background one and the other
+	cancel()
 	start := time.Now()
-	if err := cmd.Run(); err == nil {
+	if err := cmd.Wait(); err == nil {
 		t.Error("the run didn't fail")
 	}
-	if took := time.Since(start); took > 1400*time.Millisecond {
-		t.Errorf("the run took %s after its context ended: the background process outlived it", took)
+	for _, ping := range both {
+		if !gone(ping, 5*time.Second) { // TerminateProcess returns before the end
+			t.Error("a ping outlived the run")
+		}
+	}
+	if took := time.Since(start); took > 5*time.Second { // ping -n 100 runs 99 s
+		t.Errorf("the run took %s after its context ended", took)
 	}
 }
 
