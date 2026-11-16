@@ -242,7 +242,7 @@ class _WorkflowPaneState extends State<WorkflowPane> {
           for (final (title, list) in groups) ...[
             _PhaseRow(
               title: title.isEmpty ? 'No phase' : title,
-              agents: list,
+              count: _phaseCount(w, title, list),
               folded: _folded.contains(title),
               onTap: () => setState(
                 () => _folded.contains(title)
@@ -285,17 +285,32 @@ List<(String, List<WorkflowAgent>)> _grouped(
   ];
 }
 
-/// A phase's title and progress ("Review · 5/7"), which folds its agents.
+/// A phase's count as the card's [phaseProgress] says it ("5/7"): its
+/// agents that ended done or failed of those started, from the run's
+/// summary; for a phase the summary doesn't hold, from its agents listed,
+/// one stopped with the run not counted as ended.
+String _phaseCount(Workflow w, String title, List<WorkflowAgent> agents) {
+  for (final p in w.phases) {
+    if (title.isNotEmpty && p.title == title) {
+      return '${p.done + p.failed}/${p.started}';
+    }
+  }
+  final ended = agents.where((a) => a.state == 'done' || a.state == 'failed');
+  return '${ended.length}/${agents.length}';
+}
+
+/// A phase's title and progress ("Review 5/7", as the card says it), which
+/// folds its agents.
 class _PhaseRow extends StatelessWidget {
   const new({
     required this.title,
-    required this.agents,
+    required this.count,
     required this.folded,
     required this.onTap,
   });
 
   final String title;
-  final List<WorkflowAgent> agents;
+  final String count;
   final bool folded;
   final VoidCallback onTap;
 
@@ -303,7 +318,6 @@ class _PhaseRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
     final t = theme.t;
-    final ended = agents.where((a) => a.state != 'running').length;
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 2),
       child: Tap(
@@ -317,7 +331,7 @@ class _PhaseRow extends StatelessWidget {
               Chevron(open: !folded),
               Expanded(
                 child: Text(
-                  '$title · $ended/${agents.length}',
+                  '$title $count',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.ui(t.textSecondary, size: 12, weight: .w600),

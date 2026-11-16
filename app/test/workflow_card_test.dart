@@ -45,15 +45,23 @@ Item workflowCall(String state, {bool stalled = false, String id = 'wf'}) {
       ended: ended ? _ms(Duration.zero) : null,
       active: stalled ? _ms(const Duration(hours: 1, minutes: 5)) : null,
       stalled: stalled,
-      agents: ended ? 12 : 9,
-      done: ended ? 12 : 5,
+      // While it runs, as workflow_pane_test's agents are: the pane's
+      // tree and the card count alike.
+      agents: ended ? 12 : 10,
+      done: ended ? 12 : 6,
+      failed: ended ? 0 : 1,
       phases: [
         WorkflowPhase(title: 'Map', started: 2, done: 2),
-        WorkflowPhase(title: 'Review', started: 7, done: ended ? 7 : 3),
+        WorkflowPhase(
+          title: 'Review',
+          started: 7,
+          done: ended ? 7 : 3,
+          failed: ended ? 0 : 1,
+        ),
         if (ended) WorkflowPhase(title: 'Verify', started: 3, done: 3),
       ],
-      running: ended ? null : ['review:security', 'review:ui', 'review:perf'],
-      runningCount: ended ? 0 : 4,
+      running: ended ? null : ['review:ui', 'review:perf', 'review:api'],
+      runningCount: ended ? 0 : 3,
     ),
   );
 }
@@ -87,7 +95,7 @@ void main() {
   test('each state in words', () {
     expect(
       workflowState(workflowCall('running').workflow),
-      'Review 3/7 · 4 running · 4m 12s',
+      'Review 4/7 · 3 running · 4m 12s',
     );
     expect(
       workflowState(workflowCall('done').workflow),
@@ -107,7 +115,7 @@ void main() {
     );
     expect(
       workflowState(workflowCall('running', stalled: true).workflow),
-      startsWith('no activity for 1h · Review 3/7'),
+      startsWith('no activity for 1h · Review 4/7'),
     );
     expect(
       workflowState(Workflow(state: 'running', started: _ms(Duration.zero))),
@@ -115,11 +123,13 @@ void main() {
     );
     expect(
       phasesLine(workflowCall('running').workflow),
-      'Map 2/2 · Review 3/7',
+      'Map 2/2 · Review 4/7',
     );
     expect(
-      runningLine(workflowCall('running').workflow),
-      'review:security, review:ui, review:perf +1',
+      runningLine(
+        Workflow(running: ['review:ui', 'review:perf'], runningCount: 3),
+      ),
+      'review:ui, review:perf +1',
     );
     expect(workflowEndWords(workflowCall('unknown').workflow), 'paused');
     expect(
@@ -189,7 +199,7 @@ void main() {
     testWidgets('a narrow workflow card: the state on a line of its own '
         '($name)', (tester) async {
       await _pump(tester, workflowCall('running'), tokens: tokens, width: 392);
-      expect(find.text('Map 2/2 · Review 3/7'), findsNothing);
+      expect(find.text('Map 2/2 · Review 4/7'), findsNothing);
       await expectLater(
         find.byType(WorkflowCard),
         matchesGoldenFile('goldens/workflow_card_narrow_$name.png'),

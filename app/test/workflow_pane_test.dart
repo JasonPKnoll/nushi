@@ -11,6 +11,7 @@ import 'package:nushi/subagent_pane.dart';
 import 'package:nushi/task_pane.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/workflow_pane.dart';
+import 'package:nushi/workflows.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -178,19 +179,46 @@ void main() {
   ) async {
     final fake = workflowFake();
     final d = await _pane(tester, fake, workflowChat());
-    expect(find.text('Map · 2/2'), findsOne);
-    expect(find.text('Review · 4/7'), findsOne);
-    expect(find.text('No phase · 1/1'), findsOne);
+    expect(find.text('Map 2/2'), findsOne);
+    expect(find.text('Review 4/7'), findsOne);
+    expect(find.text('No phase 1/1'), findsOne);
     expect(find.text('review:security'), findsOne);
     expect(
-      tester.getRect(find.text('No phase · 1/1')).top,
+      tester.getRect(find.text('No phase 1/1')).top,
       greaterThan(tester.getRect(find.text('review:tests')).top),
     );
     // A phase folds its agents.
-    await tester.tap(find.text('Map · 2/2'));
+    await tester.tap(find.text('Map 2/2'));
     await tester.pump();
     expect(find.text('map:files'), findsNothing);
     expect(_asked<GetWorkflowRequest>(fake), 1);
+    await closeView(tester, d);
+  });
+
+  testWidgets('a stopped run counts its phases as its card does: an agent '
+      'stopped with it is not one that ended', (tester) async {
+    final stopped = [
+      for (final a in agents)
+        a.deepCopy()..state = a.state == 'running' ? 'stopped' : a.state,
+    ];
+    final chat = workflowChat(state: 'stopped');
+    chat.items.single.workflow
+      ..phases.clear()
+      ..phases.addAll([
+        WorkflowPhase(title: 'Map', started: 2, done: 2),
+        WorkflowPhase(title: 'Review', started: 7, done: 3, failed: 1),
+      ]);
+    final fake = workflowFake()
+      ..answer = (input) => switch (input) {
+        GetWorkflowRequest() => GetWorkflowResponse(
+          workflow: chat.items.single.workflow,
+          agents: stopped,
+        ),
+        _ => null,
+      };
+    final d = await _pane(tester, fake, chat);
+    expect(find.text('Review 4/7'), findsOne);
+    expect(phaseProgress(chat.items.single.workflow.phases[1]), 'Review 4/7');
     await closeView(tester, d);
   });
 
@@ -240,7 +268,7 @@ void main() {
     expect(tester.getRect(find.byTooltip('All agents')), back);
     await tester.tap(find.byTooltip('All agents'));
     await tester.pump();
-    expect(find.text('Review · 4/7'), findsOne);
+    expect(find.text('Review 4/7'), findsOne);
     await tester.pump(const Duration(seconds: 6));
     expect(_asked<GetWorkflowAgentRequest>(fake), 2);
     await closeView(tester, d);
