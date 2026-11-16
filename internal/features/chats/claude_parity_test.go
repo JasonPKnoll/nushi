@@ -52,8 +52,31 @@ func TestClaudeParity(t *testing.T) {
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("the Go agent's chats differ from the adapter's:\n%s", differences(got, want))
 			}
+			if name := filepath.Base(dir); name == "workflow" || name == "workflow-stop" {
+				launchedARun(t, want)
+			}
 		})
 	}
+}
+
+// launchedARun checks the recorded Workflow call became a workflow's item
+// (ADR 0127): the run's and task's ids, read from the call's _meta as
+// Claude sends it. The comparison above can't tell: both sides go through
+// the same reading.
+func launchedARun(t *testing.T, views []parity) {
+	t.Helper()
+	for _, v := range views {
+		for _, it := range v.Items {
+			if it.Tool != "Workflow" {
+				continue
+			}
+			if w := it.Workflow; w == nil || !strings.HasPrefix(w.RunID, "wf_") || w.TaskID == "" || it.TaskID != w.TaskID {
+				t.Errorf("the Workflow call's run: %+v", w)
+			}
+			return
+		}
+	}
+	t.Error("no Workflow call")
 }
 
 // After a refusal's fallback both agents leave the model option on the
