@@ -3,6 +3,7 @@ package chats
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -257,5 +258,46 @@ func TestRemoveWorktreeKeepsAStoppedChatFromReopening(t *testing.T) {
 	testcheck.NoErr(t, <-removed)
 	if again, _, _ := agent.count(); busy || again != launches {
 		t.Errorf("a look reopened the chat during the removal: busy %v, %d agents started", busy, again-launches)
+	}
+}
+
+// namedWorktrees makes each worktree it's asked for as a folder under
+// base, and says which it removed.
+type namedWorktrees struct {
+	removingWorktrees
+	base string
+}
+
+func (w *namedWorktrees) Add(_ context.Context, _, name, _, _ string) (model.Worktree, string, error) {
+	path := filepath.Join(w.base, name)
+	if err := os.Mkdir(path, 0o700); err != nil {
+		return model.Worktree{}, "", err
+	}
+	return model.Worktree{Path: path}, path, nil
+}
+
+// A new worktree doesn't take the path of one a chat still has on record,
+// though that one was removed and git has the name free again: the chat
+// would count as working in the new worktree, whose own chat then couldn't
+// remove it ("works in this worktree too").
+func TestANewWorktreeSkipsANameAChatHasOnRecord(t *testing.T) {
+	svc, _, _ := newChat(t, `{"sessionId":"s1"}`, &memModes{})
+	wts := &namedWorktrees{base: t.TempDir()}
+	svc.worktrees = wts
+	old := filepath.Join(wts.base, "amber-otter")
+	svc.sessions.(*memSessions).stored = []model.ChatRecord{{ID: "earlier", Folder: old, Worktree: &model.Worktree{Path: old}}}
+	names := []string{"amber-otter", "brave-owl"}
+	svc.names = func() string {
+		name := names[0]
+		names = names[1:]
+		return name
+	}
+	wt, in, err := svc.addWorktree(context.Background(), t.TempDir(), "", "")
+	testcheck.NoErr(t, err)
+	if want := filepath.Join(wts.base, "brave-owl"); wt.Path != want || in != want {
+		t.Errorf("the worktree is %q in %q, want %q", wt.Path, in, want)
+	}
+	if !slices.Equal(wts.removed, []string{old}) {
+		t.Errorf("removed %q, want the one made at the name on record", wts.removed)
 	}
 }

@@ -77,15 +77,39 @@ var (
 	nouns      = strings.Fields("otter badger beaver bison crane falcon ferret gecko heron ibis koala lemur lynx marten moose newt orca owl panda puffin quokka raven robin seal sparrow stoat tapir walrus wombat yak")
 )
 
+// worktreeName is a name for a new worktree: an adjective and an animal.
+func (s *Service) worktreeName() string {
+	if s.names != nil {
+		return s.names()
+	}
+	return adjectives[rand.IntN(len(adjectives))] + "-" + nouns[rand.IntN(len(nouns))] //nolint:gosec // a worktree's name, not a secret
+}
+
+// onRecord says whether a chat's record has a worktree at path, or a
+// folder in it. Chats that can't be read take no names.
+func (s *Service) onRecord(path string) bool {
+	stored, err := s.sessions.Sessions()
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(stored, func(r model.ChatRecord) bool {
+		at := func(wt model.Worktree) bool { return wt.Path == path }
+		return within(r.Folder, path) || (r.Worktree != nil && at(*r.Worktree)) || slices.ContainsFunc(r.EarlierWorktrees, at)
+	})
+}
+
 // addWorktree makes a worktree for a chat in folder's repository, with a
 // short, readable name not yet taken there (or on branch, with a number
 // after it if it's taken, in a folder named after it with "-" for "/"),
-// and returns the chat's folder in it. from, if given, is what the
+// and returns the chat's folder in it. A name is taken, too, while a chat
+// still has a worktree of that path on record, though the worktree was
+// removed: that chat would count as working in the new one (othersIn),
+// and find another chat's work in its folder. from, if given, is what the
 // branch starts from (a pull request's head), else folder's HEAD.
 func (s *Service) addWorktree(ctx context.Context, folder, branch, from string) (*model.Worktree, string, error) {
 	for i := range 20 {
-		name := adjectives[rand.IntN(len(adjectives))] + "-" + nouns[rand.IntN(len(nouns))] //nolint:gosec // a worktree's name, not a secret
-		named := ""                                                                         // the branch: Nushi's own, after the name
+		name := s.worktreeName()
+		named := "" // the branch: Nushi's own, after the name
 		if branch != "" {
 			named = branch
 			if i > 0 {
@@ -94,6 +118,10 @@ func (s *Service) addWorktree(ctx context.Context, folder, branch, from string) 
 			name = strings.ReplaceAll(named, "/", "-") // one folder, not one in another
 		}
 		wt, in, err := s.worktrees.Add(ctx, folder, name, named, from)
+		if err == nil && s.onRecord(wt.Path) {
+			s.dropWorktree(&wt)
+			continue
+		}
 		if err == nil {
 			if _, err := os.Stat(in); err != nil { // a folder git doesn't track
 				s.dropWorktree(&wt)

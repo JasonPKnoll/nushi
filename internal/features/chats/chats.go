@@ -31,8 +31,9 @@ type Service struct {
 	remembered Remembered
 	sessions   Sessions
 	worktrees  Worktrees
-	scratch    string // the folder that holds chats' scratch folders
-	uploads    string // the folder that holds chats' uploaded files (uploads.go)
+	names      func() string // a test's worktree names, in place of random ones
+	scratch    string        // the folder that holds chats' scratch folders
+	uploads    string        // the folder that holds chats' uploaded files (uploads.go)
 	publish    func(model.Event)
 
 	terminals Terminals   // set once at startup, if there are any
