@@ -26,19 +26,19 @@ func (l *liveSessions) SaveSession(r model.ChatRecord) error {
 	return nil
 }
 
-// pushedAt makes c's record say it pushed branch first at first and last
-// at last.
-func pushedAt(c *chat, branch string, first, last time.Time) {
+// pushedAt makes c's record say it pushed branch sub first at first and
+// last at last.
+func pushedAt(c *chat, first, last time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.saveLocked(func(s *model.ChatRecord) {
-		s.Pushed = append(s.Pushed, model.BranchPush{Branch: branch, First: first, Last: last})
+		s.Pushed = append(s.Pushed, model.BranchPush{Branch: "sub", First: first, Last: last})
 	})
 }
 
 // prItem is pull request n of a/b as GitHub says it, opened at created.
 func prItem(n int, created time.Time) model.GitHubItem {
-	return model.GitHubItem{GitHubRef: model.GitHubRef{Host: "github.com", Repo: "a/b", Number: n}, ID: fmt.Sprint("PR_", n), Pull: true, Created: created}
+	return model.GitHubItem{Host: "github.com", Repo: "a/b", Number: n, ID: fmt.Sprint("PR_", n), Pull: true, Created: created}
 }
 
 // TestFoundPullInItsLife (the owner, 2026-11-16: "old chats have PRs that
@@ -50,7 +50,7 @@ func prItem(n int, created time.Time) model.GitHubItem {
 func TestFoundPullInItsLife(t *testing.T) {
 	svc, _, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
 	began := c.record.Created
-	pushedAt(c, "sub", began.Add(time.Minute), began.Add(time.Minute))
+	pushedAt(c, began.Add(time.Minute), began.Add(time.Minute))
 	all := func() string {
 		s, err := svc.Session(c.id)
 		testcheck.NoErr(t, err)
@@ -150,9 +150,9 @@ func TestFoundPullTwoChats(t *testing.T) {
 	a, b, c := svc.chats[aID], svc.chats[bID], svc.chats[cID]
 	base := time.Now().Add(time.Minute)
 	at := func(n int) time.Time { return base.Add(time.Duration(n) * time.Minute) }
-	pushedAt(a, "sub", at(0), at(0))
-	pushedAt(b, "sub", at(10), at(10))
-	pushedAt(c, "sub", at(3), at(3))
+	pushedAt(a, at(0), at(0))
+	pushedAt(b, at(10), at(10))
+	pushedAt(c, at(3), at(3))
 	pulls := func(id string) string {
 		s, err := svc.Session(id)
 		testcheck.NoErr(t, err)

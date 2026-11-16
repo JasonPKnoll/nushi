@@ -37,6 +37,8 @@ func pushed(it model.Item) bool {
 // call of it pushed, and when (not as a reopen replays it, nor a side
 // chat's). It reads the branch with the chat locked, once a push, so the
 // ask that follows the push sees it.
+//
+//nolint:contextcheck // as an agent's update is taken, after the request behind it is gone: the chat's own life bounds it
 func (c *chat) pushedLocked(it model.Item) {
 	if c.replaying || c.quiet || c.parent != nil || c.worktrees == nil || !pushed(it) {
 		return
