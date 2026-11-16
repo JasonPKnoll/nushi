@@ -21,8 +21,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/afrase/claude-acp-go/claudeacp"
-
 	"github.com/afrase/nushi/internal/ante"
 	"github.com/afrase/nushi/internal/api"
 	"github.com/afrase/nushi/internal/claude"
@@ -63,7 +61,7 @@ func main() {
 		}
 	}
 	if len(os.Args) > 1 && os.Args[1] == claude.AgentCommand { // and Claude, through its Go agent (ADR 0066)
-		if claudeacp.Main() != nil {
+		if runClaudeAgent() != nil {
 			os.Exit(1) // Main logged why
 		}
 		return

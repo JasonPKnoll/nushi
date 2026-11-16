@@ -18,6 +18,8 @@ import (
 
 	"github.com/afrase/acp-go/steering"
 	acp "github.com/afrase/acp-go/unstable"
+
+	"github.com/afrase/nushi/internal/batchfile"
 )
 
 // NotFound says an agent's error is ACP's "Resource not found" (-32002),
@@ -41,11 +43,13 @@ type Agent struct {
 
 // Start runs cmd, in its own process group, and speaks ACP over its stdin
 // and stdout; what the agent sends goes to client, and what happens to
-// log.
+// log. On Windows an npm shim runs as node and its script
+// (batchfile.Guard).
 func Start(cmd *exec.Cmd, client acp.Client, log *slog.Logger) (*Agent, error) {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
+	batchfile.Guard(cmd)
 	stderr := &stderrLines{log: log, waiting: true}
 	cmd.Stderr = stderr
 	calls := &callLog{}

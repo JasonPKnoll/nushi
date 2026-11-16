@@ -8,11 +8,16 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/afrase/nushi/internal/batchfile"
 )
 
-// Own does nothing: Windows has no process group a child joins by itself,
-// so Kill finds what cmd started by its parents instead (ADR 0123).
-func Own(*exec.Cmd) {}
+// Own guards cmd against cmd.exe (batchfile.Guard), as every command
+// Nushi starts passes here: an npm shim runs as node and its script, and
+// nothing runs from the current folder by a bare name. Windows has no
+// process group a child joins by itself, so Kill finds what cmd started by
+// its parents instead (ADR 0123).
+func Own(cmd *exec.Cmd) { batchfile.Guard(cmd) }
 
 // Kill kills pid's process tree with taskkill's /T, which follows each
 // process's parent from pid down. One whose parent ended before the kill
