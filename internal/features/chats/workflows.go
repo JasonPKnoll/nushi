@@ -1,6 +1,7 @@
 package chats
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -46,6 +47,11 @@ func (c *chat) workflowLocked(it *model.Item) {
 	}
 	if it.Workflow.Final() || c.following[it.ID] != nil {
 		return
+	}
+	if it.Workflow.Session == "" { // where its files are, from now on
+		w := *it.Workflow
+		w.Session, w.Folder = c.sid, c.record.Folder
+		it.Workflow = &w
 	}
 	f := &follow{poke: make(chan struct{}, 1), since: time.Now()}
 	// The agent running now ran it, unless the chat is reopening: a run
@@ -104,7 +110,11 @@ func (c *chat) followWorkflow(callID string, f *follow) {
 			c.mu.Unlock()
 			return
 		}
-		w, sid, folder, gone := *it.Workflow, c.sid, c.record.Folder, f.owner != nil && c.agent != f.owner
+		sid, folder, w := c.sidFolderLocked(*it)
+		// The run lives in the claude of the session that launched it: that
+		// agent gone, or the chat on another session (it stops that claude),
+		// the run went with it.
+		gone := f.owner != nil && (c.agent != f.owner || c.sid != sid)
 		c.mu.Unlock()
 		got, err := c.kind.workflows.ReadWorkflow(sid, folder, w)
 		c.mu.Lock()
@@ -280,9 +290,15 @@ func (s *Service) workflowCall(chatID, callID string) (*chat, model.Item, error)
 	return c, *it, nil
 }
 
-// sidFolder is what the reader needs of the chat for call's run.
+// sidFolder is what the reader needs of the chat for call's run: the
+// session and folder its files are in.
 func (c *chat) sidFolder(call model.Item) (sid, folder string, w model.Workflow) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.sid, c.record.Folder, *call.Workflow
+	return c.sidFolderLocked(call)
+}
+
+func (c *chat) sidFolderLocked(call model.Item) (sid, folder string, w model.Workflow) {
+	w = *call.Workflow
+	return cmp.Or(w.Session, c.sid), cmp.Or(w.Folder, c.record.Folder), w
 }

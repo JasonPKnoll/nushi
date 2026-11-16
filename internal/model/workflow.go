@@ -22,8 +22,14 @@ import "time"
 // first line), at most 2 KB. Stalled says
 // no file of the run changed for so long (an hour) that it no longer
 // counts as working, though nothing says it ended; any change clears it.
+//
+// Session and Folder are where the run's files are: the agent's session
+// and the chat's folder when the run was first followed. A Move or a
+// rewind gives the chat another session, and the run's files stay with
+// the one that launched it. Neither goes on the wire.
 type Workflow struct {
 	RunID, TaskID, Name, Description string
+	Session, Folder                  string `json:",omitzero"`
 	State, End                       string
 	Started                          time.Time `json:",omitzero"`
 	Ended                            time.Time `json:",omitzero"`

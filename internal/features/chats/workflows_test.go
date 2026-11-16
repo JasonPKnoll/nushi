@@ -25,10 +25,15 @@ type fakeWorkflows struct {
 	reads  chan int
 	agents []model.WorkflowAgent
 	items  []model.Item
+	sids   map[string]bool // the sessions read
 }
 
-func (f *fakeWorkflows) ReadWorkflow(_, _ string, w model.Workflow) (model.Workflow, error) {
+func (f *fakeWorkflows) ReadWorkflow(sid, _ string, w model.Workflow) (model.Workflow, error) {
 	f.mu.Lock()
+	if f.sids == nil {
+		f.sids = map[string]bool{}
+	}
+	f.sids[sid] = true
 	f.n++
 	n, read := f.n, f.read
 	f.mu.Unlock()
@@ -40,7 +45,13 @@ func (f *fakeWorkflows) ReadWorkflow(_, _ string, w model.Workflow) (model.Workf
 	return got, err
 }
 
-func (f *fakeWorkflows) WorkflowAgents(string, string, model.Workflow) ([]model.WorkflowAgent, error) {
+func (f *fakeWorkflows) WorkflowAgents(sid, _ string, _ model.Workflow) ([]model.WorkflowAgent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.sids == nil {
+		f.sids = map[string]bool{}
+	}
+	f.sids[sid] = true
 	return f.agents, nil
 }
 
@@ -278,6 +289,35 @@ func TestAWorkflowWhoseFilesGo(t *testing.T) {
 				t.Errorf("%d still counted", n)
 			}
 		})
+	}
+}
+
+// The run's files stay with the session that launched it: once the chat
+// is on another session (a Move forks it, and stops the claude that ran
+// the run), the follower and the pane still read the run's, and the run
+// ends with its claude.
+func TestAWorkflowStaysWithItsSession(t *testing.T) {
+	f := workflowChat(t, Timing{WorkflowGrace: time.Millisecond, WorkflowPoll: time.Hour}, runningAs)
+	f.files.waitReads(t, 1)
+	f.c.mu.Lock()
+	launched := f.c.sid
+	f.c.sid, f.c.record.Folder = "22222222-3333-4444-5555-666666666666", t.TempDir()
+	f.files.mu.Lock()
+	f.files.sids = nil
+	f.files.mu.Unlock()
+	f.c.pokeWorkflowsLocked()
+	f.c.mu.Unlock()
+	eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.Final() })
+	if w := workflowOf(f.c); w.State != "stopped" || w.Session != launched {
+		t.Errorf("after the move: %+v", w)
+	}
+	if _, _, _, err := f.svc.Workflow(f.c.id, wfCall); err != nil {
+		t.Fatal(err)
+	}
+	f.files.mu.Lock()
+	defer f.files.mu.Unlock()
+	if len(f.files.sids) != 1 || !f.files.sids[launched] {
+		t.Errorf("read sessions %v, want only %s", f.files.sids, launched)
 	}
 }
 
