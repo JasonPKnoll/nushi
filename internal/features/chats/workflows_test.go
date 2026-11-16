@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/afrase/nushi/internal/model"
 	"github.com/afrase/nushi/internal/testcheck"
+	"github.com/afrase/nushi/internal/transcripts"
 )
 
 // fakeWorkflows reads a run as the test says: read, by the run as the chat
@@ -116,6 +118,14 @@ const wfCall = "toolu_wf"
 
 func workflowChat(t *testing.T, timing Timing, read func(model.Workflow) (model.Workflow, error)) workflowFixture {
 	t.Helper()
+	f := workflowService(t, timing, read)
+	launch(f.c)
+	return f
+}
+
+// workflowService is workflowChat's chat before the call came.
+func workflowService(t *testing.T, timing Timing, read func(model.Workflow) (model.Workflow, error)) workflowFixture {
+	t.Helper()
 	agent := &fakeAgent{}
 	testcheck.NoErr(t, json.Unmarshal([]byte(claudeSession), &agent.session))
 	files := &fakeWorkflows{read: read, reads: make(chan int, 1000)}
@@ -131,9 +141,7 @@ func workflowChat(t *testing.T, timing Timing, read func(model.Workflow) (model.
 	t.Cleanup(svc.Close)
 	id, err := svc.Start(t.Context(), "", t.TempDir(), false)
 	testcheck.NoErr(t, err)
-	c := svc.chats[id]
-	launch(c)
-	return workflowFixture{svc, agent, c, files, events}
+	return workflowFixture{svc, agent, svc.chats[id], files, events}
 }
 
 func cmpDuration(a, b time.Duration) time.Duration {
@@ -395,30 +403,68 @@ func TestAWorkflowEndsWithItsAgent(t *testing.T) {
 	}
 }
 
-// A run no agent of this daemon's runs (the chat reopened since) is
-// followed while its files change, and ends stopped once they are still.
+// launchText is the Workflow call's output as a replay has it: the
+// call's text alone, no toolResponse.
+const launchText = "Workflow launched in background. Task ID: w9u1xb6ik\nSummary: Ask four helpers\nRun ID: wf_769a004c-2aa\n"
+
+// A reopened chat's replay has the call's text alone: restoring the
+// transcript follows its run, with no agent of this daemon's as its owner
+// (the claude that ran it went with the daemon that started it). It runs
+// while its files change, ends stopped once they are still, or done by
+// its snapshot.
 func TestAWorkflowAfterAReopen(t *testing.T) {
-	var mu sync.Mutex
-	active := time.Now()
-	f := workflowChat(t, Timing{WorkflowQuiet: time.Hour}, func(w model.Workflow) (model.Workflow, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		w, _ = runningAs(w)
-		w.Active = active
-		return w, nil
-	})
-	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
-	f.c.mu.Lock()
-	f.c.following[wfCall].owner = nil // as followWorkflowsLocked follows it after a reopen
-	f.c.mu.Unlock()
-	f.files.waitReads(t, 5)
-	if w := workflowOf(f.c); w.State != "running" {
-		t.Fatalf("its files fresh: %+v", w)
+	for name, end := range map[string]string{"its files still": "stopped", "a snapshot": "done"} {
+		t.Run(name, func(t *testing.T) {
+			var mu sync.Mutex
+			active := time.Now()
+			f := workflowService(t, Timing{WorkflowQuiet: time.Hour}, func(w model.Workflow) (model.Workflow, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				w, _ = runningAs(w)
+				w.Active = active
+				return w, nil
+			})
+			f.c.mu.Lock()
+			f.c.busy = true // reopening: the agent replays
+			f.c.restoreLocked([]model.Item{{ID: wfCall, Kind: model.ToolCall, Tool: "Workflow", Status: "completed", Text: launchText}}, nil)
+			fl := f.c.following[wfCall]
+			f.c.busy = false
+			f.c.mu.Unlock()
+			if fl == nil || fl.owner != nil {
+				t.Fatalf("followed %+v", fl)
+			}
+			f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+			if w := workflowOf(f.c); w.State != "running" || w.RunID != "wf_769a004c-2aa" || w.TaskID != "w9u1xb6ik" {
+				t.Fatalf("its files fresh: %+v", w)
+			}
+			if end == "done" {
+				f.files.set(endedAs("done", "completed"))
+			} else {
+				mu.Lock()
+				active = time.Now().Add(-2 * time.Hour)
+				mu.Unlock()
+			}
+			eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.State == end })
+		})
 	}
-	mu.Lock()
-	active = time.Now().Add(-2 * time.Hour)
-	mu.Unlock()
-	eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.State == "stopped" })
+}
+
+// Items let go and read back from the copy follow the runs in them that
+// hadn't ended.
+func TestAWorkflowFollowedWhenItsItemsComeBack(t *testing.T) {
+	f := workflowService(t, Timing{}, runningAs)
+	store, err := transcripts.Open(filepath.Join(t.TempDir(), "transcripts"))
+	testcheck.NoErr(t, err)
+	f.c.mu.Lock()
+	f.c.copies = store
+	f.c.mu.Unlock()
+	w := &model.Workflow{RunID: "wf_769a004c-2aa", TaskID: "w9u1xb6ik", State: "running"}
+	testcheck.NoErr(t, store.Replace(f.c.id, []model.Item{{ID: wfCall, Kind: model.ToolCall, Tool: "Workflow", Status: "completed", Workflow: w, TaskID: w.TaskID}}))
+	f.c.mu.Lock()
+	f.c.items, f.c.inCopy = nil, true
+	f.c.itemsBackLocked()
+	f.c.mu.Unlock()
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
 }
 
 // A run whose files stay still for an hour, its agent alive, stalls: no
