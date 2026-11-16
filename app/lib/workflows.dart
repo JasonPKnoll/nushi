@@ -80,14 +80,8 @@ String _quiet(Workflow w) {
   return '${h < 1 ? 1 : h}h';
 }
 
-/// Its phases on one line: "Map ✓ · Design ✓ · Review 5/7".
-String phasesLine(Workflow w) => [
-  for (final p in w.phases)
-    if (p.started > 0 && p.done + p.failed >= p.started && p != currentPhase(w))
-      '${p.title} ✓'
-    else
-      phaseProgress(p),
-].join(' · ');
+/// Its phases on one line, each with its progress: "Map 2/2 · Review 5/7".
+String phasesLine(Workflow w) => w.phases.map(phaseProgress).join(' · ');
 
 /// Who runs now: "review:security, review:ui +1".
 String runningLine(Workflow w) {

@@ -113,7 +113,10 @@ void main() {
       workflowState(Workflow(state: 'running', started: _ms(Duration.zero))),
       'starting · 0s',
     );
-    expect(phasesLine(workflowCall('running').workflow), 'Map ✓ · Review 3/7');
+    expect(
+      phasesLine(workflowCall('running').workflow),
+      'Map 2/2 · Review 3/7',
+    );
     expect(
       runningLine(workflowCall('running').workflow),
       'review:security, review:ui, review:perf +1',
@@ -183,6 +186,15 @@ void main() {
     ('dark', Tokens.dark),
     ('light', Tokens.light),
   ]) {
+    testWidgets('a narrow workflow card: the state on a line of its own '
+        '($name)', (tester) async {
+      await _pump(tester, workflowCall('running'), tokens: tokens, width: 392);
+      expect(find.text('Map 2/2 · Review 3/7'), findsNothing);
+      await expectLater(
+        find.byType(WorkflowCard),
+        matchesGoldenFile('goldens/workflow_card_narrow_$name.png'),
+      );
+    });
     for (final (state, stalled) in [
       ('running', false),
       ('running', true),

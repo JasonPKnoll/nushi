@@ -16,7 +16,8 @@ import 'package:nushi/workflows.dart';
 /// A workflow where its call is in the transcript (ADR 0127): a row on the
 /// subagents' soft tint, as a subagent's, no outline, of three lines: its
 /// name and its state at the end, live ("Review 5/7 · 3 running · 4m
-/// 12s"); its description; its phases and who runs. A click opens its pane
+/// 12s"); its description; its phases and who runs. Narrow, the state
+/// takes the second line and the phases' line goes. A click opens its pane
 /// (the accent's soft fill while open; the failures' soft red once it
 /// failed); under the pointer, a running one's mark becomes its Stop. On
 /// the phone ([Daemon.remote]) it opens nothing and has no Stop: the chat's
@@ -32,6 +33,10 @@ class WorkflowCard extends StatelessWidget {
 
   /// No shine and no ticking (a golden, a waiting chat).
   final bool still;
+
+  /// Below this width the state has a line of its own (a phone's
+  /// transcript).
+  static const narrow = 480.0;
 
   @override
   Widget build(BuildContext context) {
@@ -62,80 +67,90 @@ class WorkflowCard extends StatelessWidget {
             8,
           ),
           child: LayoutBuilder(
-            builder: (context, box) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 2,
-              children: [
-                SizedBox(
-                  height: 20,
-                  child: Row(
-                    spacing: 8,
-                    children: [
-                      Icon(
-                        Icons.account_tree_outlined,
-                        size: 15,
-                        color: failed ? t.crashed : t.subagentAccent,
-                      ),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Shine(
-                            on: live && !w.stalled && !still,
-                            child: _name(context, call),
-                          ),
-                        ),
-                      ),
-                      // The name takes the room; the state ends the line,
-                      // half of it at most where the row is narrow.
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: math.min(320, box.maxWidth / 2),
-                        ),
-                        child: LiveText(
-                          () => workflowState(w),
-                          live: live && !w.stalled && !still,
-                          style: theme.ui(
-                            failed
-                                ? t.crashed
-                                : w.stalled
-                                ? t.needs
-                                : t.textSecondary,
-                            size: 12,
-                          ),
-                        ),
-                      ),
-                      if (hover && !phone && live && daemon != null)
-                        stopButton(context, daemon!, chat, call.id, size: 13)
-                      else
-                        TaskMark(workflowMark(w)),
-                      if (!phone)
-                        Icon(
-                          Icons.chevron_right,
-                          size: 15,
-                          color: t.textSecondary,
-                        ),
-                    ],
-                  ),
+            builder: (context, box) {
+              final narrow = box.maxWidth < WorkflowCard.narrow;
+              final state = LiveText(
+                () => workflowState(w),
+                live: live && !w.stalled && !still,
+                style: theme.ui(
+                  failed
+                      ? t.crashed
+                      : w.stalled
+                      ? t.needs
+                      : t.textSecondary,
+                  size: 12,
                 ),
-                if (w.description.isNotEmpty) _line(w.description, muted),
-                if (w.phases.isNotEmpty || w.running.isNotEmpty)
-                  _line(
-                    [
-                      if (w.phases.isNotEmpty && phone)
-                        phaseProgress(currentPhase(w)!)
-                      else if (w.phases.isNotEmpty)
-                        phasesLine(w),
-                      if (live && w.running.isNotEmpty) runningLine(w),
-                    ].join('  ·  '),
-                    theme.ui(t.textSecondary, size: 12),
+              );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 2,
+                children: [
+                  SizedBox(
+                    height: 20,
+                    child: Row(
+                      spacing: 8,
+                      children: [
+                        Icon(
+                          Icons.account_tree_outlined,
+                          size: 15,
+                          color: failed ? t.crashed : t.subagentAccent,
+                        ),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Shine(
+                              on: live && !w.stalled && !still,
+                              child: _name(context, call),
+                            ),
+                          ),
+                        ),
+                        // The name takes the room; the state ends the line,
+                        // half of it at most. Where the row is narrow (a
+                        // phone's) the state has a line of its own.
+                        if (!narrow)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: math.min(320, box.maxWidth / 2),
+                            ),
+                            child: state,
+                          ),
+                        if (hover && !phone && live && daemon != null)
+                          stopButton(context, daemon!, chat, call.id, size: 13)
+                        else
+                          TaskMark(workflowMark(w)),
+                        if (!phone)
+                          Icon(
+                            Icons.chevron_right,
+                            size: 15,
+                            color: t.textSecondary,
+                          ),
+                      ],
+                    ),
                   ),
-                if (ended.isNotEmpty)
-                  _line(
-                    ended,
-                    muted.copyWith(color: failed ? t.crashed : null),
-                  ),
-              ],
-            ),
+                  if (narrow)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 15 + 8),
+                      child: state,
+                    ),
+                  if (w.description.isNotEmpty) _line(w.description, muted),
+                  // Narrow, the state says the phase it's in: the line of
+                  // phases would only be cut.
+                  if (!narrow && (w.phases.isNotEmpty || w.running.isNotEmpty))
+                    _line(
+                      [
+                        if (w.phases.isNotEmpty) phasesLine(w),
+                        if (live && w.running.isNotEmpty) runningLine(w),
+                      ].join('  ·  '),
+                      theme.ui(t.textSecondary, size: 12),
+                    ),
+                  if (ended.isNotEmpty)
+                    _line(
+                      ended,
+                      muted.copyWith(color: failed ? t.crashed : null),
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ),

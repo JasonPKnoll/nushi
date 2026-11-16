@@ -258,7 +258,11 @@ class _WorkflowRow extends StatelessWidget {
         context,
         started: w.started.toInt(),
         ended: w.ended.toInt(),
-        state: w.state == 'unknown' ? 'ended' : w.state,
+        state: w.stalled
+            ? 'no activity'
+            : w.state == 'unknown'
+            ? 'ended'
+            : w.state,
         runs: runs && !w.stalled,
       ),
       open: () => chat.pane.value = it.id,
