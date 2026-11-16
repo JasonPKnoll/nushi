@@ -95,5 +95,8 @@ Conventions phoneHost = macConventions;
 /// The conventions of a daemon's system, as Go names it
 /// (PingResponse.os): the Mac's for "darwin", and for a daemon from before
 /// it said, which ran on a Mac.
-Conventions conventionsOf(String os) =>
-    os == 'linux' ? linuxConventions : macConventions;
+Conventions conventionsOf(String os) => switch (os) {
+  'linux' => linuxConventions,
+  'windows' => windowsConventions,
+  _ => macConventions,
+};
