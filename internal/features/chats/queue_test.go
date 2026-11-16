@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	acp "github.com/afrase/acp-go/unstable"
 
@@ -169,9 +168,13 @@ func TestQueueWaitsOutASubagentsSteps(t *testing.T) {
 			ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: acp.ToolCallID(id), Status: "completed"}}})
 	}
 	call("sub1", map[string]any{"claudeCode": map[string]any{"parentToolUseId": "agent1"}})
-	time.Sleep(20 * time.Millisecond)
-	if _, steered := agent.texts(); len(steered) != 0 || len(c.queue) != 1 {
-		t.Fatalf("steered %q after a subagent's step", steered)
+	// The update is taken under the chat's lock, and a steer it began is
+	// marked so there (steering) before its worker takes the message.
+	c.mu.Lock()
+	steering, queued := c.steering, len(c.queue)
+	c.mu.Unlock()
+	if _, steered := agent.texts(); steering || len(steered) != 0 || queued != 1 {
+		t.Fatalf("steering %v, steered %q, %d queued after a subagent's step", steering, steered, queued)
 	}
 	call("t1", nil)
 	eventually(t, c, func() bool { _, steered := agent.texts(); return reflect.DeepEqual(steered, []string{"two"}) })
