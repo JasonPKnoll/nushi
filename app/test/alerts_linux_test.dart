@@ -144,11 +144,6 @@ Future<void> _until(bool Function() done) async {
   }
 }
 
-/// A moment for what should not happen to show if it does: too short, it
-/// lets a test pass, never fail.
-Future<void> _moment() =>
-    Future<void>.delayed(const Duration(milliseconds: 50));
-
 void main() {
   test('a notification says it is Nushi’s, its body escaped where the '
       'service reads markup (the summary is plain text), with the sound or '
@@ -248,8 +243,12 @@ void main() {
 
     center.onOpen(null);
     await service.click(1);
-    await _moment();
+    // The bus has routed the click once it answers the service's ping, and
+    // the center has read it once the bus answers the center's own call.
+    await service.client!.ping();
+    expect(await center.allowed(), NotifyPermission.allowed);
     expect(opened, ['a', 'b']);
+    expect(window.presented, hasLength(2));
   });
 
   test("the badge is the launcher entry's count of the app's .desktop "
