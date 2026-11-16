@@ -7,8 +7,10 @@ import 'package:nushi/chat_header.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
+import 'package:nushi/github_card.dart';
 import 'package:nushi/github_checks.dart';
 import 'package:nushi/github_pull.dart';
+import 'package:nushi/line_icons.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panel_widgets.dart';
 import 'package:nushi/pull_link.dart';
@@ -16,6 +18,7 @@ import 'package:nushi/pull_link_dialog.dart';
 import 'package:nushi/pull_rows.dart';
 import 'package:nushi/pull_widget_parts.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/theme/theme.dart';
 
 import 'fake_daemon.dart';
 import 'github_fixture.dart' show item, pull;
@@ -323,6 +326,21 @@ void main() {
         ..checks.clear(),
     );
     expect(_inPull(find.text('Add Sub and Neg')), findsOneWidget);
+    final icon = _inPull(
+      find.descendant(
+        of: find.byType(PullRow),
+        matching: find.byType(ItemIcon),
+      ),
+    );
+    final shown = tester.widget<ItemIcon>(icon);
+    expect(
+      itemLook(
+        NushiTheme.of(tester.element(icon)).t,
+        shown.item,
+        pull: shown.pull,
+      ).$1,
+      LineIcon.pullDraft,
+    );
     expect(_inPull(find.byType(ChecksBar)), findsNothing);
     await tester.tap(_rowMenu);
     await tester.pumpAndSettle();
@@ -398,7 +416,8 @@ void main() {
       'Start work; its comments seen', (tester) async {
     final (d, fake) = await _app(tester, whole: pull());
     // A comment came since the chat first saw it.
-    pullSeen.value = {'c': pullSeen.value['c']! - 1};
+    final unseen = pullSeen.value['c']! - 1;
+    pullSeen.value = {'c': unseen};
     await tester.pump();
     expect(find.text('Pull request'), findsNWidgets(2)); // switch, widget
     await tester.tap(_inPull(find.text('Add Sub and Neg')));
@@ -408,13 +427,19 @@ void main() {
       find.byType(PanelWidget),
       findsNothing,
     ); // the panel goes, as for Changes
-    expect(find.text('Add Sub and Neg', findRichText: true), findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byType(GitHubPullPane),
+        matching: find.text('Add Sub and Neg', findRichText: true),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Start work'), findsNothing);
     expect(find.text('To do'), findsOneWidget);
     // A thread's first words in To do; the conversation under it.
     expect(find.text('Should this check for overflow?'), findsOneWidget);
     expect(find.text('A first look.'), findsOneWidget);
-    expect(pullSeen.value['c'], greaterThan(0));
+    expect(pullSeen.value['c'], unseen + 1); // the newest comment's time
     await tester.tap(find.text('Checks · 1 failing'));
     await tester.pumpAndSettle();
     expect(find.byType(GitHubChecks), findsOneWidget);
