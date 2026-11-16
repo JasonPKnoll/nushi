@@ -5,6 +5,7 @@ import 'package:nushi/chat_header.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/replies.dart';
 import 'package:nushi/review.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
@@ -140,16 +141,16 @@ void main() {
       Item(
         id: 'u',
         kind: ItemKind.ITEM_KIND_USER_MESSAGE,
-        text:
-            '<!-- reply 1 -->\n> ${message[0].quote.split('\n').join('\n> ')}'
-            '\n\n${message[0].text}\n\n<!-- reply 2 -->\n> '
-            '${message[1].quote.split('\n').join('\n> ')}\n\n'
-            '${message[1].text}\n\nThanks.',
+        text: withReplies(message, 'Thanks.'),
       ),
     );
     chat.notifyListeners();
     await tester.pump(const Duration(seconds: 3));
-    expect(unsentComments('c'), isEmpty);
+    // Out of the box but in the message: kept, and sent.
+    expect(commentsOf('c').map((c) => (c.id, c.sent)), [
+      ('1', true),
+      ('2', true),
+    ]);
     d.dispose();
   }, variant: _mac);
 
