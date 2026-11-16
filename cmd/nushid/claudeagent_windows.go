@@ -58,10 +58,10 @@ func spawnClaude(ctx context.Context, s claudeagent.Spec) (*claudeagent.Proc, er
 		}
 	}
 	s.Env = batchfile.Environ(s.Env)
-	path, args, err := batchfile.Command(s.Path, s.Args, s.Env)
+	path, args, env, err := batchfile.Command(s.Path, s.Args, s.Env)
 	if err != nil {
 		return nil, err
 	}
-	s.Path, s.Args = path, args
+	s.Path, s.Args, s.Env = path, args, env
 	return claudeagent.Exec(ctx, s)
 }

@@ -48,32 +48,52 @@ func Is(path string) bool {
 // Command is how to start path with args (those after the program's
 // name) in env when path is a batch file: npm's shim of a Node program
 // is node.exe (beside the shim, else on env's Path) and its script,
-// before args; another batch file is itself, with args, only when it and
-// every argument are plain (cmd.exe changes nothing in them). Anything
-// else is an error that says why. A path that isn't a batch file is
-// itself.
-func Command(path string, args, env []string) (string, []string, error) {
+// before args, in env with the NODE_PATH the shim sets (pnpm's); another
+// batch file is itself, with args, only when it and every argument are
+// plain (cmd.exe changes nothing in them). Anything else is an error that
+// says why. A path that isn't a batch file is itself, in env.
+func Command(path string, args, env []string) (prog string, progArgs, progEnv []string, err error) {
 	if !Is(path) {
-		return path, args, nil
+		return path, args, env, nil
 	}
-	script, isNode, err := npmScript(path)
+	sh, err := npmScript(path)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	name := filepath.Base(path)
-	if isNode {
+	if sh.script != "" {
 		node := findNode(filepath.Dir(path), env)
 		if node == "" {
-			return "", nil, fmt.Errorf("%s runs node, and there's no node.exe beside it or on Path", name)
+			return "", nil, nil, fmt.Errorf("%s runs node, and there's no node.exe beside it or on Path", name)
 		}
-		return node, append([]string{script}, args...), nil
+		return node, append([]string{sh.script}, args...), withNodePath(env, sh.nodePath), nil
 	}
 	if !plain(path) || slices.ContainsFunc(args, func(a string) bool { return !plain(a) }) {
-		return "", nil, fmt.Errorf("%s is a batch file, and cmd.exe would read an argument as commands of its own "+
+		return "", nil, nil, fmt.Errorf("%s is a batch file, and cmd.exe would read an argument as commands of its own "+
 			"(it has one of %s or a line break): install its .exe instead", name, special)
 	}
-	return path, args, nil
+	return path, args, env, nil
 }
+
+// withNodePath is env with folders, a shim's NODE_PATH, before what env's
+// NODE_PATH has, as pnpm's shim sets it; env itself when folders is "".
+func withNodePath(env []string, folders string) []string {
+	if folders == "" {
+		return env
+	}
+	if old := get(env, nodePath); old != "" {
+		folders += ";" + old
+	}
+	env = slices.DeleteFunc(slices.Clone(env), func(kv string) bool {
+		n, _, _ := strings.Cut(kv, "=")
+		return strings.EqualFold(n, nodePath)
+	})
+	return append(env, nodePath+"="+folders)
+}
+
+// nodePath is the variable through which pnpm's shims tell node where
+// the package's own dependencies are.
+const nodePath = "NODE_PATH"
 
 // special are the characters cmd.exe reads as its own on a command line,
 // in quotes or out: they expand a variable (`%`, and `!` with delayed
@@ -90,38 +110,63 @@ func plain(s string) bool {
 // hundred bytes.
 const maxShim = 64 << 10
 
-// npmScript reads the batch file at path, and is the script it runs with
-// node when it's a shim npm (or pnpm) wrote for a Node program: every
-// line that passes on its arguments (`%*`) runs node on one script in or
-// below the shim's folder (`"%dp0%\node_modules\…\cli.js" %*`). isNode is
-// false for any other batch file, one npm wrote for a shell script
-// included.
-func npmScript(path string) (script string, isNode bool, err error) {
+// shimmed is what an npm shim of a Node program runs: script, the
+// absolute path of the script it runs with node, "" when the batch file
+// isn't one, and nodePath, the NODE_PATH it sets when none is set (pnpm's
+// `@SET "NODE_PATH=<folders>"`), "" when it sets none.
+type shimmed struct{ script, nodePath string }
+
+// npmScript reads the batch file at path, and is what it runs when it's a
+// shim npm (or pnpm) wrote for a Node program: every line that passes on
+// its arguments (`%*`) runs node on one script in or below the shim's
+// folder (`"%dp0%\node_modules\…\cli.js" %*`). Its script is "" for any
+// other batch file, one npm wrote for a shell script included.
+func npmScript(path string) (shimmed, error) {
 	f, err := os.Open(path) //nolint:gosec // the program the caller is about to run
 	if err != nil {
-		return "", false, err
+		return shimmed{}, err
 	}
 	defer func() { _ = f.Close() }()
 	text, err := io.ReadAll(io.LimitReader(f, maxShim+1))
 	if err != nil || len(text) > maxShim {
-		return "", false, err
+		return shimmed{}, err
 	}
 	lines := bytes.FieldsFunc(text, func(r rune) bool { return r == '\n' || r == '\r' })
+	var sh shimmed
 	for _, line := range lines {
 		words := fields(string(line))
+		if v, ok := setsNodePath(words); ok && sh.nodePath == "" {
+			sh.nodePath = v
+		}
 		if !slices.Contains(words, "%*") {
 			continue
 		}
 		rel, ok := nodeLine(words, bytes.Contains(bytes.ToLower(text), []byte(`set "_prog=node"`)))
-		if !ok || (script != "" && rel != script) {
-			return "", false, nil
+		if !ok || (sh.script != "" && rel != sh.script) {
+			return shimmed{}, nil
 		}
-		script = rel
+		sh.script = rel
 	}
-	if script == "" {
-		return "", false, nil
+	if sh.script == "" {
+		return shimmed{}, nil
 	}
-	return filepath.Join(filepath.Dir(path), filepath.FromSlash(strings.ReplaceAll(script, `\`, "/"))), true, nil
+	sh.script = filepath.Join(filepath.Dir(path), filepath.FromSlash(strings.ReplaceAll(sh.script, `\`, "/")))
+	return sh, nil
+}
+
+// setsNodePath is the folders of a shim's line `@SET "NODE_PATH=<folders>"`
+// (pnpm writes them whole), when it's that line. One that names a
+// variable (the ELSE branch's `%NODE_PATH%`) isn't: withNodePath does
+// what it does.
+func setsNodePath(words []string) (string, bool) {
+	if len(words) != 2 || !strings.EqualFold(strings.TrimPrefix(words[0], "@"), "set") {
+		return "", false
+	}
+	name, folders, ok := strings.Cut(words[1], "=")
+	if !ok || !strings.EqualFold(name, nodePath) || folders == "" || strings.Contains(folders, "%") {
+		return "", false
+	}
+	return folders, true
 }
 
 // nodeLine is the script, relative to the shim's folder, of a shim's line

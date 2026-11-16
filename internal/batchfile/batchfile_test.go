@@ -39,6 +39,24 @@ const oldShim = `@IF EXIST "%~dp0\node.exe" (
 )
 `
 
+// pnpmShim is a shim as pnpm's cmd-shim writes it, with the NODE_PATH it
+// sets before node runs; nodePathFolders are its folders.
+const pnpmShim = `@SETLOCAL
+@IF NOT DEFINED NODE_PATH (
+  @SET "NODE_PATH=` + nodePathFolders + `"
+) ELSE (
+  @SET "NODE_PATH=` + nodePathFolders + `;%NODE_PATH%"
+)
+@IF EXIST "%~dp0\node.exe" (
+  "%~dp0\node.exe"  "%~dp0\..\.pnpm\tool@1.0.0\node_modules\tool\cli.js" %*
+) ELSE (
+  @SET PATHEXT=%PATHEXT:;.JS;=;%
+  node  "%~dp0\..\.pnpm\tool@1.0.0\node_modules\tool\cli.js" %*
+)
+`
+
+const nodePathFolders = `C:\Users\Jo Smith\pnpm\.pnpm\tool@1.0.0\node_modules;C:\Users\Jo Smith\pnpm\.pnpm\node_modules`
+
 // shellShim is npm's shim of a program with a #!/bin/sh line: not Node's.
 const shellShim = `@ECHO off
 SETLOCAL
@@ -81,13 +99,51 @@ func TestNpmShimRunsAsNodeAndItsScript(t *testing.T) {
 			node := filepath.Join(nodeDir, "node.exe")
 			testcheck.Write(t, node, "")
 
-			got, args, err := Command(path, dataArgs, pathEnv(nodeDir))
+			got, args, _, err := Command(path, dataArgs, pathEnv(nodeDir))
 			testcheck.NoErr(t, err)
 			want := append([]string{filepath.Join(filepath.Dir(path), filepath.FromSlash(tc.script))}, dataArgs...)
 			if got != node || !slices.Equal(args, want) {
 				t.Fatalf("Command = %q %q, want %q %q", got, args, node, want)
 			}
 		})
+	}
+}
+
+// pnpm's shim runs as node and its script too, with the NODE_PATH the
+// shim would set: its folders alone, or before the one already set.
+func TestPnpmShimKeepsItsNodePath(t *testing.T) {
+	path := shim(t, "tool.cmd", pnpmShim, "")
+	nodeDir := t.TempDir()
+	testcheck.Write(t, filepath.Join(nodeDir, "node.exe"), "")
+	wantScript := filepath.Join(filepath.Dir(path), "..", ".pnpm", "tool@1.0.0", "node_modules", "tool", "cli.js")
+	for _, tc := range []struct {
+		env  []string
+		want string
+	}{
+		{nil, nodePathFolders},
+		{[]string{`node_path=D:\mine`}, nodePathFolders + `;D:\mine`},
+	} {
+		got, args, env, err := Command(path, []string{"-p"}, append(pathEnv(nodeDir), tc.env...))
+		testcheck.NoErr(t, err)
+		if want := []string{wantScript, "-p"}; got != filepath.Join(nodeDir, "node.exe") || !slices.Equal(args, want) {
+			t.Fatalf("Command = %q %q, want node and %q", got, args, want)
+		}
+		if v := get(env, "NODE_PATH"); v != tc.want || len(env) != 2 {
+			t.Errorf("env = %q, want PATH and NODE_PATH=%s", env, tc.want)
+		}
+	}
+}
+
+// npm's shim sets no NODE_PATH, and the environment is passed on as it is.
+func TestNpmShimLeavesTheEnvironment(t *testing.T) {
+	path := shim(t, "claude.cmd", npmShim, "node_modules/@anthropic-ai/claude-code/cli.js")
+	nodeDir := t.TempDir()
+	testcheck.Write(t, filepath.Join(nodeDir, "node.exe"), "")
+	env := pathEnv(nodeDir)
+	_, _, got, err := Command(path, nil, env)
+	testcheck.NoErr(t, err)
+	if !slices.Equal(got, env) {
+		t.Fatalf("env = %q, want %q", got, env)
 	}
 }
 
@@ -98,7 +154,7 @@ func TestNodeBesideTheShimComesFirst(t *testing.T) {
 	onPath := t.TempDir()
 	testcheck.Write(t, filepath.Join(onPath, "node.exe"), "")
 
-	got, _, err := Command(path, nil, pathEnv(onPath))
+	got, _, _, err := Command(path, nil, pathEnv(onPath))
 	testcheck.NoErr(t, err)
 	if got != beside {
 		t.Fatalf("node = %q, want the one beside the shim, %q", got, beside)
@@ -115,14 +171,14 @@ func TestNodeInTheCurrentFolderNeverRuns(t *testing.T) {
 	testcheck.Write(t, filepath.Join(project, "bin", "node.exe"), "")
 	t.Chdir(project)
 
-	got, args, err := Command(path, []string{"-p"}, pathEnv("", ".", "bin"))
+	got, args, _, err := Command(path, []string{"-p"}, pathEnv("", ".", "bin"))
 	if err == nil {
 		t.Fatalf("Command = %q %q, want an error: no node.exe but the project's", got, args)
 	}
 
 	nodeDir := t.TempDir()
 	testcheck.Write(t, filepath.Join(nodeDir, "node.exe"), "")
-	got, _, err = Command(path, nil, pathEnv(".", "bin", nodeDir))
+	got, _, _, err = Command(path, nil, pathEnv(".", "bin", nodeDir))
 	testcheck.NoErr(t, err)
 	if want := filepath.Join(nodeDir, "node.exe"); got != want {
 		t.Fatalf("node = %q, want Path's absolute one, %q", got, want)
@@ -133,13 +189,13 @@ func TestOtherBatchFileRunsOnlyWithPlainArguments(t *testing.T) {
 	for _, text := range []string{"@echo %*\n", shellShim} {
 		path := shim(t, "tool.bat", text, "node_modules/tool/bin/tool")
 		plainArgs := []string{"mcp", "list", `C:\Users\Jo Smith\x.json`, "--name=a,b;c", "é"}
-		got, args, err := Command(path, plainArgs, nil)
+		got, args, _, err := Command(path, plainArgs, nil)
 		testcheck.NoErr(t, err)
 		if got != path || !slices.Equal(args, plainArgs) {
 			t.Fatalf("Command = %q %q, want it as it was", got, args)
 		}
 		for _, arg := range []string{"a&b", "50%", `say "hi"`, "a^b", "!x!", "a|b", "<in", ">out", "(x)", "a\nb", "a\rb"} {
-			if got, args, err := Command(path, []string{"mcp", arg}, nil); err == nil {
+			if got, args, _, err := Command(path, []string{"mcp", arg}, nil); err == nil {
 				t.Errorf("Command with %q = %q %q, want an error", arg, got, args)
 			}
 		}
@@ -149,7 +205,7 @@ func TestOtherBatchFileRunsOnlyWithPlainArguments(t *testing.T) {
 func TestBatchFileInAFolderCmdReads(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "R&D")
 	testcheck.Write(t, filepath.Join(dir, "tool.cmd"), "@echo %*\n")
-	if _, _, err := Command(filepath.Join(dir, "tool.cmd"), nil, nil); err == nil {
+	if _, _, _, err := Command(filepath.Join(dir, "tool.cmd"), nil, nil); err == nil {
 		t.Fatal("a batch file whose path has & ran")
 	}
 }
@@ -165,14 +221,14 @@ func TestShimsThatArentNodesAreOtherBatchFiles(t *testing.T) {
 		"another program": "python \"%~dp0\\a.py\" %*\n",
 	} {
 		path := shim(t, "x.cmd", text, "")
-		if _, isNode, err := npmScript(path); err != nil || isNode {
+		if sh, err := npmScript(path); err != nil || sh.script != "" {
 			t.Errorf("%s: npmScript says a node shim (%v)", name, err)
 		}
 	}
 }
 
 func TestNotABatchFileIsItself(t *testing.T) {
-	got, args, err := Command(`C:\bin\claude.exe`, dataArgs, nil)
+	got, args, _, err := Command(`C:\bin\claude.exe`, dataArgs, nil)
 	testcheck.NoErr(t, err)
 	if got != `C:\bin\claude.exe` || !slices.Equal(args, dataArgs) {
 		t.Fatalf("Command = %q %q", got, args)
@@ -199,7 +255,7 @@ func TestFields(t *testing.T) {
 
 func TestLargeFileIsNoShim(t *testing.T) {
 	path := shim(t, "big.cmd", strings.Repeat("rem\n", maxShim/3)+"node \"%~dp0\\a.js\" %*\n", "a.js")
-	if _, isNode, _ := npmScript(path); isNode {
+	if sh, _ := npmScript(path); sh.script != "" {
 		t.Fatal("a file past maxShim read as a shim")
 	}
 }

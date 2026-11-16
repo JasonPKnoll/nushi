@@ -3,6 +3,7 @@ package batchfile
 import (
 	"os"
 	"os/exec"
+	"slices"
 )
 
 // Guard readies cmd to start on Windows: its environment gets
@@ -25,10 +26,13 @@ func Guard(cmd *exec.Cmd) {
 	if len(cmd.Args) > 1 {
 		args = cmd.Args[1:]
 	}
-	path, args, err := Command(cmd.Path, args, env)
+	path, args, progEnv, err := Command(cmd.Path, args, env)
 	if err != nil {
 		cmd.Err = err
 		return
 	}
 	cmd.Path, cmd.Args = path, append([]string{path}, args...)
+	if cmd.Env != nil || !slices.Equal(progEnv, env) { // a shim's NODE_PATH
+		cmd.Env = progEnv
+	}
 }
