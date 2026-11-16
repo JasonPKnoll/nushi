@@ -1,7 +1,7 @@
-# What make check runs, as parallel jobs (one job of 12 minutes before, until 2026-10-27). macOS for what needs it, in three
+# What make check runs, as parallel jobs (one job of 12 minutes before, until 2026-10-27). macOS for what needs it, in four
 # jobs (the account runs five macOS jobs at once, and a release or another repository's CI needs one too): the
-# daemon (proc_info, sandbox-exec, launchd, the keychain's cgo), so Go's lint and tests, with the window's placement
-# maths (swiftc); and the app's tests in two shards of test files (its goldens are drawn with macOS's text
+# daemon (proc_info, sandbox-exec, launchd, the keychain's cgo), so Go's tests, and its lint with the window's placement
+# maths (swiftc), each a job; and the app's tests in two shards of test files (its goldens are drawn with macOS's text
 # rendering: on Linux a third of them differ by 1-4%; its end-to-end tests run nushid). Linux for the rest: the
 # protos' and Dart's lint, the Dart packages' tests, the web app's end-to-end test (nushid with Chrome), and the daemon on Linux (ADR 0101): every Go package's tests,
 # lint, build and vet without cgo; and the Linux app (ADR 0104): its tests in two shards (goldens are compared on macOS
@@ -43,12 +43,31 @@ env:
 
 jobs:
   go:
-    name: Go lint and tests (macOS)
+    name: Go tests (macOS)
     runs-on: macos-latest
     timeout-minutes: 15
     # The tests in a new order each run: one that passes only after another shows (the log has the seed).
     env:
       GOTESTFLAGS: -shuffle=on
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      # The lint job's key: the cache it reads was filled by the tests and the lint together.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            tools/lint/go.sum
+      - run: make test-go
+
+  # Beside the tests, not before them (2026-11-16): a macOS slot the web job left.
+  go-lint:
+    name: Go lint (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,9 +107,7 @@ jobs:
         with:
           path: ~/Library/Caches/golangci-lint
           key: ${{ steps.lint-cache.outputs.cache-primary-key }}
-      # The tests run when the lint fails too, to see both.
-      - if: ${{ !cancelled() }}
-        run: make test-go
+      # The window's placement maths, when the lint fails too.
       - if: ${{ !cancelled() }}
         run: make test-window
 
