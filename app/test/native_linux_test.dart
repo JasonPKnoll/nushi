@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/app_actions.dart';
 import 'package:nushi/app_install_linux.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/file_mode.dart';
@@ -58,7 +59,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.byType(PlatformMenuBar), findsNothing);
-    expect(find.byType(Shortcuts), findsWidgets);
+    // The app's keys, Quit's among them, which the menu bar has elsewhere.
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Shortcuts &&
+            w.shortcuts.containsKey(paletteKey) &&
+            w.shortcuts.containsKey(quitKey),
+      ),
+      findsOne,
+    );
     expect(find.text('Fix the login redirect'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     d.dispose();
