@@ -15,16 +15,29 @@ import (
 	"github.com/afrase/nushi/internal/testcheck"
 )
 
-// viewers are the clients' views, as a test sets them.
+// viewers are the clients' views, as a test sets them, and how often
+// each chat's was asked for.
 type viewers struct {
 	mu    sync.Mutex
 	shown map[string]bool
+	asked map[string]int
 }
 
 func (v *viewers) Shown(id string) bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	if v.asked == nil {
+		v.asked = map[string]int{}
+	}
+	v.asked[id]++
 	return v.shown[id]
+}
+
+// askedFor is how often chat id's view was asked for.
+func (v *viewers) askedFor(id string) int {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.asked[id]
 }
 
 func (v *viewers) show(id string, on bool) {

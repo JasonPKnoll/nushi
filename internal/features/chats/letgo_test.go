@@ -218,7 +218,11 @@ func TestUnseenLetsGo(t *testing.T) {
 	turn(t, svc, c, "one")
 	v.show(c.id, true)
 	testcheck.NoErr(t, svc.Archive(c.id, true)) // its agent stops; it isn't asleep
-	time.Sleep(50 * time.Millisecond)
+	// The loop asks for the chat's view only as it would let go of it; the
+	// second time from now, it has had a whole look since (or let go
+	// without asking).
+	from := v.askedFor(c.id)
+	eventually(t, c, func() bool { return c.inCopy || v.askedFor(c.id) >= from+2 })
 	c.mu.Lock()
 	held := !c.inCopy && len(c.items) == 2
 	c.mu.Unlock()
