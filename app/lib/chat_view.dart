@@ -4,7 +4,6 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nushi/attached_files.dart';
-import 'package:nushi/background_commands.dart';
 import 'package:nushi/beside.dart';
 import 'package:nushi/browser_pane.dart';
 import 'package:nushi/chat.dart';
@@ -30,7 +29,7 @@ import 'package:nushi/pull_link.dart';
 import 'package:nushi/review_cards.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/side_chat.dart';
-import 'package:nushi/subagent_pane.dart';
+import 'package:nushi/task_pane.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/transcript.dart';
 import 'package:nushi/transcript_find.dart';
@@ -75,6 +74,9 @@ class ChatView extends StatefulWidget {
   /// The width a subagent's or a command's pane opens at, until dragged:
   /// the details panel's before it took its own (ADR 0092).
   static const taskPaneWidth = 264.0;
+
+  /// A workflow's pane's width, until one is dragged (ADR 0127).
+  static const workflowPaneWidth = 420.0;
 
   /// The preview pane's width, as dragged.
   static double get previewWidth =>
@@ -296,7 +298,17 @@ class _ChatViewState extends State<ChatView> {
               onClose: () => toggleFiles(chat),
             ),
           ),
-        if (id != null)
+        if (id != null && workflowPaneOpen(chat, id))
+          SidePane(
+            // A workflow's tree wants more room than a subagent's steps,
+            // and keeps its own width (ADR 0127).
+            'workflow',
+            initial: ChatView.workflowPaneWidth,
+            min: 280,
+            cap: double.infinity,
+            child: _pane(id),
+          )
+        else if (id != null)
           SidePane(
             // Named as the old Wider one was: a width dragged then stays.
             'subagent',
@@ -343,28 +355,15 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
-  /// A subagent's or background command's pane.
+  /// A background command's, a workflow's or a subagent's pane.
   Widget _pane(String id) {
     final chat = widget.chat;
-    void onClose() => chat.pane.value = null;
-    // Keyed: another subagent's pane is its own, its unsent text too.
-    return chat.withRunning.any(
-          (it) => it.id == id && it.hasBackgroundCommand(),
-        )
-        ? BackgroundCommandPane(
-            key: ValueKey(id),
-            chat: chat,
-            daemon: widget.daemon,
-            id: id,
-            onClose: onClose,
-          )
-        : SubagentPane(
-            key: ValueKey(id),
-            chat: chat,
-            daemon: widget.daemon,
-            id: id,
-            onClose: onClose,
-          );
+    return taskPane(
+      chat: chat,
+      daemon: widget.daemon,
+      id: id,
+      onClose: () => chat.pane.value = null,
+    );
   }
 }
 

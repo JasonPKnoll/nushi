@@ -106,6 +106,17 @@ No need to wait for the agent to finish. Type your message, then:
 
 Press **Esc**, or click the round red **Stop** button at the end of the box's row. Queued messages wait until you send again.
 
+## Follow a workflow
+
+Claude can run a workflow: a script that has many helpers work in phases, in the background. Its card shows where Claude started it, and the chat counts as working until it ends.
+
+1. Read the card: its name, what it does, each phase's progress ("Review 5/7"), who runs now, and how long it has run. At the end it says done, failed or stopped.
+2. Click the card to open the **Workflow pane**: each phase with its helpers, their state and time.
+3. Click a helper to read its steps; **All agents** (←) goes back.
+4. To stop it, point at the card and click **Stop**, or use Stop in the pane's header.
+
+A workflow that writes nothing for an hour says "no activity for 1h" and no longer counts as working; it still ends when Claude says so.
+
 ## Pick the mode, model and effort
 
 In the box's bottom row, after the **+**, are the agent's own options (in a side chat and on the phone they're under the box):
