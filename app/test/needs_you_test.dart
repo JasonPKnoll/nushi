@@ -22,6 +22,16 @@ Item _ask({String status = 'pending'}) => Item(
 );
 
 /// The waiting card's ring: its spread, or null without one.
+/// Whether the Jump chip's words are in the amber of what needs you.
+bool _amber(WidgetTester tester) {
+  final words = find.descendant(
+    of: find.byType(JumpChip),
+    matching: find.byType(Text),
+  );
+  final t = NushiTheme.of(tester.element(words)).t;
+  return tester.widget<Text>(words).style?.color == t.needs;
+}
+
 double? _ring(WidgetTester tester) {
   final box = tester
       .widgetList<Container>(
@@ -115,6 +125,7 @@ void main() {
     await tester.drag(find.byType(SingleChildScrollView), const Offset(0, 400));
     await tester.pumpAndSettle();
     expect(find.text('Jump to latest'), findsOneWidget);
+    expect(_amber(tester), isFalse);
 
     chat
       ..waiting = true
@@ -127,6 +138,7 @@ void main() {
       matching: find.text('Needs you'),
     );
     expect(chip, findsOneWidget);
+    expect(_amber(tester), isTrue);
     await tester.pump(const Duration(milliseconds: 16));
     await tester.pump(const Duration(milliseconds: 200));
     final hop = tester.widget<Transform>(
@@ -151,10 +163,12 @@ void main() {
     await tester.pumpWidget(
       _app(JumpChip(needs: false, onTap: () {}), still: true),
     );
+    expect(_amber(tester), isFalse);
     await tester.pumpWidget(
       _app(JumpChip(needs: true, onTap: () {}), still: true),
     );
     expect(find.text('Needs you'), findsOneWidget);
+    expect(_amber(tester), isTrue);
     expect(
       find.descendant(
         of: find.byType(JumpChip),
