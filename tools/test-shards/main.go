@@ -15,7 +15,9 @@
 // -check fails on a file in the wrong set (a macOS one that builds Go, a
 // Linux-only one on the Mac), a malformed table, or a split that drops or
 // repeats a file; it notes the table's stale rows. -timings rewrites the
-// table from a flutter test JSON report. Run it from the repository root.
+// table from flutter test JSON reports, CI's shards' (make test-timings),
+// each file at its mean time over those that ran it. Run it from the
+// repository root.
 package main
 
 import (
@@ -50,8 +52,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	set := flags.String("set", "all", "the files of `set`: macos, linux or all")
 	shard := flags.String("shard", "1/1", "shard `i/n` of the set")
 	check := flags.Bool("check", false, "check the sets, the split and the table")
-	report := flags.String("timings", "", "rewrite the table from flutter test's JSON `report`")
-	if err := flags.Parse(args); err != nil || flags.NArg() > 0 {
+	timings := flags.Bool("timings", false, "rewrite the table from the flutter test JSON reports named after the flags")
+	if err := flags.Parse(args); err != nil || (flags.NArg() > 0) != *timings {
+		_, _ = fmt.Fprintln(stderr, "usage: test-shards [-set s] [-shard i/n] | -check | -timings <report>...")
 		return 2
 	}
 	i, n, err := parseShard(*shard)
@@ -71,8 +74,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch {
 	case *check:
 		return runCheck(found, stdout, stderr)
-	case *report != "":
-		if err := rewriteTable(found, *report); err != nil {
+	case *timings:
+		if err := rewriteTable(found, flags.Args()); err != nil {
 			_, _ = fmt.Fprintln(stderr, "test-shards:", err)
 			return 1
 		}
@@ -133,7 +136,7 @@ func runCheck(t tests, stdout, stderr io.Writer) int {
 	if len(missing) > 0 {
 		hint := ""
 		if len(missing) > staleAfter {
-			hint = "; make test-timings after a full make check"
+			hint = "; make test-timings RUN=<a full CI run>"
 		}
 		_, _ = fmt.Fprintf(stdout, "test-shards: %d files not in %s, weighed at its median%s\n", len(missing), tablePath, hint)
 	}

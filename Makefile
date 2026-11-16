@@ -299,11 +299,16 @@ test-app:
 	echo "flutter test $(FLUTTER_TEST_FLAGS): $$(echo "$$files" | wc -l | tr -d ' ') files, set $(APP_SET), shard $(APP_SHARD)"; \
 	cd app && NUSHI_TEST_SET='$(APP_SET)' flutter test $(FLUTTER_TEST_FLAGS) $$files
 
-# app/test/timings.tsv anew from the test times the last make check
-# wrote, when the suite's times have changed (test-shards -check says when
-# many files are missing from it).
+# app/test/timings.tsv anew from the test times of CI's app shards in
+# RUN, a run of every job (gh run list --workflow CI), downloaded by gh
+# into bin/test-times-<run>: when the suite's times have changed
+# (test-shards -check says when many files are missing from the table).
+# CI's times, not this machine's: a Mac here runs the golden files about
+# three times faster than CI's macOS runner, the rest only about twice.
 test-timings:
-	go run ./tools/test-shards -timings bin/check-logs/test-app.json
+	@test -n "$(RUN)" || { echo "RUN=<a CI run's id>: gh run list --workflow CI"; exit 2; }
+	gh run download $(RUN) -p 'test-times-*' -D bin/test-times-$(RUN)
+	go run ./tools/test-shards -timings bin/test-times-$(RUN)/*/test-times.json
 
 # The Mac window's placement maths (app/macos/Runner/Placement.swift, ADR
 # 0093), what ⌘V attaches (Clipboard.swift, on a pasteboard of its own)

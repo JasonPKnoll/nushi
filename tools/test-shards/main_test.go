@@ -2,8 +2,10 @@ package main
 
 import (
 	"io"
+	"maps"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -186,5 +188,42 @@ func TestReportTimes(t *testing.T) {
 		if d := got[f] - w; d > 1e-9 || d < -1e-9 {
 			t.Errorf("%s: %v, want %v", f, got[f], w)
 		}
+	}
+}
+
+// Each file at its mean over the reports that ran it; a file none ran
+// keeps its row, a gone file's row goes.
+func TestRewriteTable(t *testing.T) {
+	root := t.TempDir()
+	for _, f := range []string{"a_test.dart", "b_test.dart", "c_test.dart"} {
+		testcheck.Write(t, filepath.Join(root, appDir, "test", f), "")
+	}
+	testcheck.Write(t, filepath.Join(root, appDir, tablePath), "test/c_test.dart\t9\ntest/gone_test.dart\t3\n")
+	report := func(name string, ms int) string {
+		path := filepath.Join(root, name)
+		testcheck.Write(t, path, `{"suite":{"id":0,"path":"/x/app/test/a_test.dart"},"type":"suite","time":0}
+{"test":{"id":1,"name":"loading a","suiteID":0},"type":"testStart","time":0}
+{"testID":1,"result":"success","type":"testDone","time":1000}
+{"test":{"id":2,"name":"one","suiteID":0},"type":"testStart","time":1000}
+{"testID":2,"result":"success","type":"testDone","time":`+strconv.Itoa(1000+ms)+`}
+`)
+		return path
+	}
+	t.Chdir(root)
+	found, err := readTests(appDir)
+	testcheck.NoErr(t, err)
+	testcheck.NoErr(t, rewriteTable(found, []string{report("r1.json", 2000), report("r2.json", 4000)}))
+	table, bad, err := readTable(filepath.Join(appDir, tablePath))
+	testcheck.NoErr(t, err)
+	// Each report: the run plus its median load, 1 s.
+	want := map[string]float64{"test/a_test.dart": 4, "test/c_test.dart": 9}
+	if len(bad) > 0 || !maps.Equal(table, want) {
+		t.Errorf("table %v (bad %q), want %v", table, bad, want)
+	}
+	if code := run([]string{"-timings"}, io.Discard, io.Discard); code != 2 {
+		t.Errorf("-timings without a report exits %d", code)
+	}
+	if code := run([]string{"r1.json"}, io.Discard, io.Discard); code != 2 {
+		t.Errorf("a report without -timings exits %d", code)
 	}
 }

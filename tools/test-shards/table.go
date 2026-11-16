@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -18,9 +20,9 @@ import (
 
 // header opens the table, saying what it is.
 const header = `# Each app test file's weight in seconds, for tools/test-shards' split:
-# its run on a Mac at --concurrency 3 plus the median file's load. Only
-# the balance of CI's shards depends on it. make test-timings rewrites it
-# from the last make check.
+# its run in CI's shard of its set (macOS or Linux) plus the shard's
+# median load. Only the balance of CI's shards depends on it.
+# make test-timings RUN=<CI run> rewrites it from that run's reports.
 `
 
 // readTable reads the table: its weights, and each line it couldn't read.
@@ -109,28 +111,36 @@ func tableDrift(files []string, table map[string]float64) (missing, gone []strin
 	return missing, gone
 }
 
-// rewriteTable writes the table anew: the report's files at their times,
-// the rest of today's files as they were, and no gone ones.
-func rewriteTable(t tests, report string) error {
+// rewriteTable writes the table anew: each of today's files at its mean
+// time over the reports that ran it, else as it was, and no gone ones.
+func rewriteTable(t tests, reports []string) error {
 	path := filepath.Join(appDir, tablePath)
 	old, _, err := readTable(path)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	data, err := os.ReadFile(report)
-	if err != nil {
-		return fmt.Errorf("reading the report: %w", err)
-	}
-	times := reportTimes(data)
-	if len(times) == 0 {
-		return fmt.Errorf("%s has no test file's time", report)
+	sums := map[string]float64{}
+	counts := map[string]int{}
+	for _, report := range reports {
+		data, err := os.ReadFile(report)
+		if err != nil {
+			return fmt.Errorf("reading the report: %w", err)
+		}
+		times := reportTimes(data)
+		if len(times) == 0 {
+			return fmt.Errorf("%s has no test file's time", report)
+		}
+		for f, w := range times {
+			sums[f] += w
+			counts[f]++
+		}
 	}
 	var b strings.Builder
 	b.WriteString(header)
 	for _, f := range t.all {
-		w, ok := times[f]
-		if !ok {
-			w, ok = old[f]
+		w, ok := old[f]
+		if n := counts[f]; n > 0 {
+			w, ok = sums[f]/float64(n), true
 		}
 		if ok {
 			fmt.Fprintf(&b, "%s\t%.1f\n", f, w)

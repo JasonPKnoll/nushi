@@ -219,7 +219,7 @@ jobs:
     env:
       SET: macos
       SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-      FLUTTER_TEST_FLAGS: --concurrency 3
+      FLUTTER_TEST_FLAGS: --concurrency 3 --file-reporter json:build/test-times.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -239,6 +239,14 @@ jobs:
           cache: true
           cache-key: flutter-:os:-:channel:-:version:-:arch:-:hash:-lean
       - run: make test-app
+      # Each file's times, for make test-timings RUN=<this run> (app/test/timings.tsv).
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-times-${{ env.SET }}-${{ matrix.shard }}
+          path: app/build/test-times.json
+          if-no-files-found: ignore
+          retention-days: 30
       # A golden that differs on the runner: its images, to see why.
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -403,7 +411,7 @@ jobs:
     env:
       SET: linux
       SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-      FLUTTER_TEST_FLAGS: --concurrency 4
+      FLUTTER_TEST_FLAGS: --concurrency 4 --file-reporter json:build/test-times.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -420,6 +428,14 @@ jobs:
           flutter-version: ${{ env.NUSHI_FLUTTER_VERSION }}
           cache: true
       - run: make test-app
+      # Each file's times, for make test-timings RUN=<this run> (app/test/timings.tsv).
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-times-${{ env.SET }}-${{ matrix.shard }}
+          path: app/build/test-times.json
+          if-no-files-found: ignore
+          retention-days: 30
 
   linux-package:
     name: App (Linux, ${{ matrix.arch }})
