@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"slices"
 	"strings"
 	"time"
-
-	"github.com/afrase/claude-acp-go/claudeagent/sessions"
 
 	"github.com/afrase/nushi/internal/model"
 	"github.com/afrase/nushi/internal/secrets"
@@ -17,67 +17,101 @@ import (
 // workflow agent's steps, not its whole output.
 const stepCap = 8 << 10
 
-// stepItems are a workflow agent's messages as transcript items, its steps
-// as its pane shows them: the model's text and thinking, and each tool call
-// with its input and result. Its prompt, the first user message, shows in
-// the pane's head, so user text isn't a step. This is a plain reading for
-// the pane only; a chat's own transcript comes from the agent's replay.
-func stepItems(prefix string, msgs []sessions.Message) []model.Item {
-	var out []model.Item
-	calls := map[string]int{}
-	for mi, m := range msgs {
-		var body struct {
-			ID      string          `json:"id"`
+const (
+	maxStepLine = 8 << 20   // a transcript line longer is passed over
+	maxAgentLog = 256 << 20 // the most of an agent's transcript read
+	maxSteps    = 2000      // the most steps kept of one agent: the pane shows the last 400
+)
+
+// steps are a workflow agent's transcript as items, its steps as its pane
+// shows them, read as the transcript grows (lines): the model's text and
+// thinking, and each tool call with its input and result. Its prompt, the
+// first user message, shows in the pane's head, so user text isn't a step.
+// This is a plain reading for the pane only, line by line: a workflow
+// agent's transcript is one chain (it isn't rewound), and a chat's own
+// transcript comes from the agent's replay. At most maxSteps are kept;
+// dropped counts those let go from the front.
+type steps struct {
+	lines
+	prefix  string
+	items   []model.Item
+	calls   map[string]int // a call's index, dropped included
+	msgs    int            // the lines of messages read
+	dropped int
+}
+
+// read reads what the transcript (f, of size bytes) added since the last.
+func (s *steps) read(f io.ReaderAt, size int64) error {
+	if size < s.off { // rewritten
+		*s = steps{prefix: s.prefix}
+	}
+	return s.lines.read(f, min(size, maxAgentLog), maxStepLine, s.line)
+}
+
+// line takes one line of the agent's transcript.
+func (s *steps) line(line []byte) {
+	var m struct {
+		Type      string `json:"type"`
+		Timestamp string `json:"timestamp"`
+		Message   struct {
 			Content json.RawMessage `json:"content"`
-		}
-		if json.Unmarshal(m.Message, &body) != nil {
-			continue
-		}
-		var blocks []struct {
-			Type      string          `json:"type"`
-			Text      string          `json:"text"`
-			Thinking  string          `json:"thinking"`
-			ID        string          `json:"id"`
-			Name      string          `json:"name"`
-			Input     json.RawMessage `json:"input"`
-			ToolUseID string          `json:"tool_use_id"`
-			Content   json.RawMessage `json:"content"`
-			IsError   bool            `json:"is_error"`
-		}
-		if json.Unmarshal(body.Content, &blocks) != nil {
-			continue // a string: the user's text
-		}
-		sent := sentAt(m.Raw)
-		for bi, b := range blocks {
-			id := fmt.Sprintf("%s%d-%d", prefix, mi, bi)
-			switch {
-			case m.Type == "assistant" && b.Type == "text" && strings.TrimSpace(b.Text) != "":
-				out = append(out, model.Item{ID: id, Kind: model.AgentMessage, Text: clipText(b.Text, stepCap), Sent: sent})
-			case m.Type == "assistant" && b.Type == "thinking" && strings.TrimSpace(b.Thinking) != "":
-				out = append(out, model.Item{ID: id, Kind: model.Thought, Text: clipText(b.Thinking, stepCap), Sent: sent})
-			case m.Type == "assistant" && b.Type == "tool_use":
-				calls[b.ID] = len(out)
-				out = append(out, model.Item{ID: prefix + "call-" + b.ID, Kind: model.ToolCall, Tool: b.Name, Title: toolTitle(b.Name, b.Input),
-					ToolKind: toolKind(b.Name), Status: "in_progress", Input: inputText(b.Input), Sent: sent})
-			case m.Type == "user" && b.Type == "tool_result":
-				if i, ok := calls[b.ToolUseID]; ok {
-					out[i].Status, out[i].Text = "completed", clipText(resultText(b.Content), stepCap)
-					if b.IsError {
-						out[i].Status = "failed"
-					}
+		} `json:"message"`
+	}
+	if json.Unmarshal(line, &m) != nil || m.Type != "user" && m.Type != "assistant" {
+		return
+	}
+	mi := s.msgs
+	s.msgs++
+	var blocks []struct {
+		Type      string          `json:"type"`
+		Text      string          `json:"text"`
+		Thinking  string          `json:"thinking"`
+		ID        string          `json:"id"`
+		Name      string          `json:"name"`
+		Input     json.RawMessage `json:"input"`
+		ToolUseID string          `json:"tool_use_id"`
+		Content   json.RawMessage `json:"content"`
+		IsError   bool            `json:"is_error"`
+	}
+	if json.Unmarshal(m.Message.Content, &blocks) != nil {
+		return // a string: the user's text
+	}
+	sent, _ := time.Parse(time.RFC3339Nano, m.Timestamp)
+	if s.calls == nil {
+		s.calls = map[string]int{}
+	}
+	for bi, b := range blocks {
+		id := fmt.Sprintf("%s%d-%d", s.prefix, mi, bi)
+		switch {
+		case m.Type == "assistant" && b.Type == "text" && strings.TrimSpace(b.Text) != "":
+			s.add(model.Item{ID: id, Kind: model.AgentMessage, Text: clipText(b.Text, stepCap), Sent: sent})
+		case m.Type == "assistant" && b.Type == "thinking" && strings.TrimSpace(b.Thinking) != "":
+			s.add(model.Item{ID: id, Kind: model.Thought, Text: clipText(b.Thinking, stepCap), Sent: sent})
+		case m.Type == "assistant" && b.Type == "tool_use":
+			s.calls[b.ID] = s.dropped + len(s.items)
+			s.add(model.Item{ID: s.prefix + "call-" + b.ID, Kind: model.ToolCall, Tool: b.Name, Title: toolTitle(b.Name, b.Input),
+				ToolKind: toolKind(b.Name), Status: "in_progress", Input: inputText(b.Input), Sent: sent})
+		case m.Type == "user" && b.Type == "tool_result":
+			i, ok := s.calls[b.ToolUseID]
+			delete(s.calls, b.ToolUseID)
+			if i -= s.dropped; ok && i >= 0 {
+				it := &s.items[i]
+				it.Status, it.Text = "completed", clipText(resultText(b.Content), stepCap)
+				if b.IsError {
+					it.Status = "failed"
 				}
 			}
 		}
 	}
-	return out
 }
 
-func sentAt(raw json.RawMessage) time.Time {
-	var r struct {
-		Timestamp time.Time `json:"timestamp"`
+// add adds a step, letting the oldest go past maxSteps.
+func (s *steps) add(it model.Item) {
+	s.items = append(s.items, it)
+	if n := len(s.items) - maxSteps; n > 0 {
+		s.items = slices.Delete(s.items, 0, n)
+		s.dropped += n
 	}
-	_ = json.Unmarshal(raw, &r)
-	return r.Timestamp
 }
 
 // toolTitle is a call's title as a row shows it: the tool and what it

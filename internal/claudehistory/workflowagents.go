@@ -5,11 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
-
-	"github.com/afrase/claude-acp-go/claudeagent/sessions"
 
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/regularfile"
 )
 
 // WorkflowAgents lists the agents of the run w names, in the order they
@@ -54,6 +52,7 @@ func (r *run) agents() []model.WorkflowAgent {
 // id never names a file of its own; one it doesn't is fs.ErrNotExist.
 func (l Local) WorkflowAgentItems(sid, folder string, w model.Workflow, id string, limit int) ([]model.Item, int, error) {
 	var items []model.Item
+	earlier := 0
 	err := l.readRun(sid, folder, w, func(r *run, root *os.Root) error {
 		listed := false
 		for _, a := range r.agents() {
@@ -62,35 +61,34 @@ func (l Local) WorkflowAgentItems(sid, folder string, w model.Workflow, id strin
 		if !listed || !agentID.MatchString(id) || root == nil {
 			return fmt.Errorf("agent %q of workflow %s: %w", id, w.RunID, fs.ErrNotExist)
 		}
-		fi, err := root.Lstat(path.Join("subagents", "workflows", w.RunID, "agent-"+id+".jsonl"))
+		// The agent's own file, opened inside the session's folder as a
+		// regular file and read as it grows: the path the run's id and a
+		// listed agent's id name.
+		f, fi, err := regularfile.OpenIn(root, path.Join("subagents", "workflows", w.RunID, "agent-"+id+".jsonl"), false)
 		if err != nil {
 			return err
 		}
-		if !fi.Mode().IsRegular() {
-			return fmt.Errorf("agent %q of workflow %s: %w", id, w.RunID, fs.ErrNotExist)
+		defer f.Close() //nolint:errcheck // read-only
+		if r.steps == nil {
+			r.steps = map[string]*steps{}
 		}
-		s, ok := r.steps[id]
-		if !ok || s.size != fi.Size() || !s.mod.Equal(fi.ModTime()) {
-			msgs, err := sessions.Store{ConfigDir: filepath.Dir(l.Projects)}.SubagentMessages(sid, folder, id)
-			if err != nil {
-				return err
-			}
-			s = steps{size: fi.Size(), mod: fi.ModTime(), items: stepItems("wf/"+id+"/", msgs)}
-			if r.steps == nil {
-				r.steps = map[string]steps{}
-			}
+		s := r.steps[id]
+		if s == nil {
+			s = &steps{prefix: "wf/" + id + "/"}
 			r.steps[id] = s
 		}
-		items = s.items
+		if err := s.read(f, fi.Size()); err != nil {
+			return err
+		}
+		items, earlier = s.items, s.dropped
 		return nil
 	})
 	if err != nil {
 		return nil, 0, err
 	}
-	earlier := 0
 	if limit > 0 && len(items) > limit {
-		earlier = len(items) - limit
-		items = items[earlier:]
+		earlier += len(items) - limit
+		items = items[len(items)-limit:]
 	}
 	return append([]model.Item(nil), items...), earlier, nil
 }

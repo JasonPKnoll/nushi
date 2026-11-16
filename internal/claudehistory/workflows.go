@@ -95,14 +95,7 @@ type run struct {
 	// at; snapshotWait how long an end its notification told waits for
 	// the snapshot.
 	agentStat, snapshotWait time.Duration
-	steps                   map[string]steps
-}
-
-// steps are an agent's transcript as items, as read at its size and time.
-type steps struct {
-	size  int64
-	mod   time.Time
-	items []model.Item
+	steps                   map[string]*steps // the agents' transcripts read for the pane
 }
 
 // runKey is the folder of session sid in folder's history, for a run of
