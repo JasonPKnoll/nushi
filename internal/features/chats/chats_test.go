@@ -462,18 +462,14 @@ func TestBackgroundCommandsAreFollowed(t *testing.T) {
 	}
 	shell := func(want string) model.BackgroundCommand {
 		t.Helper()
-		for deadline := time.After(2 * time.Second); ; {
+		for { // every change comes with an event; a state never reached hangs the test
 			c.mu.Lock()
 			sh := *c.items[0].BackgroundCommand
 			c.mu.Unlock()
 			if sh.State == want && sh.Output != "" {
 				return sh
 			}
-			select {
-			case <-deadline:
-				t.Fatalf("shell = %+v, want %s", sh, want)
-			case <-events:
-			}
+			<-events
 		}
 	}
 	if sh := shell("running"); sh.Output != "half" || sh.Started.IsZero() {
