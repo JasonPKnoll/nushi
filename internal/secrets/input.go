@@ -11,7 +11,7 @@ import (
 
 // InputMask stands in for a secret in a tool call's input, as the MCP
 // view's Mask does.
-const InputMask = "••••" //nolint:gosec // a mask, not a credential
+const InputMask = "••••"
 
 var (
 	// secretKey is a JSON key whose string value is a secret.

@@ -30,7 +30,7 @@ func notification(t *testing.T, kind, task, status, summary string) string {
 	case "typed": // the user's own text: no origin
 		line = map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": text}}
 	}
-	return string(testcheck.JSON(t, line)) + "\n"
+	return testcheck.JSON(t, line) + "\n"
 }
 
 // writeTranscript appends lines to the session's transcript, beside its

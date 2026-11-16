@@ -324,7 +324,7 @@ func TestWorkflowSnapshotTextMasked(t *testing.T) {
 	testcheck.NoErr(t, err)
 	agents, err := l.WorkflowAgents(id, folder, w)
 	testcheck.NoErr(t, err)
-	all := string(testcheck.JSON(t, got)) + string(testcheck.JSON(t, agents))
+	all := testcheck.JSON(t, got) + testcheck.JSON(t, agents)
 	for _, s := range []string{"abcdefghijklmnop", "abcd1234efgh", "hunter2222"} {
 		if strings.Contains(all, s) {
 			t.Errorf("%q kept: %s", s, all)
@@ -339,7 +339,7 @@ func TestWorkflowSummaryMasked(t *testing.T) {
 	l, id, folder, _ := fakeRun(t, launchedLine+`{"type":"started","key":"k1","agentId":"a1","label":"run `+tok+`","phase":"P `+tok+`"}`+"\n", "")
 	got, err := l.ReadWorkflow(id, folder, model.Workflow{RunID: "wf_abc"})
 	testcheck.NoErr(t, err)
-	if len(got.Running) != 1 || len(got.Phases) != 1 || strings.Contains(string(testcheck.JSON(t, got)), "abcdefghijklmnop") {
+	if len(got.Running) != 1 || len(got.Phases) != 1 || strings.Contains(testcheck.JSON(t, got), "abcdefghijklmnop") {
 		t.Errorf("got %+v", got)
 	}
 }
