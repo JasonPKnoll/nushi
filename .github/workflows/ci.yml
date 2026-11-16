@@ -136,6 +136,9 @@ jobs:
           flutter-version: ${{ env.NUSHI_FLUTTER_VERSION }}
           cache: true
       - run: make lint-dart
+      # What the changes job says a change can affect, against its table.
+      - if: ${{ !cancelled() }}
+        run: tools/ci-changes.sh --self-test
       # The committed API code is what make gen makes from the protos, with the plugins it pins.
       - if: ${{ !cancelled() }}
         run: |

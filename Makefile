@@ -205,8 +205,10 @@ $(GOVULNCHECK): tools/lint/go.mod tools/lint/go.sum
 # known vulnerabilities in the code the daemon, the relay and the tools call
 # (govulncheck asks vuln.go.dev, so this needs the network). CI runs the
 # parts as jobs of their own (.github/workflows/ci.yml); make check runs
-# everything they do.
+# everything they do, and tools/ci-changes.sh's self-test (what CI's jobs
+# skip for a change, ADR 0128).
 lint: lint-go lint-dart lint-linux lint-windows
+	tools/ci-changes.sh --self-test
 
 # Go's: on macOS (the keychain's cgo needs its SDK).
 lint-go: $(GOLANGCI) $(GOVULNCHECK)
