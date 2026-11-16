@@ -1,9 +1,14 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
+
+	"github.com/afrase/nushi/internal/features/chats"
 	"github.com/afrase/nushi/internal/model"
 )
 
@@ -31,5 +36,16 @@ func TestWorkflowProto(t *testing.T) {
 	st := statusProto(model.Status{Background: 3, Workflows: 1, OwnTurn: true})
 	if st.Background != 3 || st.Workflows != 1 || !st.OwnTurn {
 		t.Errorf("status %+v", st)
+	}
+}
+
+// No such workflow (a chat, call or agent not there, a run's files gone)
+// is NotFound; anything else is a refusal.
+func TestWorkflowErr(t *testing.T) {
+	if code := connect.CodeOf(workflowErr(fmt.Errorf("the run's files: %w", chats.ErrNoWorkflow))); code != connect.CodeNotFound {
+		t.Errorf("no workflow: %v", code)
+	}
+	if code := connect.CodeOf(workflowErr(errors.New("permission denied"))); code == connect.CodeNotFound {
+		t.Errorf("a read that failed: %v", code)
 	}
 }

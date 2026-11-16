@@ -240,14 +240,18 @@ const maxWorkflowAgents = 500
 
 // Workflow returns the run tool call callID of chat chatID launched, and
 // its agents (maxWorkflowAgents at most; more says there are others), as
-// the agent's files say now.
+// the agent's files say now. A run that hasn't ended may have no files
+// yet: no agents; one that ended whose files are gone is ErrNoWorkflow.
 func (s *Service) Workflow(chatID, callID string) (w model.Workflow, agents []model.WorkflowAgent, more bool, err error) {
 	c, call, err := s.workflowCall(chatID, callID)
 	if err != nil {
 		return model.Workflow{}, nil, false, err
 	}
 	agents, err = c.kind.workflows.WorkflowAgents(c.sidFolder(call))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	switch {
+	case errors.Is(err, fs.ErrNotExist) && call.Workflow.Final():
+		return model.Workflow{}, nil, false, fmt.Errorf("the run's files: %w", ErrNoWorkflow)
+	case err != nil && !errors.Is(err, fs.ErrNotExist):
 		return model.Workflow{}, nil, false, err
 	}
 	if len(agents) > maxWorkflowAgents {

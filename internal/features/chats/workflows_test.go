@@ -27,6 +27,8 @@ type fakeWorkflows struct {
 	agents []model.WorkflowAgent
 	items  []model.Item
 	sids   map[string]bool // the sessions read
+	// agentsErr is what WorkflowAgents fails with.
+	agentsErr error
 }
 
 func (f *fakeWorkflows) ReadWorkflow(sid, _ string, w model.Workflow) (model.Workflow, error) {
@@ -53,7 +55,7 @@ func (f *fakeWorkflows) WorkflowAgents(sid, _ string, _ model.Workflow) ([]model
 		f.sids = map[string]bool{}
 	}
 	f.sids[sid] = true
-	return f.agents, nil
+	return f.agents, f.agentsErr
 }
 
 func (f *fakeWorkflows) WorkflowAgentItems(_, _ string, _ model.Workflow, id string, _ int) ([]model.Item, int, error) {
@@ -513,6 +515,31 @@ func TestReadingAWorkflow(t *testing.T) {
 	}
 	if _, _, _, err := f.svc.Workflow(f.c.id, "nope"); !errors.Is(err, ErrNoWorkflow) {
 		t.Errorf("no such call: %v", err)
+	}
+}
+
+// GetWorkflow of a run whose files aren't there: one that runs has no
+// agents yet; one that ended had its files go, which is no workflow (the
+// pane says Claude no longer has them).
+func TestAWorkflowWithoutFiles(t *testing.T) {
+	f := workflowChat(t, Timing{}, runningAs)
+	f.files.mu.Lock()
+	f.files.agentsErr = fs.ErrNotExist
+	f.files.mu.Unlock()
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+	if _, agents, _, err := f.svc.Workflow(f.c.id, wfCall); err != nil || len(agents) != 0 {
+		t.Errorf("running: %v, %v", agents, err)
+	}
+	f.files.set(endedAs("done", "completed"))
+	eventually(t, f.c, func() bool { return f.c.itemLocked(wfCall).Workflow.Final() })
+	if _, _, _, err := f.svc.Workflow(f.c.id, wfCall); !errors.Is(err, ErrNoWorkflow) {
+		t.Errorf("ended: %v", err)
+	}
+	f.files.mu.Lock()
+	f.files.agentsErr = errors.New("permission denied")
+	f.files.mu.Unlock()
+	if _, _, _, err := f.svc.Workflow(f.c.id, wfCall); err == nil || errors.Is(err, ErrNoWorkflow) {
+		t.Errorf("a read that failed: %v", err)
 	}
 }
 
