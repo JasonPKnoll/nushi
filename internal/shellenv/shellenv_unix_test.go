@@ -66,23 +66,29 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// Only the shell that hangs is given a time it can run out of: the others
+// end by themselves, and a loaded machine may take a while to start one.
 func TestReadFails(t *testing.T) {
 	base := []string{"PATH=/usr/bin:/bin"}
-	for _, c := range []struct{ body, want string }{
-		{"sleep 30", "zsh took over 1s"},
-		{"exit 3", "zsh exited with status 3 before printing its environment"},
-		{"echo all is well; exit 0", "zsh: no environment in what it printed"},
+	for _, c := range []struct {
+		body    string
+		timeout time.Duration
+		want    string
+	}{
+		{"sleep 300", time.Second, "zsh took over 1s"},
+		{"exit 3", time.Hour, "zsh exited with status 3 before printing its environment"},
+		{"echo all is well; exit 0", time.Hour, "zsh: no environment in what it printed"},
 	} {
 		start := time.Now()
-		_, err := Read(context.Background(), fakeShell(t, "zsh", c.body), base, time.Second)
+		_, err := Read(context.Background(), fakeShell(t, "zsh", c.body), base, c.timeout)
 		if err == nil || err.Error() != c.want {
 			t.Errorf("%q: %v", c.body, err)
 		}
-		if time.Since(start) > 3*time.Second {
+		if time.Since(start) > 30*time.Second { // the hung one was stopped, not waited for
 			t.Errorf("%q took %s", c.body, time.Since(start))
 		}
 	}
-	if _, err := Read(context.Background(), "/no/such/shell", base, time.Second); err == nil || !strings.Contains(err.Error(), "couldn't start") {
+	if _, err := Read(context.Background(), "/no/such/shell", base, time.Hour); err == nil || !strings.Contains(err.Error(), "couldn't start") {
 		t.Errorf("a missing shell: %v", err)
 	}
 }
