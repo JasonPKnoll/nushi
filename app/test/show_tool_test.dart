@@ -550,6 +550,8 @@ void main() {
         tester.platformDispatcher.platformBrightnessTestValue = brightness;
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         await _shows(tester, fake, 'docs/report.md');
+        expect(tester.takeException(), isNull);
+        expectTextInside(tester, width);
         // Header buttons at the pane's edge, nothing past the window.
         if (name == 'wide') {
           final close = tester.getTopRight(find.byTooltip('Close')).dx;
