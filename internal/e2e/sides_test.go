@@ -14,8 +14,8 @@ import (
 )
 
 // Side chats go from the agent's history however they end: here by a
-// reload, by the daemon stopping (once the chat opens again), and by the
-// app leaving.
+// reload and by the daemon stopping (once the chat opens again); by the
+// app leaving, below.
 func TestSideChatsLeaveNoHistory(t *testing.T) {
 	ctx := context.Background()
 	history := &acptest.History{}
@@ -52,13 +52,24 @@ func TestSideChatsLeaveNoHistory(t *testing.T) {
 	a = open(t, d)
 	a.get(id)
 	gone(s2)
+}
 
-	// The app quits with a side chat open: nobody will see it again.
-	a.waitFor("the reopen", idle)
+// The app quits with a side chat open: nobody will see it again, so it
+// goes from the agent's history. A test of its own, as the grace is made
+// short before the daemon starts (shortSidesGrace).
+func TestASideChatGoesWhenTheAppLeaves(t *testing.T) {
 	shortSidesGrace(t)
-	s3 := side()
+	history := &acptest.History{}
+	d := startDaemon(t, t.TempDir(), history)
+	a := open(t, d)
+	id := a.start(&nushiv1.StartChatRequest{Folder: t.TempDir()})
+	a.say(id, "hello")
+	side := must(a.c.ForkChat(context.Background(), connect.NewRequest(&nushiv1.ForkChatRequest{ChatId: id}))).ChatId
+	if !history.Has(side) {
+		t.Fatalf("the fork %s isn't in the history", side)
+	}
 	a.quit()
-	gone(s3)
+	until(t, "the side chat to go from the agent's history", func() bool { return !history.Has(side) })
 }
 
 // Side chats stay while any app follows, the Mac's or a phone's: the Mac
@@ -111,10 +122,11 @@ func TestASideChatStartsInItsChatsMode(t *testing.T) {
 }
 
 // shortSidesGrace makes side chats close 10 ms after the last app goes, for
-// one test. It's put back in a cleanup, not a defer: cleanups run after
-// the test's defers, and an earlier one runs later, so this one runs only
-// once the daemon's (registered after it) has stopped every handler that
-// reads it.
+// one test, which calls it before it starts a daemon: no handler reads the
+// grace as it changes, and it's put back in a cleanup, not a defer:
+// cleanups run after the test's defers, and an earlier one runs later, so
+// this one runs only once the daemon's (registered after it) has stopped
+// every handler that reads it.
 func shortSidesGrace(t *testing.T) {
 	t.Helper()
 	g := chats.SidesGrace
