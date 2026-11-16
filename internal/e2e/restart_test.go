@@ -14,7 +14,9 @@ import (
 	nushiv1 "github.com/afrase/nushi/internal/gen/nushi/v1"
 )
 
-// due says whether the daemon's restart came within wait.
+// due says whether the daemon's restart came within wait, for a test that
+// it didn't: one that waits for the restart receives from Due, with no
+// deadline of its own (a restart that never comes ends in go test's).
 func (d *daemon) due(wait time.Duration) bool {
 	select {
 	case <-d.restart.Due():
@@ -44,9 +46,7 @@ func TestRestartWaitsForTheTurn(t *testing.T) {
 		t.Fatal("restarted while a turn waited on the user")
 	}
 	must(a.c.AnswerPermission(ctx, connect.NewRequest(&nushiv1.AnswerPermissionRequest{ChatId: id, ItemId: perm.Id, OptionId: "allow"})))
-	if !d.due(3 * time.Second) {
-		t.Fatal("no restart after the turn ended")
-	}
+	<-d.restart.Due() // once the turn has ended
 	_, err := a.c.SendPrompt(ctx, connect.NewRequest(&nushiv1.SendPromptRequest{ChatId: id, Text: "hello"}))
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnavailable || !strings.Contains(ce.Message(), "restarting") ||
@@ -64,9 +64,7 @@ func TestRestartWithNothingRunning(t *testing.T) {
 	id := a.start(&nushiv1.StartChatRequest{Folder: t.TempDir()})
 	a.say(id, "hello")
 	must(a.c.RestartWhenIdle(ctx, connect.NewRequest(&nushiv1.RestartWhenIdleRequest{})))
-	if !d.due(time.Second) {
-		t.Fatal("no restart with nothing running")
-	}
+	<-d.restart.Due()
 }
 
 // A prompt sent as the restart is decided either runs first (the restart
@@ -84,9 +82,7 @@ func TestAPromptAtTheRestartIsntLost(t *testing.T) {
 			sent <- err
 		}()
 		must(a.c.RestartWhenIdle(ctx, connect.NewRequest(&nushiv1.RestartWhenIdleRequest{})))
-		if !d.due(3 * time.Second) {
-			t.Fatal("no restart")
-		}
+		<-d.restart.Due()
 		err := <-sent
 		items := a.get(id).Items
 		switch {
@@ -120,9 +116,7 @@ func TestRestartWaitsForATerminalsCommand(t *testing.T) {
 		t.Fatal("restarted while a terminal ran a command")
 	}
 	must(a.c.WriteTerminal(ctx, connect.NewRequest(&nushiv1.WriteTerminalRequest{TerminalId: term.Id, Data: []byte("\x03")})))
-	if !d.due(3 * time.Second) {
-		t.Fatal("no restart once the command ended")
-	}
+	<-d.restart.Due() // once the command has ended
 }
 
 // An ask that isn't repeated lapses: the app that would start the new
