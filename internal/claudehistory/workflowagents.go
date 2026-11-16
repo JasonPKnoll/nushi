@@ -8,6 +8,7 @@ import (
 
 	"github.com/afrase/nushi/internal/model"
 	"github.com/afrase/nushi/internal/regularfile"
+	"github.com/afrase/nushi/internal/secrets"
 )
 
 // WorkflowAgents lists the agents of the run w names, in the order they
@@ -27,7 +28,7 @@ func (r *run) agents() []model.WorkflowAgent {
 	if s := r.snap; s != nil && len(s.Agents) > 0 {
 		for _, a := range s.Agents {
 			wa := model.WorkflowAgent{ID: a.ID, Label: label(a.Label, a.ID), Phase: label(a.Phase, ""), State: agentState(a.State),
-				Model: clipText(a.Model, 100), Prompt: clipText(a.Prompt, 2048), Result: clipText(a.Result, 2048),
+				Model: clipText(a.Model, 100), Prompt: preview(a.Prompt), Result: preview(a.Result),
 				Started: a.Started, Tokens: a.Tokens, ToolCalls: a.ToolCalls}
 			if !a.Started.IsZero() && a.Duration > 0 {
 				wa.Ended = a.Started.Add(a.Duration)
@@ -92,3 +93,7 @@ func (l Local) WorkflowAgentItems(sid, folder string, w model.Workflow, id strin
 	}
 	return append([]model.Item(nil), items...), earlier, nil
 }
+
+// preview is the start of an agent's task or answer, as the snapshot kept
+// it: the model's text, masked as a tool call's text is, cut short.
+func preview(s string) string { return clipText(secrets.MaskText(s), 2048) }

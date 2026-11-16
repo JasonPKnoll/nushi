@@ -303,6 +303,26 @@ func TestAResumedWorkflow(t *testing.T) {
 	}
 }
 
+// What the snapshot keeps of the model's text (previews, a phase's
+// detail, the name and summary) is masked as a tool call's text is.
+func TestWorkflowSnapshotTextMasked(t *testing.T) {
+	const tok = "ghp_abcdefghijklmnopqrstuvwxyz0123"
+	snap := `{"status":"completed","workflowName":"n ` + tok + `","summary":"s API_TOKEN=abcd1234efgh","phases":[{"title":"Map","detail":"d ` + tok + `"}],` +
+		`"workflowProgress":[{"type":"workflow_agent","agentId":"a1","state":"done","promptPreview":"p ` + tok + `","resultPreview":"r DB_PASSWORD=hunter2222"}]}`
+	l, id, folder, _ := fakeRun(t, launchedLine+startA, snap)
+	w := model.Workflow{RunID: "wf_abc"}
+	got, err := l.ReadWorkflow(id, folder, w)
+	testcheck.NoErr(t, err)
+	agents, err := l.WorkflowAgents(id, folder, w)
+	testcheck.NoErr(t, err)
+	all := string(testcheck.JSON(t, got)) + string(testcheck.JSON(t, agents))
+	for _, s := range []string{"abcdefghijklmnop", "abcd1234efgh", "hunter2222"} {
+		if strings.Contains(all, s) {
+			t.Errorf("%q kept: %s", s, all)
+		}
+	}
+}
+
 // The summary on the item stays small whatever the run: phases, running
 // labels and their length capped, a secret's shape masked.
 func TestWorkflowSummaryBounds(t *testing.T) {

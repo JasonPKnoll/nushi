@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/secrets"
 )
 
 // A workflow's ids as Claude writes them (docs/facts/claude.md): a run's
@@ -40,7 +41,8 @@ func launched(run, task, name, summary string) *model.Workflow {
 	if !ValidRunID(run) || !ValidTaskID(task) {
 		return nil
 	}
-	return &model.Workflow{RunID: run, TaskID: task, Name: clip(name, 200), Description: clip(summary, model.WorkflowSummaryText)}
+	// The name and summary are the model's text: masked as a tool call's.
+	return &model.Workflow{RunID: run, TaskID: task, Name: clip(secrets.MaskText(name), 200), Description: clip(secrets.MaskText(summary), model.WorkflowSummaryText)}
 }
 
 // LaunchedWorkflow reads a Workflow call's output when no toolResponse came

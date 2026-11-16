@@ -297,7 +297,7 @@ func (r *run) noted() *note {
 // ended is w as the snapshot says the run ended.
 func (r *run) ended(w model.Workflow, s snapshot) model.Workflow {
 	w.State, w.End = endState(s.Status), s.Status
-	w.Name, w.Description = cmp.Or(w.Name, clipText(s.Name, 200)), cmp.Or(w.Description, clipText(s.Summary, model.WorkflowSummaryText))
+	w.Name, w.Description = cmp.Or(w.Name, clipText(secrets.MaskText(s.Name), 200)), cmp.Or(w.Description, clipText(secrets.MaskText(s.Summary), model.WorkflowSummaryText))
 	w.Started = cmp.Or(w.Started, s.Started)
 	w.Ended = r.snapMod
 	if !s.Started.IsZero() && s.Duration > 0 {
@@ -368,7 +368,7 @@ func phaseOf(w *model.Workflow, at map[string]int, title, detail string) int {
 		return -1
 	}
 	at[title] = len(w.Phases)
-	w.Phases = append(w.Phases, model.WorkflowPhase{Title: label(title, ""), Detail: clipText(detail, 200)})
+	w.Phases = append(w.Phases, model.WorkflowPhase{Title: label(title, ""), Detail: clipText(secrets.MaskText(detail), 200)})
 	return len(w.Phases) - 1
 }
 
