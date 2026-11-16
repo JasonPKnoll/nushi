@@ -179,6 +179,7 @@ void main() {
     await drag.moveTo(_at(tester, 1.15));
     await tester.pump();
     expect(f.playhead, 8); // the last kept
+    expect(find.text('0:00.8'), findsOneWidget); // its time, while held
     await drag.up();
     await tester.pump();
     expect(find.text('0:00.8'), findsNothing);
