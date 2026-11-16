@@ -731,7 +731,7 @@ Future<void> _openFloats(WidgetTester tester) async {
       .ensureTooltipVisible();
   // Every part a toast can have: an icon, its action, its ×.
   showToast(
-    ScaffoldMessenger.of(tester.element(find.byType(Scaffold))),
+    Toasts.maybeOf(tester.element(find.byType(Scaffold))),
     'Archived “Paginate the feed”',
     icon: Icons.info_outline,
     action: (label: 'Undo', onPressed: _tap),
@@ -855,6 +855,7 @@ Future<void> drawSheet(WidgetTester tester, Sheet sheet, Tokens tokens) async {
     MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: NushiTheme(tokens).toThemeData(),
+      builder: (context, child) => ToastHost(child: child!),
       home: Builder(
         builder: (context) => MediaQuery(
           data: MediaQuery.of(context).copyWith(disableAnimations: true),

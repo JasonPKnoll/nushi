@@ -48,7 +48,7 @@ class _GitHubChecksState extends State<GitHubChecks> {
       );
       if (!mounted) return;
       showToast(
-        ScaffoldMessenger.maybeOf(context),
+        Toasts.maybeOf(context),
         r.runs == 1
             ? 'Re-running the failed jobs of 1 workflow run'
             : 'Re-running the failed jobs of ${r.runs} workflow runs',

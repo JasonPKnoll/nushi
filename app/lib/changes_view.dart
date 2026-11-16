@@ -753,7 +753,7 @@ class _ChangesViewState extends State<ChangesView> with FollowsChanges {
   /// index the view showed; with the user's staging since, which only a
   /// later reload names, that reload's, as its files are the ones shown.
   Future<void> _commit(String message) async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
+    final toasts = Toasts.maybeOf(context);
     final seen = stagedPaths(_files);
     final seenIndex = _seenIndex;
     await _staging;
@@ -769,7 +769,7 @@ class _ChangesViewState extends State<ChangesView> with FollowsChanges {
           index: seenIndex ?? _span?.index,
         ),
       );
-      showToast(messenger, 'Committed ${done.short}');
+      showToast(toasts, 'Committed ${done.short}');
     } finally {
       chat.committed();
     }

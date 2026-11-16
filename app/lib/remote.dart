@@ -154,7 +154,7 @@ class _DeviceRow extends StatelessWidget {
     });
     if (sent && context.mounted) {
       showToast(
-        ScaffoldMessenger.maybeOf(context),
+        Toasts.maybeOf(context),
         'Sent a test notification to ${d.name}',
       );
     }

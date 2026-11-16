@@ -12,6 +12,7 @@ import 'package:nushi/phone/keyboard.dart';
 import 'package:nushi/phone/pair_screen.dart';
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 
 /// The phone's app (ADR 0054): pairing until paired, then the chats.
 /// Light or dark as the system is, in the theme picked (ADR 0086).
@@ -125,7 +126,8 @@ class _PhoneAppState extends State<PhoneApp> with WidgetsBindingObserver {
       child: TouchTargets(
         child: MediaQuery.withClampedTextScaling(
           minScaleFactor: 1.15,
-          child: child!,
+          // The toasts at the bottom, near the thumb (ADR 0128).
+          child: ToastHost(atBottom: true, child: child!),
         ),
       ),
     ),

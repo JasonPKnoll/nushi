@@ -60,7 +60,7 @@ bool canKeepSide(Daemon d, ChatState side) =>
 Future<void> keepSide(BuildContext context, Daemon d, ChatState chat) async {
   final side = chat.side.value;
   if (side == null) return;
-  final toast = ScaffoldMessenger.maybeOf(context);
+  final toast = Toasts.maybeOf(context);
   await tryOrShow(context, () async {
     final r = await d.client.keepSideChat(KeepSideChatRequest(chatId: side.id));
     if (chat.side.value == side) chat.side.value = null;

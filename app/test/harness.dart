@@ -13,6 +13,7 @@ import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 
 /// The time the app sees in every test ([clock], set before each by
 /// `flutter_test_config.dart`): fixed, so an age a golden shows never moves.
@@ -36,13 +37,14 @@ void viewport(
 }
 
 /// [child] as a test shows a widget on its own: in a plain app in the
-/// theme of [tokens], on a Scaffold. With [still], Reduce Motion is that
-/// for it (the MediaQuery's disableAnimations), the window's MediaQuery
-/// otherwise kept.
+/// theme of [tokens], on a Scaffold, with the window's toasts. With
+/// [still], Reduce Motion is that for it (the MediaQuery's
+/// disableAnimations), the window's MediaQuery otherwise kept.
 Widget themed(Widget child, {Tokens tokens = Tokens.dark, bool? still}) {
   final page = Scaffold(body: child);
   return MaterialApp(
     theme: NushiTheme(tokens).toThemeData(),
+    builder: (context, child) => ToastHost(child: child!),
     home: still == null
         ? page
         : Builder(

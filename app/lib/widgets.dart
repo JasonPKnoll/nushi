@@ -7,6 +7,7 @@ import 'package:nushi/commits.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/errors.dart';
 import 'package:nushi/motion.dart';
+import 'package:nushi/spinner.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/toast.dart';
 
@@ -16,43 +17,49 @@ export 'package:nushi/toast.dart';
 
 /// Shows [message] in a toast.
 void showError(BuildContext context, Object message) =>
-    showToast(ScaffoldMessenger.of(context), errorText(message));
+    showToast(Toasts.maybeOf(context), errorText(message));
 
-/// Runs a call, showing its error, if any, in a snack bar: the app's, also
+/// Runs a call, showing its error, if any, in a toast: the app's, also
 /// once the widget that asked is gone (a trust card replaced it).
 Future<void> tryOrShow(
   BuildContext context,
   Future<void> Function() call,
 ) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final toasts = Toasts.maybeOf(context);
   try {
     await call();
   } on Object catch (e) {
     if (context.mounted) {
       showError(context, e);
     } else {
-      showToast(messenger, errorText(e));
+      showToast(toasts, errorText(e));
     }
   }
 }
 
 /// Runs a call that shows nothing of its own while it runs, saying so in
-/// a toast: [running] (when it takes longer than a moment), then [done],
-/// or its error; without [done] (what it made shows) the toast just goes.
+/// a toast: [running] with a spinner (when it takes longer than a moment),
+/// then [done] with a check, or its error; without [done] (what it made
+/// shows) the toast just goes. The two never look alike (ADR 0128).
 Future<void> runAndSay(
   BuildContext context,
   Future<void> Function() call, {
   required String running,
   String? done,
 }) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
-  void say(String text, {Duration lasts = const Duration(seconds: 4)}) =>
-      showToast(messenger, text, replace: true, duration: lasts);
+  final toasts = Toasts.maybeOf(context);
+  final t = NushiTheme.of(context).t;
+  void say(
+    String text, {
+    Widget? leading,
+    Duration lasts = const Duration(seconds: 4),
+  }) =>
+      showToast(toasts, text, leading: leading, replace: true, duration: lasts);
   // Said only past a moment: a quick call goes straight to [done].
   var shown = false;
   final slow = Timer(Waits.slow, () {
     shown = true;
-    say(running, lasts: const Duration(minutes: 5));
+    say(running, leading: const Spinner(), lasts: const Duration(minutes: 5));
   });
   try {
     await call();
@@ -63,9 +70,9 @@ Future<void> runAndSay(
     slow.cancel();
   }
   if (done != null) {
-    say(done);
+    say(done, leading: Icon(Icons.check_circle, size: 16, color: t.done));
   } else if (shown) {
-    messenger?.hideCurrentSnackBar();
+    toasts?.hide();
   }
 }
 

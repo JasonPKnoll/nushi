@@ -10,6 +10,7 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/preview_entry.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 
 import 'browser_fixture.dart';
 import 'fake_daemon.dart' show loadFonts;
@@ -31,6 +32,7 @@ Future<ChatState> _pane(
     MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: NushiTheme(tokens).toThemeData(),
+      builder: (context, child) => ToastHost(child: child!),
       home: Scaffold(
         body: ValueListenableBuilder(
           valueListenable: c.browser.shown,
@@ -143,7 +145,7 @@ void main() {
     await _open(tester, c, 'https://example.com');
     await tester.tap(find.text('Save screenshot'));
     await tester.pumpAndSettle();
-    await untilReal(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
+    await untilReal(tester, () => find.byType(ToastLine).evaluate().isNotEmpty);
     expect(find.textContaining('Couldn’t save the screenshot'), findsOneWidget);
     expect(dir.listSync(recursive: true), isEmpty);
   }, variant: macOnly);
@@ -164,7 +166,7 @@ void main() {
     await tester.tap(find.text('Save screenshot'));
     await tester.pumpAndSettle();
     expect(asked, 1);
-    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(ToastLine), findsNothing);
     // A new tab has no page to take.
     c.openBrowserTab();
     await tester.pumpAndSettle();

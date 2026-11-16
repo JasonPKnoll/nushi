@@ -263,7 +263,7 @@ void main() {
       tester.platformDispatcher.platformBrightnessTestValue = brightness;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       await _close(tester);
-      // The toast's layer: a strip as wide as the window, the card in it.
+      // The toast's card.
       await expectLater(
         find.descendant(of: _toast, matching: find.byType(Material)).first,
         matchesGoldenFile('goldens/side_chat_archived_toast_$name.png'),
@@ -281,8 +281,8 @@ void main() {
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         await _close(tester);
         expectTextInside(tester, size.width);
-        // Its card (the SnackBar's own box is wider than what it draws):
-        // the text first, the close button last, inside the window.
+        // Its card: the text first, the close button last, inside the
+        // window.
         final text = tester.getRect(find.text('Archived side chat'));
         final close = tester.getRect(
           find.descendant(of: _toast, matching: find.byIcon(Icons.close)),

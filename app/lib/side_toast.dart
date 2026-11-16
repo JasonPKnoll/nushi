@@ -14,7 +14,7 @@ const archivedSideFor = Duration(seconds: 10);
 /// app does: an info icon, Undo and ×, for [archivedSideFor]. Undo brings
 /// it back beside [chat] with [was]'s draft, or says why it can't.
 void showArchivedSide(
-  ScaffoldMessengerState toast,
+  Toasts toast,
   Daemon daemon,
   ChatState chat,
   String archived, {
@@ -40,7 +40,7 @@ void showArchivedSide(
 /// when it can't be (the chat was deleted or archived, or has a side chat
 /// open, or the daemon refuses), a toast says why.
 Future<void> _undo(
-  ScaffoldMessengerState toast,
+  Toasts toast,
   Daemon daemon,
   ChatState chat,
   String archived, {

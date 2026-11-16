@@ -12,6 +12,7 @@ import 'package:nushi/main.dart';
 import 'package:nushi/panel_widgets.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 import 'package:nushi/worktree.dart';
 
 import 'fake_daemon.dart';
@@ -85,6 +86,7 @@ Future<Daemon> _panel(
   final d = await fake.connect(tester);
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => ToastHost(child: child!),
       debugShowCheckedModeBanner: false,
       theme: NushiTheme(tokens).toThemeData(),
       home: Scaffold(

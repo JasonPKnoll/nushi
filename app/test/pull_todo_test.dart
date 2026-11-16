@@ -6,6 +6,7 @@ import 'package:nushi/pull_todo_items.dart';
 import 'package:nushi/review_findings.dart';
 import 'package:nushi/send_to_agent.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/toast.dart';
 
 import 'fake_daemon.dart';
 import 'pull_fixture.dart';
@@ -272,7 +273,7 @@ void main() {
     final (d, _) = await openPullTab(tester, fixturePull());
     final box = d.chats['c']!.draft.replies;
     Finder toast(String s) =>
-        find.descendant(of: find.byType(SnackBar), matching: find.text(s));
+        find.descendant(of: find.byType(ToastLine), matching: find.text(s));
     expect(find.text('To do'), findsOneWidget);
     expect(
       find.textContaining(
@@ -290,7 +291,7 @@ void main() {
       endsWith('on PR octo/notes#412 (GitHub), my pull request:'),
     );
     // The row and the bar say it went in; no toast besides.
-    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(ToastLine), findsNothing);
     expect(find.text('In the box ✓'), findsOneWidget);
     expect(find.text('Send'), findsNWidgets(5));
     // The bar, at the tab's foot.
@@ -308,13 +309,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(box.value.length, 3);
     expect(box.value.last.from, startsWith('Changes requested by @mona'));
-    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(ToastLine), findsNothing);
     expect(find.text('Send 2 picked'), findsNothing); // unpicked once sent
     expect(find.text('In the box ✓'), findsNWidgets(3));
     await tester.tap(find.text('Send all 6 to agent'));
     await tester.pumpAndSettle();
     expect(box.value.length, 6); // the same card once
-    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(ToastLine), findsNothing);
     expect(find.text('Send'), findsNothing);
     // All of them there already: only a toast can say so.
     await tester.tap(find.text('Send all 6 to agent'));

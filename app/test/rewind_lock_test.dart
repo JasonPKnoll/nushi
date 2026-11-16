@@ -12,6 +12,7 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/rewind.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 
 import 'fake_daemon.dart';
 import 'harness.dart';
@@ -81,6 +82,7 @@ Future<_Box> _box(
   d.chats[c.id] = c;
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => ToastHost(child: child!),
       debugShowCheckedModeBanner: false,
       theme: NushiTheme(tokens).toThemeData(),
       home: Scaffold(
@@ -259,7 +261,7 @@ void main() {
     expect(b.text, 'Mind the footer');
     expect(find.byTooltip('Send\u2002⏎'), findsOne);
     expect(find.textContaining('the agent quit'), findsOne);
-    await tester.pumpAndSettle(const Duration(seconds: 1)); // its snack bar
+    await tester.pumpAndSettle(const Duration(seconds: 1)); // its toast
     await _done(tester, b);
   }, variant: _mac);
 
