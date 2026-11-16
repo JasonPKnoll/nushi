@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -103,11 +104,14 @@ func killJob() (windows.Handle, error) {
 	if err != nil {
 		return 0, err
 	}
-	info := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
+	// On the heap, which doesn't move, as the call takes it as a uintptr.
+	info := &windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
 		BasicLimitInformation: windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE},
 	}
-	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
-		uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info))); err != nil {
+	_, err = windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(info)), uint32(unsafe.Sizeof(*info))) //nolint:gosec // the system's own struct, kept alive below
+	runtime.KeepAlive(info)
+	if err != nil {
 		_ = windows.CloseHandle(job)
 		return 0, err
 	}

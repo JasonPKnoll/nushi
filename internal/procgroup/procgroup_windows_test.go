@@ -101,7 +101,7 @@ func children(t *testing.T, parent int, exe string) []uint32 {
 
 // gone says h's process has exited, waiting up to wait for it.
 func gone(h windows.Handle, wait time.Duration) bool {
-	ev, err := windows.WaitForSingleObject(h, uint32(wait.Milliseconds()))
+	ev, err := windows.WaitForSingleObject(h, uint32(wait.Milliseconds())) //nolint:gosec // seconds at most
 	return err == nil && ev == windows.WAIT_OBJECT_0
 }
 
