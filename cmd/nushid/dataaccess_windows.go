@@ -181,7 +181,8 @@ func openFolder(path string) (windows.Handle, error) {
 		return 0, fmt.Errorf("opening the data folder %s: %w", path, err)
 	}
 	var info windows.ByHandleFileInformation
-	switch err := windows.GetFileInformationByHandle(h, &info); {
+	err = windows.GetFileInformationByHandle(h, &info)
+	switch {
 	case err != nil:
 		err = fmt.Errorf("reading the data folder %s: %w", path, err)
 	case info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0:
