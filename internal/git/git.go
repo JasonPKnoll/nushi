@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/procgroup"
 )
 
 const (
@@ -407,8 +408,9 @@ func IgnoredOf(ctx context.Context, folder string, paths []string) map[string]bo
 			as[asked[i]] = p
 		}
 	}
-	cmd := command(ctx, folder, nil, "check-ignore", "-z", "--stdin")
+	cmd := unbound(ctx, folder, nil, "check-ignore", "-z", "--stdin")
 	cmd.Stdin = strings.NewReader(strings.Join(asked, "\x00") + "\x00")
+	procgroup.Bound(cmd)
 	out, err := cmd.Output() // exit 1: none ignored; 128: not a repository
 	if err != nil {
 		return nil

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/afrase/nushi/internal/model"
+	"github.com/afrase/nushi/internal/procgroup"
 	"github.com/afrase/nushi/internal/regularfile"
 )
 
@@ -128,7 +129,7 @@ func (b *blobs) read(ctx context.Context, rev, path string) ([]byte, error) {
 }
 
 func (b *blobs) start(ctx context.Context) error {
-	b.cmd = command(ctx, b.folder, nil, "cat-file", "--batch")
+	b.cmd = unbound(ctx, b.folder, nil, "cat-file", "--batch")
 	in, err := b.cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -137,6 +138,7 @@ func (b *blobs) start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	procgroup.Bound(b.cmd)
 	if err := b.cmd.Start(); err != nil {
 		return err
 	}

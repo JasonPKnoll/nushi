@@ -48,9 +48,10 @@ func Stage(ctx context.Context, folder string, paths []string, on bool) error {
 	if on {
 		args = []string{"add", "-A"}
 	}
-	cmd := command(ctx, folder, nil, append(args, "--pathspec-from-file=-", "--pathspec-file-nul")...)
+	cmd := unbound(ctx, folder, nil, append(args, "--pathspec-from-file=-", "--pathspec-file-nul")...)
 	cmd.Env = append(cmd.Env, "GIT_LITERAL_PATHSPECS=1")
 	cmd.Stdin = strings.NewReader(strings.Join(paths, "\x00"))
+	procgroup.Bound(cmd)
 	return finish(cmd, args[0])
 }
 
