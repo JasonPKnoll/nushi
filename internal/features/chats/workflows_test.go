@@ -219,6 +219,29 @@ func TestAWorkflowIsFollowedToItsEnd(t *testing.T) {
 	}
 }
 
+// A run whose call is before the recent page still comes with it, as
+// Running, while it runs (the Background tasks row and the pane find it
+// there), and no longer once it ended.
+func TestARunningWorkflowBeforeTheRecentPage(t *testing.T) {
+	f := workflowChat(t, Timing{}, runningAs)
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+	_ = f.c.SessionUpdate(context.Background(), &acp.SessionNotification{SessionID: acp.SessionID(f.c.sid), Update: acp.SessionUpdate{
+		SessionUpdate: "agent_message_chunk", AgentMessageChunk: &acp.ContentChunk{Content: acp.ContentBlock{Type: "text", Text: &acp.TextContent{Text: "It runs."}}}}})
+	has := func(items []model.Item) bool {
+		return slices.ContainsFunc(items, func(it model.Item) bool { return it.ID == wfCall })
+	}
+	part, err := f.svc.Recent(f.c.id, 1)
+	testcheck.NoErr(t, err)
+	if part.Older == 0 || has(part.Chat.Items) || !has(part.Running) {
+		t.Fatalf("running: %d older, page %+v, running %+v", part.Older, part.Chat.Items, part.Running)
+	}
+	f.files.set(endedAs("done", "completed"))
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 0 })
+	if part, err = f.svc.Recent(f.c.id, 1); err != nil || has(part.Running) {
+		t.Errorf("ended: running %+v, %v", part.Running, err)
+	}
+}
+
 // Reads that change nothing publish nothing.
 func TestAnUnchangedWorkflowSaysNothing(t *testing.T) {
 	f := workflowChat(t, Timing{}, runningAs)
