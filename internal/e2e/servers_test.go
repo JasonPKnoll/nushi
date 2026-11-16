@@ -27,7 +27,10 @@ func fakeServerBin(t *testing.T) string {
 	return bin
 }
 
-// freePort is a port nothing listens on now.
+// freePort is a port nothing listens on now, for a launch file. Another
+// program may take it before the server starts (the fake server's build
+// comes between), and the server then gets the next free one, so a test
+// reads the port from the server's row, never from here.
 func freePort(t *testing.T) int {
 	t.Helper()
 	ln, err := net.Listen("tcp4", "127.0.0.1:0")
@@ -62,13 +65,17 @@ func TestDevServers(t *testing.T) {
 	}
 	must(a.c.StartServer(ctx, connect.NewRequest(&nushiv1.StartServerRequest{ChatId: id, Entry: &nushiv1.StartServerRequest_Name{Name: "web"}, Hash: hash})))
 	a.waitFor("the server's change", func(e *nushiv1.EventsResponse) bool { return e.GetServersChanged() == repo })
+	var row *nushiv1.DevServer
 	until(t, "the server to answer", func() bool {
-		s := must(a.c.ListServers(ctx, connect.NewRequest(&nushiv1.ListServersRequest{ChatId: id}))).Servers[0]
-		return s.State == nushiv1.DevServerState_DEV_SERVER_STATE_RUNNING && s.Url == fmt.Sprintf("http://localhost:%d", port)
+		row = must(a.c.ListServers(ctx, connect.NewRequest(&nushiv1.ListServersRequest{ChatId: id}))).Servers[0]
+		return row.State == nushiv1.DevServerState_DEV_SERVER_STATE_RUNNING
 	})
+	if int(row.Port) < port || row.Url != fmt.Sprintf("http://localhost:%d", row.Port) {
+		t.Fatalf("the server runs at %s, port %d, want its entry's port %d or the next free one", row.Url, row.Port, port)
+	}
 	must(a.c.ArchiveChat(ctx, connect.NewRequest(&nushiv1.ArchiveChatRequest{ChatId: id, Archived: true})))
 	until(t, "the server to stop", func() bool {
-		c, err := net.Dial("tcp4", fmt.Sprintf("127.0.0.1:%d", port))
+		c, err := net.Dial("tcp4", fmt.Sprintf("127.0.0.1:%d", row.Port))
 		if err == nil {
 			_ = c.Close()
 		}
@@ -96,17 +103,20 @@ func TestAgentRunsADevServer(t *testing.T) {
 	if failed || json.Unmarshal([]byte(text), &list) != nil || len(list.Servers) != 1 || list.Servers[0].Name != "web" || list.Servers[0].State != "stopped" {
 		t.Fatalf("preview_list: %q, failed %v", text, failed)
 	}
-	url := fmt.Sprintf("http://localhost:%d", port)
-	if text, failed = callTool(t, d, key, "preview_start", map[string]string{"name": "web"}); failed || !strings.Contains(text, url) {
+	if text, failed = callTool(t, d, key, "preview_start", map[string]string{"name": "web"}); failed {
 		t.Fatalf("preview_start: %q", text)
 	}
 	e := a.waitFor("the server's page", func(e *nushiv1.EventsResponse) bool { return e.GetShowUrl() != "" })
-	if e.ChatId != id || e.GetShowUrl() != url {
-		t.Errorf("event %+v", e)
-	}
 	row := must(a.c.ListServers(ctx, connect.NewRequest(&nushiv1.ListServersRequest{ChatId: id}))).Servers[0]
 	if row.State != nushiv1.DevServerState_DEV_SERVER_STATE_RUNNING || row.LogId == "" || row.LogId != row.ServerId {
 		t.Fatalf("row %v", row)
+	}
+	url := fmt.Sprintf("http://localhost:%d", row.Port)
+	if int(row.Port) < port || row.Url != url || !strings.Contains(text, url) {
+		t.Fatalf("the server runs at %s, port %d, want its entry's port %d or the next free one; preview_start said %q", row.Url, row.Port, port, text)
+	}
+	if e.ChatId != id || e.GetShowUrl() != url {
+		t.Errorf("event %+v", e)
 	}
 	phone := openAt(t, d.devices)
 	ps, err := phone.c.WatchServerLog(ctx, connect.NewRequest(&nushiv1.WatchServerLogRequest{ChatId: id, ServerId: row.LogId}))
@@ -119,7 +129,7 @@ func TestAgentRunsADevServer(t *testing.T) {
 	testcheck.NoErr(t, err)
 	defer func() { _ = stream.Close() }()
 	var log strings.Builder
-	for !strings.Contains(log.String(), fmt.Sprintf("listening on %d", port)) {
+	for !strings.Contains(log.String(), fmt.Sprintf("listening on %d", row.Port)) {
 		if !stream.Receive() {
 			t.Fatalf("the log ended: %q, %v", log.String(), stream.Err())
 		}
