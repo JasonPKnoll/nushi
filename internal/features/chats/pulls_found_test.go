@@ -103,8 +103,9 @@ func TestFoundPullInItsLife(t *testing.T) {
 }
 
 // TestLived: a chat's life runs from Since (else Created) to ArchivedAt,
-// or for one archived before that was kept, to Updated; an unknown time
-// is in it.
+// or for one archived before that was kept, to a day after Updated (a
+// pull request opened from the user's terminal after the last turn is
+// the chat's); an unknown time is in it.
 func TestLived(t *testing.T) {
 	at := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	hour := func(n int) time.Time { return at.Add(time.Duration(n) * time.Hour) }
@@ -122,7 +123,8 @@ func TestLived(t *testing.T) {
 		{"a fork, after its parent began", model.ChatRecord{Created: hour(5), Since: at}, hour(1), true},
 		{"archived, before", model.ChatRecord{Created: at, Archived: true, ArchivedAt: hour(3)}, hour(2), true},
 		{"archived, after", model.ChatRecord{Created: at, Archived: true, ArchivedAt: hour(3)}, hour(4), false},
-		{"archived before it was kept: its last turn", model.ChatRecord{Created: at, Archived: true, Updated: hour(3)}, hour(4), false},
+		{"archived before it was kept: 23 hours after its last turn", model.ChatRecord{Created: at, Archived: true, Updated: hour(3)}, hour(3 + 23), true},
+		{"archived before it was kept: 25 hours after its last turn", model.ChatRecord{Created: at, Archived: true, Updated: hour(3)}, hour(3 + 25), false},
 		{"archived, nothing kept", model.ChatRecord{Created: at, Archived: true}, hour(4), true},
 	} {
 		if got := tc.r.Lived(tc.t); got != tc.want {
@@ -168,5 +170,26 @@ func TestFoundPullTwoChats(t *testing.T) {
 	find(4, at(5))  // b pushed only after it; c is another repository's
 	if got := fmt.Sprint(pulls(a.id), pulls(b.id), pulls(c.id)); got != "[4][7][7 4]" {
 		t.Fatalf("a, b, c: %s", got)
+	}
+}
+
+// TestDropStrayPullsUnkeptArchive: a chat archived before its archive time
+// was kept keeps a found pull request opened 23 hours after its last turn
+// (the user's own gh pr create, after the agent finished) and drops one
+// opened 25 hours after.
+func TestDropStrayPullsUnkeptArchive(t *testing.T) {
+	svc, _, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
+	last := c.record.Created.Add(time.Hour)
+	c.mu.Lock()
+	c.saveLocked(func(s *model.ChatRecord) {
+		s.Archived, s.ArchivedAt, s.Updated = true, time.Time{}, last
+		setPulls(s, []model.ChatGitHub{pullLink(7, "sub"), pullLink(8, "sub")})
+	})
+	c.mu.Unlock()
+	svc.DropStrayPulls(c.id, []model.GitHubItem{prItem(7, last.Add(23*time.Hour)), prItem(8, last.Add(25*time.Hour))})
+	s, err := svc.Session(c.id)
+	testcheck.NoErr(t, err)
+	if got := fmt.Sprint(numbers(s.AllPulls())); got != "[7]" || len(s.NoPulls) != 0 {
+		t.Fatalf("%s, unlinked %v", got, s.NoPulls)
 	}
 }

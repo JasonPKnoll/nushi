@@ -37,11 +37,20 @@ func (s ChatRecord) Claim(branch string, created time.Time) time.Time {
 	return time.Time{}
 }
 
+// UnkeptArchiveGrace is how long after its last message or turn
+// (Updated) a chat archived before ArchivedAt was kept is taken as still
+// alive. Its archive time is unknown, and a common flow ends after the last
+// turn: the user opens the pull request from their own terminal minutes
+// or hours later and archives the chat once it merged. A day keeps those
+// and still drops the ones opened long after.
+const UnkeptArchiveGrace = 24 * time.Hour
+
 // Lived says t is in the chat's life, as a pull request found by its
 // branch must have been opened (ADR 0059's amendment of 2026-11-16): at
 // or after the chat began (Since, else Created), and before it was
-// archived (ArchivedAt; for one archived before that was kept, its last
-// message or turn, Updated). A zero t, not known, is taken as in it.
+// archived (ArchivedAt; for one archived before that was kept, up to
+// UnkeptArchiveGrace after its last message or turn, Updated). A zero t,
+// not known, is taken as in it.
 func (s ChatRecord) Lived(t time.Time) bool {
 	if t.IsZero() {
 		return true
@@ -57,8 +66,8 @@ func (s ChatRecord) Lived(t time.Time) bool {
 		return true
 	}
 	end := s.ArchivedAt
-	if end.IsZero() {
-		end = s.Updated
+	if end.IsZero() && !s.Updated.IsZero() {
+		end = s.Updated.Add(UnkeptArchiveGrace)
 	}
 	return end.IsZero() || !t.After(end)
 }
