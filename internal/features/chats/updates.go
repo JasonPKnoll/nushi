@@ -45,7 +45,11 @@ func (c *chat) updateLocked(n *acp.SessionNotification, from *child) { //nolint:
 			c.ownNoted = true
 			c.noticeLocked("own_turn", "On its own, after a background task")
 		}
-		c.ownTurn = true // until its usage_update, which ends a turn
+		if !c.ownTurn {
+			c.ownTurn = true // until its usage_update, which ends a turn
+			c.statusChangedLocked()
+			c.pokeWorkflowsLocked() // a workflow's end starts one (Claude's task-notification)
+		}
 	}
 	switch u := n.Update; u.SessionUpdate {
 	case "user_message_chunk": // replayed by session/load
@@ -65,13 +69,18 @@ func (c *chat) updateLocked(n *acp.SessionNotification, from *child) { //nolint:
 		keepRaw(&item, t.RawInput, t.RawOutput)
 		if it := c.itemLocked(item.ID); it != nil { // a repeated tool_call replaces the call
 			item.Subagent, item.BackgroundCommand = it.Subagent, it.BackgroundCommand
+			if it.Workflow != nil {
+				item.Workflow, item.TaskID = it.Workflow, it.TaskID
+			}
 			*it = item
 			c.subagentLocked(it)
 			c.backgroundCommandLocked(it)
+			c.workflowLocked(it)
 			c.publishLocked(*it)
 		} else {
 			c.subagentLocked(&item)
 			c.backgroundCommandLocked(&item)
+			c.workflowLocked(&item)
 			c.addLocked(item)
 		}
 		c.reportedLocked(item)
@@ -103,10 +112,14 @@ func (c *chat) updateLocked(n *acp.SessionNotification, from *child) { //nolint:
 			c.configChangedLocked()
 		}
 	case "usage_update":
-		if c.ownTurn {
+		own := c.ownTurn
+		if own {
 			c.lookRelatedLocked()
 		}
 		c.ownTurn, c.ownNoted = false, false
+		if own {
+			defer c.statusChangedLocked() // once its usage is in
+		}
 		u := u.UsageUpdate
 		if c.kind.transcript != nil && !c.started.IsZero() && !c.stopped && c.kind.transcript.TurnDone(u) {
 			switch {
@@ -159,6 +172,7 @@ func (c *chat) updateLocked(n *acp.SessionNotification, from *child) { //nolint:
 		keepRaw(it, t.RawInput, t.RawOutput)
 		c.subagentLocked(it)
 		c.backgroundCommandLocked(it)
+		c.workflowLocked(it)
 		c.publishLocked(*it)
 		c.reportedLocked(*it)
 		c.passedOnLocked(*it)
