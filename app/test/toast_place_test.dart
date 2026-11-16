@@ -162,17 +162,75 @@ void main() {
           await tester.pumpAndSettle();
           say(context, 'Committed 3f2a9c1');
           await shot('i_side_pane');
+          // Centred over what's left of the transcript where a toast fits
+          // there, else over the whole area; inside it either way.
           final left = tester.getRect(find.byType(ChatView));
           final files = tester.getRect(find.byType(FilesPane));
+          final right = min(left.right, files.left);
           expect(
             toast(tester).center.dx,
-            closeTo((left.left + min(left.right, files.left)) / 2, 0.5),
+            closeTo(
+              right - left.left >= ToastHost.width + 16
+                  ? (left.left + right) / 2
+                  : main.center.dx,
+              0.5,
+            ),
           );
+          expectInside(tester, toast(tester));
+          expectInside(tester, tester.getRect(updateToast));
+          expectTextInside(tester, width);
           toggleFiles(d.chats['c']!);
           await closeView(tester, d);
         }, variant: macOSOnly);
       }
     }
+  }
+
+  // No window lets a toast or the card out of the main area: with Files
+  // over the transcript, and in windows narrower than a toast.
+  for (final width in [720.0, 480.0, 400.0]) {
+    testWidgets('a toast and the card stay inside, ${width.toInt()} wide', (
+      tester,
+    ) async {
+      sidebarHidden.value = true;
+      final d = await openWithUpdate(
+        tester,
+        updateDaemon(() => newerUpdate('0.1.17')),
+        width: width,
+        brightness: Brightness.light,
+      );
+      toggleFiles(d.chats['c']!);
+      await tester.pumpAndSettle();
+      showToast(
+        Toasts.maybeOf(tester.element(find.byType(Scaffold))),
+        'Committed 3f2a9c1',
+        action: (label: 'Undo', onPressed: () {}),
+      );
+      await tester.pumpAndSettle();
+      final main = tester.getRect(find.byType(Beside));
+      final box = toast(tester);
+      expect(box.width, min(ToastHost.width, main.width - 16));
+      expectInside(tester, box);
+      expectInside(tester, tester.getRect(updateToast));
+      expect(box.overlaps(tester.getRect(updateToast)), isFalse);
+      // Their words too, none cut at the main area's edge.
+      for (final of in [find.byType(ToastLine), updateToast]) {
+        for (final e
+            in find
+                .descendant(of: of, matching: find.byType(RichText))
+                .evaluate()) {
+          final r = e.renderObject! as RenderBox;
+          expectInside(tester, r.localToGlobal(Offset.zero) & r.size);
+        }
+      }
+      await render(
+        tester,
+        find.byType(MaterialApp),
+        'j_inside_${width.toInt()}',
+      );
+      toggleFiles(d.chats['c']!);
+      await closeView(tester, d);
+    }, variant: macOSOnly);
   }
 
   testWidgets('the phone: a toast at the bottom', (tester) async {
@@ -200,3 +258,10 @@ Rect toast(WidgetTester tester) => tester.getRect(
       .ancestor(of: find.byType(ToastLine), matching: find.byType(Material))
       .first,
 );
+
+/// [box] at least 8 points inside the main area.
+void expectInside(WidgetTester tester, Rect box) {
+  final main = tester.getRect(find.byType(Beside));
+  expect(box.left, greaterThanOrEqualTo(main.left + 8 - 0.5));
+  expect(box.right, lessThanOrEqualTo(main.right - 8 + 0.5));
+}

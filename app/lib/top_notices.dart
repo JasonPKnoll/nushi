@@ -59,7 +59,9 @@ enum NoticeSlot { card, bars, toasts }
 /// Places [TopNotices.slots] (ADR 0128): the bars centred across the
 /// width, the top given down; the card at the right of the column from
 /// its left to its right (the chat's transcript, or the whole width); the
-/// toasts' anchor centred over that column, under the bars. A bar or the
+/// toasts' anchor centred over that column, under the bars (over the
+/// whole width where a toast doesn't fit the column). A toast and the card
+/// stay 8 points inside the width, a toast narrowed to fit. A bar or the
 /// toasts that would meet the card, in a narrow window, go under it.
 mixin NoticesPlace on MultiChildLayoutDelegate {
   /// Lays the notices out; see [NoticesPlace].
@@ -69,8 +71,14 @@ mixin NoticesPlace on MultiChildLayoutDelegate {
     required double left,
     required double right,
   }) {
-    final card = layoutChild(NoticeSlot.card, BoxConstraints(maxWidth: width));
-    final cardLeft = max(0.0, right - TopNotices.cardInset - card.width);
+    const margin = ToastHost.margin;
+    final room = max(0.0, width - 2 * margin);
+    final card = layoutChild(NoticeSlot.card, BoxConstraints(maxWidth: room));
+    // At the column's right, but never out of the main area.
+    final cardLeft = max(
+      margin,
+      min(right - TopNotices.cardInset, width - margin) - card.width,
+    );
     positionChild(NoticeSlot.card, Offset(cardLeft, top));
     final under = top + card.height + TopNotices.gap;
     // Whether something centred at [centre], [across] wide, meets the card.
@@ -82,11 +90,18 @@ mixin NoticesPlace on MultiChildLayoutDelegate {
     final barsTop = !bars.isEmpty && meets(width / 2, bars.width) ? under : top;
     positionChild(NoticeSlot.bars, Offset((width - bars.width) / 2, barsTop));
 
-    layoutChild(NoticeSlot.toasts, BoxConstraints.tight(Size.zero));
-    final centre = (left + right) / 2;
+    // A toast is at most the main area less its margins: over the column
+    // where it fits, else over the whole area, and never out of it.
+    final across = min(ToastHost.width, room);
+    layoutChild(NoticeSlot.toasts, BoxConstraints.tight(Size(across, 0)));
+    final fits = right - left >= across + 2 * margin;
+    final least = margin + across / 2;
+    final centre = (fits ? (left + right) / 2 : width / 2)
+        .clamp(least, max(least, width - least))
+        .toDouble();
     var toasts = bars.isEmpty ? top : max(top, barsTop + bars.height);
-    if (meets(centre, ToastHost.width)) toasts = max(toasts, under);
-    positionChild(NoticeSlot.toasts, Offset(centre, toasts));
+    if (meets(centre, across)) toasts = max(toasts, under);
+    positionChild(NoticeSlot.toasts, Offset(centre - across / 2, toasts));
   }
 }
 

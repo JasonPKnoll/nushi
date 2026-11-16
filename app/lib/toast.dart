@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -64,8 +65,12 @@ class ToastHost extends StatefulWidget {
   final Widget child;
   final bool atBottom;
 
-  /// A toast's width on the Mac and Linux; a phone's fills the width.
+  /// A toast's width on the Mac and Linux, where there's room; a phone's
+  /// fills the width.
   static const width = 420.0;
+
+  /// The least room between a toast and the main area's edges.
+  static const margin = 8.0;
 
   @override
   State<ToastHost> createState() => Toasts();
@@ -101,6 +106,20 @@ class Toasts extends State<ToastHost> with SingleTickerProviderStateMixin {
   _Toast? _showing;
   bool _going = false;
   Timer? _timer;
+
+  /// The width the [ToastAnchor] gives a toast, while one is in the tree,
+  /// and which one told it: one going (as the main view changes) clears it
+  /// only if no other has told it since.
+  double? _anchorWidth;
+  Object? _anchorBy;
+
+  void _anchored(Object by, double? width) {
+    if (!mounted || (width == null && by != _anchorBy)) return;
+    _anchorBy = width == null ? null : by;
+    if (width == _anchorWidth) return;
+    _anchorWidth = width;
+    _layer.markNeedsBuild();
+  }
 
   /// Shows a toast whose line [line] builds, given what closes it; it
   /// goes after [duration], unless it [holds] an action and VoiceOver is
@@ -239,14 +258,19 @@ class Toasts extends State<ToastHost> with SingleTickerProviderStateMixin {
             ],
           );
         }
+        // As wide as the anchor says (narrower in a narrow main area);
+        // without one, at most the window less 8 points a side.
+        final wide =
+            _anchorWidth ??
+            max(0.0, min(ToastHost.width, box.maxWidth - 2 * ToastHost.margin));
         // The follower is the stack's own child: it takes pointers where
         // the anchor puts it, not where it's laid out.
         return Stack(
           children: [
             Positioned(
               top: PaneHeader.height + FloatBar.inset,
-              left: (box.maxWidth - ToastHost.width) / 2,
-              width: ToastHost.width,
+              left: (box.maxWidth - wide) / 2,
+              width: wide,
               child: CompositedTransformFollower(
                 link: anchor,
                 targetAnchor: Alignment.topCenter,
@@ -261,20 +285,74 @@ class Toasts extends State<ToastHost> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Where the window's toasts show: their top centre. The main area puts it
-/// under its header and the bars there (`TopNotices`); nothing without
-/// [Toasts] above it.
-class ToastAnchor extends StatelessWidget {
+/// Where the window's toasts show: the top of the box it's laid out as,
+/// whose width is a toast's (`NoticesPlace` puts it under the header and
+/// the bars, inside the main area). Nothing without [Toasts] above it.
+class ToastAnchor extends StatefulWidget {
   const new({super.key});
 
   @override
-  Widget build(BuildContext context) => switch (Toasts.maybeOf(context)) {
+  State<ToastAnchor> createState() => _ToastAnchorState();
+}
+
+class _ToastAnchorState extends State<ToastAnchor> {
+  Toasts? _toasts;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _toasts = Toasts.maybeOf(context);
+  }
+
+  @override
+  void dispose() {
+    final toasts = _toasts;
+    // After the frame: the host's layer isn't built while this goes.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => toasts?._anchored(this, null),
+    );
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => switch (_toasts) {
     final toasts? => CompositedTransformTarget(
       link: toasts.anchor,
-      child: const SizedBox.shrink(),
+      child: _Widths(onWidth: (width) => toasts._anchored(this, width)),
     ),
     null => const SizedBox.shrink(),
   };
+}
+
+/// As big as it's let be, telling [onWidth] its width after a frame that
+/// changed it: the toast's layer takes it the next.
+class _Widths extends SingleChildRenderObjectWidget {
+  const new({required this.onWidth});
+
+  final void Function(double width) onWidth;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderWidths(onWidth);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderObject renderObject) =>
+      (renderObject as _RenderWidths).onWidth = onWidth;
+}
+
+class _RenderWidths extends RenderBox {
+  new(this.onWidth);
+
+  void Function(double width) onWidth;
+  double? _told;
+
+  @override
+  void performLayout() {
+    size = constraints.biggest.isFinite ? constraints.biggest : Size.zero;
+    if (size.width == _told) return;
+    final width = _told = size.width;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onWidth(width));
+  }
 }
 
 class _Toast {
