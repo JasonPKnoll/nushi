@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/app_install_windows.dart';
 import 'package:nushi/conventions.dart';
@@ -17,4 +19,9 @@ void main() {
     expect(set.install, isA<WindowsAppInstall>());
     expect(set.install.canStop, isFalse);
   });
+
+  test('presenting with no window of the app to find (a test has none) does '
+      'nothing', () async {
+    await windowsNative().window.present();
+  }, skip: !Platform.isWindows);
 }
