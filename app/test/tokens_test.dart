@@ -92,6 +92,12 @@ const _surfaceFloor = 1.8;
 const _borderFloor = 8.0;
 
 void main() {
+  test('the sets whose greys are let off are sets', () {
+    expect([
+      for (final (name, _) in everySet) name,
+    ], containsAll(_greysTogether));
+  });
+
   for (final (name, t) in everySet) {
     Color on(Color tint, Color surface) => Color.alphaBlend(tint, surface);
 
@@ -195,16 +201,20 @@ void main() {
     });
 
     test('text, textSecondary and textMuted are three steps ($name)', () {
-      if (_greysTogether.contains(name)) return;
       final (text, secondary, muted) = (
         _lightness(t.text),
         _lightness(t.textSecondary),
         _lightness(t.textMuted),
       );
-      expect([
-        (text - secondary).abs(),
-        (secondary - muted).abs(),
-      ], everyElement(greaterThanOrEqualTo(_greyStep)));
+      final steps = [(text - secondary).abs(), (secondary - muted).abs()];
+      // A set let off still needs it: once its greys are three steps, it
+      // comes off the list.
+      expect(
+        steps,
+        _greysTogether.contains(name)
+            ? anyElement(lessThan(_greyStep))
+            : everyElement(greaterThanOrEqualTo(_greyStep)),
+      );
     });
 
     test('a field’s hint stands clearly under a typed value and muted '
