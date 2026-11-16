@@ -249,21 +249,21 @@ Future<void> _pair(BuildContext context, NushiServiceClient client) async {
 }
 
 /// Whether a pairing dialog is open.
-var _open = false;
+final ValueNotifier<bool> _open = runValue(false);
 
 Future<void> _show(
   BuildContext context,
   NushiServiceClient client,
   String qr,
 ) async {
-  _open = true;
+  _open.value = true;
   try {
     await showDialog<void>(
       context: context,
       builder: (_) => _Pairing(client, qr),
     );
   } finally {
-    _open = false;
+    _open.value = false;
   }
 }
 
@@ -278,7 +278,7 @@ void watchPairings(
     final r = remoteState.value;
     final code = r != null && r.hasPairing() ? r.pairing.code : '';
     final context = navigator.currentContext;
-    if (code.isEmpty || code == asked || _open || context == null) return;
+    if (code.isEmpty || code == asked || _open.value || context == null) return;
     asked = code;
     unawaited(_show(context, client, ''));
   });
