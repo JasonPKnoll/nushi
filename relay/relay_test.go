@@ -620,60 +620,77 @@ func TestSecondListenerReplacesFirst(t *testing.T) {
 	expect(t, l2, "to the newest")
 }
 
-// Connections that aren't WebSockets count under the caps too, and an idle
-// one goes: one address can't pile up keep-alive connections.
-func TestIdleHTTPConnections(t *testing.T) {
-	lim := Defaults
-	lim.PlainPerIP = 3
-	lim.HTTPIdle = 300 * time.Millisecond
+// plainServer is the relay's server on a port of its own, until the test
+// ends.
+func plainServer(t *testing.T, lim Limits) string {
+	t.Helper()
 	srv := NewServer(lim)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	go func() { _ = srv.Serve(ln) }()
-	defer func() { _ = srv.Close() }()
-	// healthz asks once on a new connection, keeping it open; it says
-	// whether the relay answered.
-	healthz := func() (net.Conn, bool) {
-		c, err := net.Dial("tcp", ln.Addr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		testcheck.NoErr(t, c.SetDeadline(time.Now().Add(2*time.Second)))
-		_, _ = io.WriteString(c, "GET /healthz HTTP/1.1\r\nHost: relay\r\n\r\n") // a refused one may be closed already: the answer says
-		resp, err := http.ReadResponse(bufio.NewReader(c), nil)
-		if err == nil {
-			_ = resp.Body.Close()
-		}
-		return c, err == nil
+	t.Cleanup(func() { _ = srv.Close() })
+	return ln.Addr().String()
+}
+
+// healthz asks once on a new connection to addr, keeping it open until
+// the test ends; it says whether the relay answered.
+func healthz(t *testing.T, addr string) (net.Conn, bool) {
+	t.Helper()
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = c.Close() })
+	testcheck.NoErr(t, c.SetDeadline(time.Now().Add(30*time.Second)))
+	_, _ = io.WriteString(c, "GET /healthz HTTP/1.1\r\nHost: relay\r\n\r\n") // a refused one may be closed already: the answer says
+	resp, err := http.ReadResponse(bufio.NewReader(c), nil)
+	if err == nil {
+		_ = resp.Body.Close()
+	}
+	return c, err == nil
+}
+
+// Connections that aren't WebSockets count under the caps too: one address
+// can't pile up keep-alive connections.
+func TestPlainConnectionsAreCapped(t *testing.T) {
+	lim := Defaults
+	lim.PlainPerIP = 3
+	lim.HTTPIdle, lim.FirstWait = time.Hour, time.Hour // none goes within the test
+	addr := plainServer(t, lim)
 	// A WebSocket counts as one only until it is one.
-	l, d := pair(t, "ws://"+ln.Addr().String(), newKey())
-	var open []net.Conn
+	l, d := pair(t, "ws://"+addr, newKey())
 	for range 3 {
-		c, ok := healthz()
-		if !ok {
+		if _, ok := healthz(t, addr); !ok {
 			t.Fatal("refused under the cap")
 		}
-		open = append(open, c)
 	}
-	if c, ok := healthz(); ok {
-		_ = c.Close()
+	if _, ok := healthz(t, addr); ok {
 		t.Fatal("a fourth idle connection from one address")
 	}
 	send(t, d, "still")
 	expect(t, l, "still")
-	for _, c := range open {
-		testcheck.NoErr(t, c.SetDeadline(time.Now().Add(2*time.Second)))
-		if _, err := c.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
-			t.Fatalf("an idle connection stayed: %v", err)
-		}
+}
+
+// An idle plain connection goes after HTTPIdle, and its place is free
+// again.
+func TestIdleHTTPConnections(t *testing.T) {
+	lim := Defaults
+	lim.PlainPerIP = 1
+	lim.HTTPIdle = 300 * time.Millisecond
+	lim.FirstWait = time.Hour // only idleness closes one here
+	addr := plainServer(t, lim)
+	c, ok := healthz(t, addr)
+	if !ok {
+		t.Fatal("refused under the cap")
 	}
-	if c, ok := healthz(); !ok {
-		t.Fatal("refused once the idle ones went")
-	} else {
-		_ = c.Close()
+	if _, err := c.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+		t.Fatalf("an idle connection stayed: %v", err)
+	}
+	// The server uncounts a connection just after it closes it.
+	if !testcheck.Eventually(func() bool { _, ok := healthz(t, addr); return ok }) {
+		t.Fatal("refused once the idle one went")
 	}
 }
 
