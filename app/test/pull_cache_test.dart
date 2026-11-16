@@ -109,7 +109,11 @@ void main() {
   }, variant: _mac);
 
   test('kept files: one per pull request, private, the 50 newest', () {
+    // Each read a minute after the one before: which are the newest is
+    // the files' times, and the same time for all would leave it to the
+    // folder's order.
     for (var n = 1; n <= 52; n++) {
+      clock = () => fixtureNow.add(Duration(minutes: n));
       keepPull(
         GitHubRef(host: 'github.com', repo: fixtureRepo, number: n),
         fixturePull(),
@@ -122,11 +126,9 @@ void main() {
     );
     final dir = Directory('$dataDir/pulls');
     final files = dir.listSync().whereType<File>().toList();
-    expect(files, hasLength(50));
-    expect(
-      files.map((f) => f.uri.pathSegments.last),
-      contains('github.com_octo_notes_52.pb'),
-    );
+    expect(files.map((f) => f.uri.pathSegments.last).toSet(), {
+      for (var n = 3; n <= 52; n++) 'github.com_octo_notes_$n.pb',
+    });
     int mode(String path) => FileStat.statSync(path).mode & 0x1ff;
     expect(mode(dir.path), 0x1c0);
     expect(mode(files.first.path), 0x180);
