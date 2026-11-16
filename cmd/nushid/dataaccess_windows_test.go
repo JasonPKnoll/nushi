@@ -48,7 +48,7 @@ func TestOwnDataFolderRefusesAJunction(t *testing.T) {
 	testcheck.NoErr(t, os.MkdirAll(target, 0o700))
 	link := filepath.Join(t.TempDir(), "nd")
 	cmd := filepath.Join(os.Getenv("SystemRoot"), "System32", "cmd.exe")
-	if out, err := exec.Command(cmd, "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil { //nolint:gosec,noctx // the system's cmd.exe, two test folders
+	if out, err := exec.Command(cmd, "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
 		t.Fatalf("mklink /J: %v: %s", err, out)
 	}
 	if err := ownDataFolder(link); err == nil {
@@ -107,10 +107,12 @@ func TestOwnDataFolderRefusesWhatItsDACLMissed(t *testing.T) {
 		plant func(t *testing.T, path string)
 	}{
 		{"agents", func(t *testing.T, path string) {
+			t.Helper()
 			testcheck.NoErr(t, os.Mkdir(path, 0o700))
 			setDACL(t, path, true, fullAccess(currentUser(t), windows.TRUSTEE_IS_USER))
 		}},
 		{"servers.json", func(t *testing.T, path string) {
+			t.Helper()
 			testcheck.Write(t, path, "{}")
 			setDACL(t, path, false, fullAccess(everyone, windows.TRUSTEE_IS_WELL_KNOWN_GROUP))
 		}},
