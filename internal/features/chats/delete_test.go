@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/afrase/nushi/internal/model"
 	"github.com/afrase/nushi/internal/testcheck"
@@ -180,7 +179,9 @@ func TestNothingReopensAChatBeingDeleted(t *testing.T) {
 	if _, err := svc.Fork(context.Background(), c.id); err == nil {
 		t.Error("a chat being deleted forked")
 	}
-	time.Sleep(20 * time.Millisecond)
+	// A reopen Get or Prompt began is busy from then until its agent has
+	// started: waited out, its launch is counted.
+	eventually(t, c, func() bool { return !c.busy })
 	agent.mu.Lock()
 	again := agent.launches
 	agent.mu.Unlock()
