@@ -142,12 +142,21 @@ void main() {
     ]) {
       await _type(tester, key);
     }
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyE);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
-    await tester.pumpAndSettle();
+    for (final held in [
+      LogicalKeyboardKey.metaLeft,
+      LogicalKeyboardKey.controlLeft,
+      LogicalKeyboardKey.altLeft,
+    ]) {
+      await tester.sendKeyDownEvent(held);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyE);
+      await tester.sendKeyUpEvent(held);
+      await tester.pumpAndSettle();
+    }
     expect(_boxText(tester), '');
     expect(_boxFocused(tester), isFalse);
+    // Tab moves the focus, and types nothing.
+    await _type(tester, LogicalKeyboardKey.tab);
+    expect(_boxText(tester), '');
     await closeView(tester, d);
   }, variant: mac);
 
