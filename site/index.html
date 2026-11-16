@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nushi: your coding agents as chats</title>
-<meta name="description" content="A Mac and Linux app that runs your coding agents as chats, beside a diff viewer, your pull requests and your phone.">
+<title>Nushi: all your coding agents, in one window</title>
+<meta name="description" content="A Mac and Linux app that runs all your coding agents in one window, beside a diff viewer, your pull requests and your phone.">
 <meta property="og:title" content="Nushi">
-<meta property="og:description" content="Your coding agents as chats, beside a diff viewer, your pull requests and your phone.">
+<meta property="og:description" content="All your coding agents in one window, beside a diff viewer, your pull requests and your phone.">
 <meta property="og:image" content="images/hero.png">
 <meta name="theme-color" content="#0F1A20">
 <link rel="icon" href="brand/icon.svg" type="image/svg+xml">
@@ -28,21 +28,10 @@
 
 <main id="top">
   <section class="hero">
-    <svg class="orbits" viewBox="0 0 1000 1000" aria-hidden="true">
-      <g class="ring outer">
-        <path d="M500 60a440 440 0 0 1 413 288"/><path d="M940 500a440 440 0 0 1-288 413"/>
-        <path d="M500 940a440 440 0 0 1-413-288"/><path d="M60 500a440 440 0 0 1 288-413"/>
-        <circle cx="940" cy="500" r="9"/><circle cx="189" cy="811" r="9"/>
-      </g>
-      <g class="ring inner">
-        <path d="M772 657a315 315 0 0 1-288 157"/><path d="M343 772a315 315 0 0 1-157-288"/>
-        <path d="M228 343a315 315 0 0 1 288-157"/><path d="M657 228a315 315 0 0 1 157 288"/>
-        <circle cx="500" cy="185" r="7"/><circle cx="773" cy="657" r="7"/>
-      </g>
-    </svg>
+    <canvas class="field" aria-hidden="true"></canvas>
     <div class="hero-text">
-      <h1>Run your coding agents as chats.</h1>
-      <p class="lede">Nushi is a Mac and Linux app for Claude, Codex and the other agents you already use. Each runs as your own CLI, with your login and history, beside a diff viewer, your pull requests and your phone.</p>
+      <h1>All your coding agents, in one window.</h1>
+      <p class="lede">Nushi is a Mac and Linux app for Claude, Codex, Pi and the other agents you already use, each running as your own CLI with your login and history. Review their diffs, work through their pull requests, and answer them from your phone.</p>
       <div class="cta">
         <button class="brew" type="button" data-copy="brew install --cask afrase/tap/nushi" aria-label="Copy the Homebrew install command">
           <code>brew install --cask afrase/tap/nushi</code><span class="copied" aria-live="polite">Copy</span>
@@ -144,6 +133,7 @@
   <a href="https://github.com/afrase/nushi/wiki">Guide</a>
 </footer>
 
+<script src="field.js" defer></script>
 <script>
 for (const b of document.querySelectorAll('[data-copy]')) {
   b.addEventListener('click', async () => {
