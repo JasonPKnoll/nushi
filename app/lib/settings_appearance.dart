@@ -8,9 +8,10 @@ import 'package:nushi/settings_fonts.dart';
 import 'package:nushi/settings_rows.dart';
 import 'package:nushi/settings_theme.dart';
 import 'package:nushi/sidebar_view.dart';
+import 'package:nushi/view_options.dart';
 
 /// Settings › Appearance: Light, Dark or as the system, the chat's width,
-/// the app's and code's fonts (ADR 0114), whether the preview shows
+/// the app's and code's fonts (ADR 0114), whether Files' viewer shows
 /// whitespace, and the color theme (ADR 0086).
 class AppearanceSection extends StatelessWidget {
   const new({super.key});
@@ -22,16 +23,17 @@ class AppearanceSection extends StatelessWidget {
   );
 }
 
-/// How a file's source shows in the preview: whether its whitespace is
-/// marked (ADR 0096). An app preference; View › Show Whitespace too.
+/// How a file's source shows in the Files pane: whether its whitespace is
+/// marked (ADR 0096). An app preference; View › Show Whitespace and the
+/// pane's ⋯ too ([whitespaceOption], the one switch).
 class _Preview extends StatelessWidget {
   const new();
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder(
-    valueListenable: showWhitespace,
+    valueListenable: whitespaceOption.pref,
     builder: (context, on, _) => SettingsGroup(
-      title: 'Preview',
+      title: 'Files',
       children: [
         SettingsRow(
           'Show whitespace',
@@ -40,7 +42,7 @@ class _Preview extends StatelessWidget {
               'source.',
           control: SettingsSwitch(
             value: on,
-            onChanged: (v) => showWhitespace.value = v,
+            onChanged: (v) => whitespaceOption.pref.value = v,
           ),
         ),
       ],

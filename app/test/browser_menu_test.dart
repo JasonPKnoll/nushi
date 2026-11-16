@@ -33,7 +33,7 @@ Future<ChatState> _pane(
       theme: NushiTheme(tokens).toThemeData(),
       home: Scaffold(
         body: ValueListenableBuilder(
-          valueListenable: c.preview,
+          valueListenable: c.browser.shown,
           builder: (context, tab, _) => tab is BrowserTab
               ? BrowserPane(
                   key: ObjectKey(tab),

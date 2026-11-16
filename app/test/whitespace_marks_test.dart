@@ -129,7 +129,7 @@ void main() {
     final context = tester.element(find.byType(SourceEditor));
     expect(
       appActions(context, d).firstWhere((a) => a.act == Act.whitespace).title,
-      'Hide whitespace in the preview',
+      'Hide whitespace in Files',
     );
 
     // The editor keeps its text: an edit and ⌘S save only what's typed.

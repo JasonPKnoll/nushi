@@ -111,7 +111,6 @@ class TreeRowView extends StatelessWidget {
       );
     }
     final dim = r.ignored || r.kind != TreeRowKind.folder && !r.opens;
-    final kind = previewKind(r.path);
     return Tap(
       onTap: onTap,
       selected: selected,
@@ -120,45 +119,74 @@ class TreeRowView extends StatelessWidget {
       fill: showing ? t.accentSoft : null,
       tooltip: _tooltip(r),
       padding: EdgeInsets.only(left: indent, right: 6),
-      child: Row(
-        spacing: 4,
-        children: [
-          SizedBox(
-            width: 14,
-            child: r.kind == TreeRowKind.folder ? Chevron(open: r.open) : null,
-          ),
-          Icon(
-            switch (r.kind) {
-              TreeRowKind.folder =>
-                r.open ? Icons.folder_open_outlined : Icons.folder_outlined,
-              TreeRowKind.link => Icons.link_off,
-              _ => kind?.icon ?? Icons.insert_drive_file_outlined,
-            },
-            size: icon,
-            color: dim ? t.textMuted : t.textSecondary,
-          ),
-          Flexible(
-            child: Text(
-              // Anyone's name: its bidi marks show, so it can't pose as
-              // another (docs/security.md).
-              plainPath(r.name),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.ui(
-                dim ? t.textMuted : t.text,
-                size: text,
-                weight: showing ? FontWeight.w600 : null,
-              ),
-            ),
-          ),
-          if (wrote)
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: t.done, shape: BoxShape.circle),
-            ),
-        ],
+      // Squeezed narrower than its chevron, icon and dot, the row is cut
+      // at its right rather than overflowing (a pane lying over the chat
+      // in a narrow window, ADR 0123).
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final row = _row(context, r, icon: icon, text: text, dim: dim);
+          final least = 14 + icon + 8 + (wrote ? 10 : 0);
+          if (box.maxWidth >= least) return row;
+          return UnconstrainedBox(
+            constrainedAxis: Axis.vertical,
+            alignment: Alignment.centerLeft,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(width: least, child: row),
+          );
+        },
       ),
+    );
+  }
+
+  /// The row's chevron, icon, name and dot.
+  Widget _row(
+    BuildContext context,
+    TreeRow r, {
+    required double icon,
+    required double text,
+    required bool dim,
+  }) {
+    final theme = NushiTheme.of(context);
+    final t = theme.t;
+    final kind = previewKind(r.path);
+    return Row(
+      spacing: 4,
+      children: [
+        SizedBox(
+          width: 14,
+          child: r.kind == TreeRowKind.folder ? Chevron(open: r.open) : null,
+        ),
+        Icon(
+          switch (r.kind) {
+            TreeRowKind.folder =>
+              r.open ? Icons.folder_open_outlined : Icons.folder_outlined,
+            TreeRowKind.link => Icons.link_off,
+            _ => kind?.icon ?? Icons.insert_drive_file_outlined,
+          },
+          size: icon,
+          color: dim ? t.textMuted : t.textSecondary,
+        ),
+        Flexible(
+          child: Text(
+            // Anyone's name: its bidi marks show, so it can't pose as
+            // another (docs/security.md).
+            plainPath(r.name),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.ui(
+              dim ? t.textMuted : t.text,
+              size: text,
+              weight: showing ? FontWeight.w600 : null,
+            ),
+          ),
+        ),
+        if (wrote)
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: t.done, shape: BoxShape.circle),
+          ),
+      ],
     );
   }
 

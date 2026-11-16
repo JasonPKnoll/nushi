@@ -142,8 +142,9 @@ void main() {
                 values: [ConfigValue(value: model, name: model)],
               ),
             ];
-          // A Jira key and a GitHub chip never fold: everything else
-          // folded, a long key fits from about 380, an issue's chip from
+          // A Jira key and a GitHub chip fold last, into ⋯ (ADR 0123);
+          // with them shown and everything else folded, a long key fits
+          // from about 380, an issue's chip from
           // 350, a pull request's with its badges from 430.
           // A found pull request's chip (ADR 0117) takes about 50 more.
           final least =
@@ -286,7 +287,7 @@ void main() {
     });
   }
 
-  testWidgets('at 460 the tabs are a menu, at 330 the terminal is in ⋯; '
+  testWidgets('at 460 the tabs are a menu, at 250 the terminal is in ⋯; '
       'wide, they are buttons', (tester) async {
     final d = await FakeDaemon([]).connect(tester);
     final chat = ChatState('c', '/Users/me/repo')
@@ -322,7 +323,7 @@ void main() {
     await tester.tap(find.textContaining('Pull request', findRichText: true));
     await tester.pumpAndSettle();
     expect(picked, ChatTab.pull);
-    await pump(330);
+    await pump(250);
     expect(find.byTooltip('Show terminal\u2002⌃`'), findsNothing);
     await tester.tap(find.byTooltip('Chat menu'));
     await tester.pumpAndSettle();

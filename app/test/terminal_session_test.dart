@@ -57,6 +57,7 @@ void main() {
     session.terminal.resize(80, 24);
     await tester.pump();
     expect(streams, hasLength(3));
+    await tester.pump(TermSession.resizeEvery); // its resize's spell ends
   });
 
   // Restart shows only on an exited shell, so every other app has been
@@ -85,6 +86,7 @@ void main() {
     await tester.pump();
     expect(streams, hasLength(2), reason: 'never attached to the new shell');
     expect(session.fresh, isFalse); // the app that restarted it answers
+    await tester.pump(TermSession.resizeEvery); // its resize's spell ends
   });
 
   // A restart here whose list event comes before its answer attaches
@@ -118,6 +120,7 @@ void main() {
     session.terminal.resize(80, 24);
     await tester.pump();
     expect(streams, hasLength(2));
+    await tester.pump(TermSession.resizeEvery); // its resize's spell ends
   });
 }
 

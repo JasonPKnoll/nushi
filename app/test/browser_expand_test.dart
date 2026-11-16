@@ -2,10 +2,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/browser_pane.dart';
-import 'package:nushi/chat_view.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/panes.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 
@@ -37,9 +37,10 @@ void main() {
     expect(find.byType(Composer), findsOneWidget);
     await tester.tap(_expand);
     await tester.pumpAndSettle();
+    // The whole chat area, its header and terminal too (ADR 0123).
     expect(
       tester.getRect(find.byType(BrowserPane)),
-      tester.getRect(find.byType(ChatView)),
+      tester.getRect(find.byType(Pane)),
     );
     // Hidden: not drawn, not reached.
     expect(find.byType(Composer), findsNothing);
@@ -53,7 +54,7 @@ void main() {
     expect(fakes.hosts, hasLength(1));
     expect(fakes.hosts.single.opened, hasLength(1));
     // Its width as dragged is kept.
-    expect(paneWidths.value, isNot(contains('preview')));
+    expect(paneWidths.value, isNot(contains('browser')));
     await closeView(tester, d);
   }, variant: macOnly);
 
@@ -124,10 +125,10 @@ void main() {
     expect(_expand, findsOneWidget);
 
     await expand();
-    c.openPreview('docs/plan.md');
+    c.openInFiles('docs/plan.md');
     await tester.pumpAndSettle();
     expect(find.byType(Composer), findsOneWidget);
-    c.showPreviewTab(c.previewTabs.value.first);
+    c.showBrowserTab(c.browser.tabs.value.first);
     await tester.pumpAndSettle();
     expect(_expand, findsOneWidget);
 
@@ -156,7 +157,7 @@ void main() {
           brightness: brightness,
         );
         d.chats['c']!
-          ..openPreview('docs/plan.md')
+          ..openInFiles('docs/plan.md')
           ..openBrowserTab('https://example.com');
         await tester.pumpAndSettle();
         await render(
@@ -197,7 +198,7 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
         final c = d.chats['c']!;
-        c.showPreviewTab(c.previewTabs.value.first);
+        c.showBrowserTab(c.browser.tabs.value.first);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await render(

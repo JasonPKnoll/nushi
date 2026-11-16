@@ -57,14 +57,16 @@ Widget tooltip(
       child: child,
     );
   }
-  final t = NushiTheme.of(context).t;
+  final theme = NushiTheme.of(context);
   return Tooltip(
     richMessage: TextSpan(
       children: [
         TextSpan(text: message.substring(0, at)),
         TextSpan(
           text: message.substring(at),
-          style: TextStyle(color: tooltipKey(t)),
+          // The words' font; the key's symbols (⇧⌘) from the bundled code
+          // font, which has them, as the menu's keys are (`menu.dart`).
+          style: tooltipKeyStyle(theme),
         ),
       ],
     ),
@@ -75,6 +77,13 @@ Widget tooltip(
 
 /// A tooltip's key's grey: its words' muted grey, a step further back.
 Color tooltipKey(Tokens t) => t.textMuted.withValues(alpha: 0.6);
+
+/// A tooltip's key as [tooltip] draws it: [tooltipKey]'s grey in the
+/// tooltip's type, the bundled code font after its fallbacks for ⇧ and ⌘,
+/// which the UI font lacks.
+TextStyle tooltipKeyStyle(NushiTheme theme) => theme
+    .ui(tooltipKey(theme.t), size: 12)
+    .thenFonts(const [NushiTheme.codeFont]);
 
 /// How a control is, to draw it: under the pointer, focused from the
 /// keyboard, pressed (the pointer down on it: a click shows at once, before

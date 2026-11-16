@@ -7,6 +7,7 @@ import 'package:nushi/app_actions.dart' show findKey;
 import 'package:nushi/conventions.dart';
 import 'package:nushi/editor_find.dart';
 import 'package:nushi/file_edit.dart';
+import 'package:nushi/indent_guides.dart';
 import 'package:nushi/keys.dart';
 import 'package:nushi/menu.dart' show Menu;
 import 'package:nushi/settings.dart';
@@ -64,7 +65,12 @@ class _SourceEditorState extends State<SourceEditor> {
   void initState() {
     super.initState();
     _focus.addListener(_focusChanged);
+    tabSize.addListener(_tabSizeChanged);
   }
+
+  /// Tab size set: the lines' runs are made again, to the new stops
+  /// (`FileEdit`'s spans read it), in the same editor and its edits.
+  void _tabSizeChanged() => widget.edit.controller.forceRepaint();
 
   @override
   void didChangeDependencies() {
@@ -74,6 +80,7 @@ class _SourceEditorState extends State<SourceEditor> {
 
   @override
   void dispose() {
+    tabSize.removeListener(_tabSizeChanged);
     _unfollow();
     _find.dispose();
     _focus.dispose();
@@ -118,7 +125,7 @@ class _SourceEditorState extends State<SourceEditor> {
   late final Map<Type, Action<Intent>> _tabActions = {
     CodeShortcutIndentIntent: _tabAction<CodeShortcutIndentIntent>(tabIndent),
     CodeShortcutOutdentIntent: _tabAction<CodeShortcutOutdentIntent>(
-      tabOutdent,
+      (v) => tabOutdent(v, size: tabSize.value),
     ),
     CodeShortcutNewLineIntent: _tabAction<CodeShortcutNewLineIntent>(
       tabNewLine,
@@ -144,53 +151,77 @@ class _SourceEditorState extends State<SourceEditor> {
     final t = theme.t;
     final code = theme.code(t.text, size: 12);
     final gutter = theme.code(t.textMuted, size: 12);
+    // A line as re_editor draws it (no text scaling): Scroll past end's
+    // room under the last one.
+    final line = (TextPainter(
+      text: TextSpan(text: '0', style: code),
+      textDirection: TextDirection.ltr,
+    )..layout());
+    final lineHeight = line.height;
+    line.dispose();
     final editor = ListenableBuilder(
-      listenable: Listenable.merge([widget.edit, _find.roomAbove]),
-      builder: (context, _) => CodeEditor(
-        controller: widget.edit.controller,
-        findController: _find.marking,
-        focusNode: _focus,
-        scrollController: _scroll,
-        readOnly: widget.edit.readOnly != null,
-        wordWrap: widget.wrap,
-        autocompleteSymbols: false,
-        chunkAnalyzer: const NonCodeChunkAnalyzer(),
-        shortcutsActivatorsBuilder: const _EditorKeys(),
-        shortcutOverrideActions: widget.edit.tabs ? _tabActions : null,
-        padding: EdgeInsets.only(
-          left: 14,
-          top:
-              widget.padding.top + (_find.roomAbove.value ? FindBar.height : 0),
-          right: widget.padding.right,
-          bottom: widget.padding.bottom,
-        ),
-        style: CodeEditorStyle(
-          fontFamily: code.fontFamily,
-          fontFamilyFallback: code.fontFamilyFallback,
-          fontSize: code.fontSize,
-          fontHeight: code.height,
-          textColor: t.text,
-          backgroundColor: t.base,
-          selectionColor: DefaultSelectionStyle.of(context).selectionColor,
-          cursorColor: t.text,
-          cursorWidth: 1.5,
-          cursorLineColor: t.base,
-          // A find's matches; the current one is the selection, as the
-          // transcript's (TextMarks) are.
-          highlightColor: t.needs.withValues(alpha: 0.3),
-        ),
-        indicatorBuilder: (context, controller, chunks, notifier) {
-          _lines.follow(notifier);
-          return Padding(
-            key: _gutter,
-            padding: EdgeInsets.only(left: widget.padding.left),
-            child: DefaultCodeLineNumber(
-              controller: controller,
-              notifier: notifier,
-              minNumberCount: 1,
-              textStyle: gutter,
-              focusedTextStyle: gutter.copyWith(color: t.textSecondary),
+      listenable: Listenable.merge([
+        widget.edit,
+        _find.roomAbove,
+        scrollPastEnd,
+      ]),
+      builder: (context, _) => LayoutBuilder(
+        builder: (context, box) {
+          final top =
+              widget.padding.top + (_find.roomAbove.value ? FindBar.height : 0);
+          return CodeEditor(
+            controller: widget.edit.controller,
+            findController: _find.marking,
+            focusNode: _focus,
+            scrollController: _scroll,
+            readOnly: widget.edit.readOnly != null,
+            wordWrap: widget.wrap,
+            autocompleteSymbols: false,
+            chunkAnalyzer: const NonCodeChunkAnalyzer(),
+            shortcutsActivatorsBuilder: const _EditorKeys(),
+            shortcutOverrideActions: widget.edit.tabs ? _tabActions : null,
+            padding: EdgeInsets.only(
+              left: 14,
+              top: top,
+              right: widget.padding.right,
+              bottom: scrollPastEnd.value
+                  ? pastEndPadding(
+                      box.maxHeight,
+                      lineHeight,
+                      top: top,
+                      bottom: widget.padding.bottom,
+                    )
+                  : widget.padding.bottom,
             ),
+            style: CodeEditorStyle(
+              fontFamily: code.fontFamily,
+              fontFamilyFallback: code.fontFamilyFallback,
+              fontSize: code.fontSize,
+              fontHeight: code.height,
+              textColor: t.text,
+              backgroundColor: t.base,
+              selectionColor: DefaultSelectionStyle.of(context).selectionColor,
+              cursorColor: t.text,
+              cursorWidth: 1.5,
+              cursorLineColor: t.base,
+              // A find's matches; the current one is the selection, as the
+              // transcript's (TextMarks) are.
+              highlightColor: t.needs.withValues(alpha: 0.3),
+            ),
+            indicatorBuilder: (context, controller, chunks, notifier) {
+              _lines.follow(notifier);
+              return Padding(
+                key: _gutter,
+                padding: EdgeInsets.only(left: widget.padding.left),
+                child: DefaultCodeLineNumber(
+                  controller: controller,
+                  notifier: notifier,
+                  minNumberCount: 1,
+                  textStyle: gutter,
+                  focusedTextStyle: gutter.copyWith(color: t.textSecondary),
+                ),
+              );
+            },
           );
         },
       ),
@@ -199,13 +230,23 @@ class _SourceEditorState extends State<SourceEditor> {
     // elsewhere it's the chat's or Changes'.
     return CallbackShortcuts(
       bindings: {findKey: _find.open},
-      child: ValueListenableBuilder(
-        valueListenable: showWhitespace,
-        builder: (context, show, editor) => Stack(
+      child: ListenableBuilder(
+        listenable: Listenable.merge([showWhitespace, indentGuides, tabSize]),
+        builder: (context, editor) => Stack(
           fit: StackFit.expand,
           children: [
             editor!,
-            if (show)
+            // Over its fill, in the indentation, where no text is.
+            if (indentGuides.value)
+              IndentGuideOverlay(
+                lines: _lines,
+                controller: widget.edit.controller,
+                gutter: _gutter,
+                column: columnWidth(code, TextScaler.noScaling),
+                size: tabSize.value,
+                color: whitespaceColor(NushiTheme.of(context).t),
+              ),
+            if (showWhitespace.value)
               WhitespaceOverlay(
                 lines: _lines,
                 controller: widget.edit.controller,
@@ -213,14 +254,20 @@ class _SourceEditorState extends State<SourceEditor> {
                 // re_editor draws with no text scaling.
                 column: columnWidth(code, TextScaler.noScaling),
               ),
+            // At the top right, and no wider than the pane leaves it: a
+            // pane at its least is narrower than the bar.
             Positioned(
               top: 8,
+              left: NushiTheme.gutter,
               right: NushiTheme.gutter,
-              child: EditorFindBar(
-                find: _find,
-                lines: _lines,
-                gutter: _gutter,
-                down: _down,
+              child: Align(
+                alignment: Alignment.topRight,
+                child: EditorFindBar(
+                  find: _find,
+                  lines: _lines,
+                  gutter: _gutter,
+                  down: _down,
+                ),
               ),
             ),
           ],
@@ -269,7 +316,10 @@ class _EditorKeys extends CodeShortcutsActivatorsBuilder {
     CodeShortcutType.lineDelete ||
     CodeShortcutType.lineSelect ||
     CodeShortcutType.singleLineComment ||
-    CodeShortcutType.multiLineComment => null,
+    CodeShortcutType.multiLineComment ||
+    // Esc is the pane's: it collapses an expanded Files pane (ADR 0094);
+    // the find bar takes its own.
+    CodeShortcutType.esc => null,
     CodeShortcutType.cursorMoveLineStart when commandKey == CommandKey.meta => [
       ...?_builtIn.build(type),
       const SingleActivator(LogicalKeyboardKey.keyA, control: true),

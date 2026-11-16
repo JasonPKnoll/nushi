@@ -486,4 +486,58 @@ void main() {
     await tester.pumpAndSettle();
     expect(picked, '13');
   });
+
+  for (final (name, tokens) in [
+    ('dark', Tokens.dark),
+    ('light', Tokens.light),
+  ]) {
+    testWidgets('golden, a tooltip with its key, ⇧ and ⌘ drawn, $name', (
+      tester,
+    ) async {
+      viewport(tester, const Size(220, 72), ratio: 2);
+      await tester.pumpWidget(
+        // Without the debug banner, which would lie over it.
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: NushiTheme(tokens).toThemeData(),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Builder(
+                  builder: (context) => tooltip(
+                    context,
+                    withKey('Hide file tree', '⇧⌘Y'),
+                    const SizedBox(width: 16, height: 16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      tester.state<TooltipState>(find.byType(Tooltip)).ensureTooltipVisible();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300)); // its fade in
+      // The key's symbols are the code font's: the UI font has no ⇧ or ⌘,
+      // and drew them as empty boxes.
+      final spans = <TextSpan>[];
+      for (final r in tester.widgetList<RichText>(find.byType(RichText))) {
+        r.text.visitChildren((s) {
+          if (s case TextSpan(:final text?) when text.contains('⌘')) {
+            spans.add(s);
+          }
+          return true;
+        });
+      }
+      final key = spans.single;
+      expect(key.style!.fontFamilyFallback, contains(NushiTheme.codeFont));
+      // The app, whose overlay holds the tooltip.
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/control_tooltip_key_$name.png'),
+      );
+    });
+  }
 }

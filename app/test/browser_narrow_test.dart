@@ -1,0 +1,89 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/browser_pane.dart';
+import 'package:nushi/daemon.dart';
+import 'package:nushi/pane_tabs.dart';
+import 'package:nushi/theme/theme.dart';
+
+import 'browser_fixture.dart' show browserFakes, macOnly;
+import 'harness.dart';
+import 'panes_app.dart';
+
+// The browser pane squeezed (ADR 0123): its Servers, ⋯ and + go before
+// the showing chip has less than its least, and a lone chip shrinks to
+// its icon and ✕ rather than being cut; nothing overflows.
+
+/// [d]'s chat c's browser pane alone, [width] wide.
+Future<void> _pane(WidgetTester tester, Daemon d, double width) async {
+  final c = d.chats['c']!;
+  await tester.pumpWidget(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: const NushiTheme(Tokens.dark).toThemeData(),
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: width,
+            height: 400,
+            child: BrowserPane(
+              chat: c,
+              tab: c.browser.shown.value!,
+              daemon: d,
+              onClose: () {},
+              onExpand: () {},
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('from its least down, the showing chip stays whole, its ✕ in '
+      'sight, and nothing overflows', (tester) async {
+    browserFakes();
+    final (d, _) = await panesApp(tester, width: 1700);
+    viewport(tester, const Size(600, 400));
+    d.chats['c']!.openBrowserTab('http://localhost:3000');
+    final errors = <String>[];
+    final was = FlutterError.onError;
+    FlutterError.onError = (e) => errors.add(
+      e
+          .toString()
+          .split('\n')
+          .where((l) => l.contains('overflowed') || l.contains('.dart:'))
+          .take(2)
+          .join(' '),
+    );
+    addTearDown(() => FlutterError.onError = was);
+    for (var w = 320.0; w >= 100; w -= 5) {
+      final before = errors.length;
+      await _pane(tester, d, w);
+      for (var i = before; i < errors.length; i++) {
+        errors[i] = '$w: ${errors[i]}';
+      }
+      final row = tester.getRect(find.byType(PaneTabs));
+      final close = tester.getRect(
+        find.descendant(
+          of: find.byType(PaneTabs),
+          matching: find.byTooltip('Close tab'),
+        ),
+      );
+      // While the tabs have a chip's least, its ✕ is inside them.
+      if (row.width >= previewChipLeast) {
+        expect(close.right, lessThanOrEqualTo(row.right + 0.5), reason: '$w');
+        expect(close.left, greaterThanOrEqualTo(row.left), reason: '$w');
+      }
+      // The + only with room for a chip at its least beside it.
+      if (find.byTooltip('New browser tab').evaluate().isNotEmpty) {
+        expect(row.width, greaterThanOrEqualTo(previewTabLeast), reason: '$w');
+      }
+    }
+    FlutterError.onError = was;
+    expect(errors, isEmpty);
+    await closeView(tester, d);
+  }, variant: macOnly);
+}

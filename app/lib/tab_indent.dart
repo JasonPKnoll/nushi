@@ -52,9 +52,9 @@ CodeLineEditingValue tabIndent(CodeLineEditingValue v) {
   );
 }
 
-/// ⇧Tab: one tab, or up to four spaces, off the start of each selected
-/// line.
-CodeLineEditingValue tabOutdent(CodeLineEditingValue v) {
+/// ⇧Tab: one tab, or up to [size] spaces (a tab's columns), off the start
+/// of each selected line.
+CodeLineEditingValue tabOutdent(CodeLineEditingValue v, {int size = 4}) {
   final s = v.selection;
   final lines = CodeLines.from(v.codeLines);
   final (first, last) = _rows(s);
@@ -63,7 +63,7 @@ CodeLineEditingValue tabOutdent(CodeLineEditingValue v) {
     final t = lines[i].text;
     final n = t.startsWith('\t')
         ? 1
-        : min(4, t.length - t.replaceFirst(_spaces, '').length);
+        : min(size, t.length - t.replaceFirst(_spaces, '').length);
     cut[i] = n;
     lines[i] = lines[i].copyWith(text: t.substring(n));
   }

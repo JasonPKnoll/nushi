@@ -25,3 +25,12 @@ The roadmap's Files view wanted "a file tree of the chat's folder to open any fi
 - A header tab, as Changes is: it would take the chat's place, where the point is to see the files beside it.
 - The app reading the folder (`Directory.watch`): the phone can't, and every path the daemon checks would be checked twice.
 - A whole-folder listing up front: a repository with node_modules would send hundreds of thousands of names.
+
+**Amendment (2026-11-15):** the Files pane, with the other side panes, is right of the details panel and runs the chat pane's full height, its top row level with the chat's header ([ADR 0123](0123-side-panes-right-of-the-rail.md)); it's still left of the preview.
+
+**Amendment (2026-11-15): the tree is inside the Files pane, right of the open files** ([ADR 0123](0123-side-panes-right-of-the-rail.md)'s amendment), as Claude desktop's: the pane is [viewer | tree], the tree at the window's edge with its filter field on top, and a file opens in the pane's viewer, never moving the tree. "The tree inside the preview pane" (rejected below because the pane existed only with a file open) is what this now is: the pane exists with no file open, its viewer blank.
+
+**Amendment (2026-11-15): Search files…**, as Claude desktop's: the filter field says "Search files…", the git-ignored eye at its end, and a search with more than its 200 best matches says so under the list: "Some entries may not be listed. Keep typing to narrow." (an explanation, so its full stops).
+
+**Amendment (2026-11-16): the tree hides, collapses and takes either side**, as Claude desktop's ([ADR 0123](0123-side-panes-right-of-the-rail.md)'s amendment): the pane's second row ends in Collapse all folders (every folder closed at once, their listings ended, the keys on the top folder that held them), the tree shown or hidden (⇧⌘Y, one choice for the app; hidden, the viewer takes its room) and ⋯, whose File tree position puts it on the right (Automatic, away from the transcript) or the left. A click on a file opens a provisional tab with Preview tabs on ([ADR 0070](0070-preview-tabs-are-the-panes-own.md)'s amendment); ⏎ keeps it.
+

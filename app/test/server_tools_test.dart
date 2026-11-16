@@ -94,7 +94,7 @@ Future<void> _showsUrl(WidgetTester tester, FakeDaemon fake, String url) async {
 }
 
 /// The address of chat c's browser tab that shows, or null.
-String? _page(Daemon d) => switch (d.chats['c']!.preview.value) {
+String? _page(Daemon d) => switch (d.chats['c']!.browser.shown.value) {
   BrowserTab(:final address) => address.value,
   _ => null,
 };
@@ -392,9 +392,9 @@ void main() {
       // the tab at its address.
       await _showsUrl(tester, fake, 'http://localhost:5173/about');
       expect(_page(d), 'http://localhost:5173/about');
-      expect(d.chats['c']!.previewTabs.value, hasLength(2));
+      expect(d.chats['c']!.browser.tabs.value, hasLength(2));
       await _showsUrl(tester, fake, 'http://localhost:5173/');
-      expect(d.chats['c']!.previewTabs.value, hasLength(2));
+      expect(d.chats['c']!.browser.tabs.value, hasLength(2));
       await closeView(tester, d);
     }, variant: macOnly);
 
@@ -412,7 +412,7 @@ void main() {
       await tester.pumpAndSettle();
       await _showsUrl(tester, fake, 'http://localhost:8080');
       expect(c.tab.value, ChatTab.changes);
-      expect(c.previewTabs.value, hasLength(1));
+      expect(c.browser.tabs.value, hasLength(1));
       c.tab.value = ChatTab.chat;
       await tester.pumpAndSettle();
       expect(_page(d), 'http://localhost:8080');

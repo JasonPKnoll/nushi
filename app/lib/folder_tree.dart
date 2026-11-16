@@ -84,6 +84,23 @@ class FolderTree extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Whether a folder is open: Collapse all folders has something to do.
+  bool get anyOpen => open.isNotEmpty;
+
+  /// Closes every folder (the Files pane's Collapse all folders, Claude
+  /// desktop's): their listings end, and the keys go to the top folder
+  /// that held them, the one row of theirs still showing. One change told.
+  void collapseAll() {
+    if (open.isEmpty) return;
+    open.clear();
+    if (selected case final s? when s.contains('/')) {
+      selected = s.substring(0, s.indexOf('/'));
+    }
+    revealing = null;
+    _sync();
+    notifyListeners();
+  }
+
   /// Puts the keys on [path].
   void select(String path) {
     if (selected == path) return;

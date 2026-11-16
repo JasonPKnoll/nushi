@@ -42,6 +42,17 @@ void main() {
     );
     expect(_text(spaces), '  x');
     expect(spaces.selection.extentOffset, 2);
+    // A tab's columns at most, whatever Tab size says.
+    for (final (size, left) in [(2, '    x'), (8, 'x')]) {
+      final v = tabOutdent(
+        _value(
+          '      x',
+          const CodeLineSelection.collapsed(index: 0, offset: 6),
+        ),
+        size: size,
+      );
+      expect(_text(v), left, reason: '$size');
+    }
   });
 
   test('Return carries the line’s tabs and spaces', () {

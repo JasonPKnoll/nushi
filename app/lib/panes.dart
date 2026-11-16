@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:nushi/controls.dart';
 
 import 'package:nushi/settings.dart';
 import 'package:nushi/sidebar_button.dart';
@@ -47,6 +48,7 @@ class Resizable extends StatefulWidget {
     this.top = false,
     this.locked = false,
     this.line = true,
+    this.onDrag,
   });
 
   final String name;
@@ -62,6 +64,11 @@ class Resizable extends StatefulWidget {
   /// the window with a gap beside it: its edge shows only under the pointer.
   final bool line;
   final Widget child;
+
+  /// Told the width a drag gives it, in whole points, each time that
+  /// changes, and null once the drag ends (and the width is saved): what
+  /// lays out beside it can decide on the width as dragged (ADR 0123).
+  final ValueChanged<double?>? onDrag;
 
   /// How far in from the pane's side the edge takes the pointer.
   static const edgeWidth = 5.0;
@@ -107,7 +114,10 @@ double paneWidth(String name, double initial) =>
     paneWidths.value[name] ?? initial;
 
 class _ResizableState extends State<Resizable> {
+  double? _asked; // where the pointer has taken the edge
   double? _dragged; // the width the drag asks for, not yet clamped
+  double? _told; // the width [Resizable.onDrag] was last told
+  double? _from; // the width the drag started at
   bool _hover = false;
 
   double _width() => (_dragged ?? paneWidth(widget.name, widget.initial)).clamp(
@@ -115,11 +125,40 @@ class _ResizableState extends State<Resizable> {
     max(widget.min, widget.max),
   );
 
-  void _start() => setState(() => _dragged = _width());
+  void _start() => setState(() => _from = _asked = _dragged = _width());
 
+  // A drag's width is a whole number of points, and moves once the pointer
+  // is a point from it: a pointer's sub-pixel jitter doesn't change it.
+  void _drag(double by) {
+    final asked = _asked = _asked! + by;
+    if ((asked - _dragged!).abs() < 1) return;
+    setState(() => _dragged = asked.roundToDouble());
+    final width = _width();
+    if (width == _told) return;
+    _told = width;
+    widget.onDrag?.call(width);
+  }
+
+  // Saved in whole points, never past its most: a drag let go at a most
+  // that isn't whole (a window of 1209.5) keeps beside what it was beside.
+  // One let go where it started saves nothing: a pane narrowed for the
+  // room (ADR 0123) keeps the width it was given, pushed at or not.
   void _end() {
-    _set(_width().roundToDouble());
-    setState(() => _dragged = null);
+    final width = _width();
+    final most = max(widget.min, widget.max);
+    final whole = width.roundToDouble();
+    if (width != _from) _set(whole > most ? most.floorToDouble() : whole);
+    setState(() => _from = _asked = _dragged = null);
+    if (_told == null) return;
+    _told = null;
+    widget.onDrag?.call(null);
+  }
+
+  @override
+  void didUpdateWidget(Resizable old) {
+    super.didUpdateWidget(old);
+    // Locked mid-drag, its edge is gone and the drag with it.
+    if (widget.locked && !old.locked) _asked = _dragged = _told = null;
   }
 
   void _set(double? width) => paneWidths.value = {
@@ -134,7 +173,6 @@ class _ResizableState extends State<Resizable> {
       final t = NushiTheme.of(context).t;
       final active = _hover || _dragged != null;
       final top = widget.top;
-      void drag(double d) => setState(() => _dragged = _dragged! + d);
       final edge = MouseRegion(
         cursor: top
             ? SystemMouseCursors.resizeRow
@@ -147,10 +185,10 @@ class _ResizableState extends State<Resizable> {
           onHorizontalDragStart: top ? null : (_) => _start(),
           onHorizontalDragUpdate: top
               ? null
-              : (d) => drag(widget.left ? -d.delta.dx : d.delta.dx),
+              : (d) => _drag(widget.left ? -d.delta.dx : d.delta.dx),
           onHorizontalDragEnd: top ? null : (_) => _end(),
           onVerticalDragStart: top ? (_) => _start() : null,
-          onVerticalDragUpdate: top ? (d) => drag(-d.delta.dy) : null,
+          onVerticalDragUpdate: top ? (d) => _drag(-d.delta.dy) : null,
           onVerticalDragEnd: top ? (_) => _end() : null,
           child: Align(
             alignment: top
@@ -227,6 +265,11 @@ class PaneHeader extends StatelessWidget {
 
   /// The chat header's height too (ADR 0111; 44 until then, ADR 0072).
   static const height = 56.0;
+
+  /// How far in from a pane's right a row ending in the header's own icon
+  /// buttons (`IconTap.header`) ends them, as the chat's header does (ADR
+  /// 0111): the button's box brings the rest of the room.
+  static const buttonsEnd = 12.0;
 
   /// Below this a pane's header keeps its row's room over the gutters: a side
   /// chat's title and buttons take most of the narrowest pane.
@@ -343,4 +386,59 @@ class TitleBand extends StatelessWidget {
             ),
           ],
         );
+}
+
+/// The buttons at a wide side pane's top row's right end, the Files pane's
+/// and the browser's alike, as Claude desktop's: Expand (Collapse while
+/// [expanded]), when [onExpand] is given, and × ([onClose]). Each sits in
+/// a box of one size, ending 8 in from the pane's edge with the row's
+/// `end`, so both panes put them at the same pixels.
+class PaneEndButtons extends StatelessWidget {
+  const new({
+    required this.onClose,
+    super.key,
+    this.expanded = false,
+    this.onExpand,
+  });
+
+  final bool expanded;
+  final VoidCallback? onExpand;
+  final VoidCallback onClose;
+
+  /// The side of each button's box.
+  static const box = 32.0;
+
+  /// The room at the row's ends, in from the pane's edges (Claude's).
+  static const inset = 8.0;
+
+  /// The padding that sets an icon of [size] in a [box].
+  static double boxed(double size) => (box - size) / 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = NushiTheme.of(context).t;
+    final expand = onExpand;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (expand != null)
+          IconTap.line(
+            expanded ? LineIcon.collapse : LineIcon.expand,
+            tooltip: expanded ? 'Collapse' : 'Expand',
+            size: 18,
+            padding: boxed(18),
+            color: t.text,
+            onTap: expand,
+          ),
+        IconTap.line(
+          LineIcon.close,
+          tooltip: 'Close',
+          size: 22,
+          padding: boxed(22),
+          color: t.text,
+          onTap: onClose,
+        ),
+      ],
+    );
+  }
 }

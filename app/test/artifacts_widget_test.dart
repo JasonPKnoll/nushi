@@ -11,10 +11,10 @@ import 'package:nushi/chat_files.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panel_widgets.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/widgets.dart';
 
@@ -85,7 +85,7 @@ const _minutes = {
 /// The app on a chat with [items], the details panel shown, and the fake
 /// daemon behind it.
 Future<(Daemon, FakeDaemon)> _app(WidgetTester tester, List<Item> items) async {
-  viewport(tester, const Size(1700, 900));
+  viewport(tester, const Size(2400, 900));
   showDetails.value = true;
   paneWidths.value = {};
   collapsedWidgets.value = {};
@@ -174,10 +174,10 @@ void main() {
     expect(_inRows(find.text('Show more')), findsNothing);
     await tester.tap(_inRows(find.text('chart.png')));
     await tester.pumpAndSettle();
-    expect(d.chats['c']!.previewFile, 'docs/img/chart.png');
+    expect(d.chats['c']!.shownFile, 'docs/img/chart.png');
     expect(
       find.descendant(
-        of: find.byType(PreviewPane),
+        of: find.byType(FilesPane),
         matching: find.text('chart.png'),
       ),
       findsOneWidget,
@@ -225,7 +225,7 @@ void main() {
     fake.emit(EventsResponse(chatId: 'c', show: page));
     await tester.pumpAndSettle();
     final c = d.chats['c']!;
-    expect(c.previewFile, page);
+    expect(c.shownFile, page);
     expect(
       tester
           .widget<Tap>(
@@ -353,7 +353,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_names(tester).take(3), ['chart.png', 'report.md', 'flows.md']);
     // Closed, it stays recent for the hour.
-    c.preview.value = null;
+    c.files.closeAll();
     clock = () => start.add(const Duration(minutes: 59));
     await tester.pump(const Duration(minutes: 1)); // the widget's tick
     expect(_names(tester).take(3), ['chart.png', 'report.md', 'flows.md']);
@@ -374,7 +374,7 @@ void main() {
       tester.platformDispatcher.platformBrightnessTestValue = mode;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       togglePin(d.chats['c']!, 'mock/home.html');
-      d.chats['c']!.openPreview('docs/report.md');
+      d.chats['c']!.openInFiles('docs/report.md');
       await tester.pumpAndSettle();
       expect(_inRows(find.text('Show more')), findsOneWidget);
       // The widget on its own is its golden; the window a render.

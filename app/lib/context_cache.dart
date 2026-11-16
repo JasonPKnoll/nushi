@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
 
+import 'package:nushi/clock.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_mode.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
@@ -72,7 +73,7 @@ DateTime? contextAskedAt(String chatId) => _asked[chatId]?.$1;
 /// Keeps [r] as what [chatId]'s context holds now: for this run, and on
 /// disk as [rememberContext] keeps it.
 void askedContext(String chatId, GetContextUsageResponse r) {
-  _asked[chatId] = (DateTime.now(), r);
+  _asked[chatId] = (clock(), r);
   rememberContext(chatId, r);
 }
 

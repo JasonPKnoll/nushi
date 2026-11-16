@@ -14,13 +14,13 @@ import 'package:nushi/composer.dart';
 import 'package:nushi/composer_plus.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/message_actions.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/pickers.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/theme/theme.dart';
@@ -107,8 +107,8 @@ final _items = <Item>[
   ),
 ];
 
-/// The app on a chat with [items] ([_items] if not given), its preview open
-/// with [file], [pane] wide if given.
+/// The app on a chat with [items] ([_items] if not given), the Files pane
+/// open on [file] if given, the panes at their widths.
 Future<Daemon> _app(
   WidgetTester tester, {
   required double width,
@@ -116,11 +116,10 @@ Future<Daemon> _app(
   Brightness? brightness,
   double height = 1000,
   String? file,
-  double? pane,
 }) async {
   viewport(tester, Size(width, height), brightness: brightness);
   showDetails.value = false;
-  paneWidths.value = {'preview': ?pane};
+  paneWidths.value = {};
   final c = chat('c', 'claude', 'Fix the login redirect after it expires');
   final fake = FakeDaemon([c])
     ..answer = ((input) => input is GetChatRequest
@@ -145,10 +144,32 @@ Future<Daemon> _app(
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
   if (file != null) {
-    d.chats['c']!.openPreview(file);
+    d.chats['c']!.openInFiles(file);
     await tester.pumpAndSettle();
   }
   return d;
+}
+
+/// Chat c's Files pane on its own, squeezed as in a narrow window with
+/// other panes beside it (ADR 0123): its bar's buttons fold into ⋯.
+Future<void> _squeezed(
+  WidgetTester tester,
+  Daemon d,
+  Brightness brightness,
+) async {
+  await tester.pumpWidget(
+    themed(
+      tokens: brightness == Brightness.dark ? Tokens.dark : Tokens.light,
+      Center(
+        child: SizedBox(
+          width: 210,
+          height: 500,
+          child: FilesPane(chat: d.chats['c']!, daemon: d, onClose: () {}),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 /// The composer's box.
@@ -310,9 +331,9 @@ void main() {
 
     test('the bar’s gaps never fold anything', () {
       // Where each case first folds without them: 524 for the row, 80 for
-      // the title, the browser's button 32, then what the case adds (the
-      // Pull request segment 106, a model 50, the Files button 32); each
-      // button's gap 2.
+      // the title, the browser's button 32 (it folds with the others),
+      // then what the case adds (the Pull request segment 106, a model 50,
+      // the Files button 32); each button's gap 2.
       for (final (pull, model, files, first) in [
         (false, false, false, 636.0),
         (true, false, false, 742.0),
@@ -344,6 +365,35 @@ void main() {
           }
         }
       }
+    });
+
+    test("a shorter agent's name folds the row later, by what it takes "
+        'less', () {
+      // 636 is where the row with the longest name first folds.
+      for (final name in [headerName, 50.0, 30.0]) {
+        HeaderFolds at(double width) => headerFolds(
+          width,
+          pull: false,
+          panel: true,
+          files: false,
+          name: name,
+        );
+        final first = 636 - (headerName - name);
+        expect(at(first).any, isFalse);
+        expect(at(first - 1).any, isTrue);
+        expect(at(first - 1).name, isTrue);
+      }
+      // Folding the name frees what it takes.
+      final folds = headerFolds(
+        400,
+        pull: false,
+        panel: true,
+        files: false,
+        name: 40,
+      );
+      final longest = headerFolds(400, pull: false, panel: true, files: false);
+      expect(folds.name, isTrue);
+      expect(folds.more - longest.more, 40 - headerName);
     });
 
     test('a wider app font folds the row sooner, by what its words take '
@@ -674,7 +724,7 @@ void main() {
               body: Align(
                 alignment: Alignment.topLeft,
                 child: SizedBox(
-                  width: 330,
+                  width: 250,
                   child: ChatHeader(
                     c,
                     d,
@@ -709,13 +759,17 @@ void main() {
           height: 600,
           brightness: brightness,
           file: 'docs/login-report.md',
-          pane: 300,
         );
+        await _squeezed(tester, d, brightness);
         await tester.tap(find.byTooltip('More'));
         await tester.pumpAndSettle();
         expect(find.text('Show in Finder', findRichText: true), findsOne);
-        await render(tester, find.byType(NushiApp), 'preview_menu_720_$name');
-        d.dispose();
+        await render(
+          tester,
+          find.byType(MaterialApp),
+          'preview_menu_squeezed_$name',
+        );
+        await closeView(tester, d);
       }, variant: _mac);
     }
 
@@ -732,18 +786,20 @@ void main() {
           width: width,
           height: 600,
           file: 'docs/login-report.md',
-          pane: 300,
         );
+        // Unfolded, its button says so.
+        expect(find.byTooltip('Show in Folder'), findsOne);
+        await _squeezed(tester, d, Brightness.dark);
         await tester.tap(find.byTooltip('More'));
         await tester.pumpAndSettle();
         expect(find.text('Show in Folder', findRichText: true), findsOne);
         expect(find.text('Show in Finder', findRichText: true), findsNothing);
         await render(
           tester,
-          find.byType(NushiApp),
+          find.byType(MaterialApp),
           'linux_preview_menu_${width.toInt()}',
         );
-        d.dispose();
+        await closeView(tester, d);
       }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
     }
   });
@@ -779,7 +835,7 @@ void main() {
           file: 'docs/login-report.md',
         );
         // The column's composer clear of the preview beside it.
-        final preview = tester.getRect(find.byType(PreviewPane));
+        final preview = tester.getRect(find.byType(FileView));
         expect(_box(tester).right, lessThan(preview.left));
         await render(
           tester,

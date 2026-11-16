@@ -6,13 +6,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/chat_header.dart';
+import 'package:nushi/chat_view.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/file_view.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
@@ -98,34 +100,48 @@ void main() {
       await tester.pumpWidget(NushiApp(daemon: d));
       await tester.pumpAndSettle();
       if (preview) {
-        d.chats['c']!.openPreview('docs/plan.md');
+        d.chats['c']!.openInFiles('docs/plan.md');
         await tester.pumpAndSettle();
-        expect(find.byType(PreviewPane), findsOneWidget);
+        expect(find.byType(FileView), findsOneWidget);
         expect(find.byType(SourceButton), findsOneWidget);
       }
       expect(tester.takeException(), isNull);
       final header = tester.getRect(find.byType(ChatHeader));
       final menu = tester.getRect(find.byTooltip('Chat menu'));
       expect(menu.right, header.right - ChatHeader.end);
-      // The header is the main pane's top, the window's margin in,
-      // across the details too where they show: they're under it.
+      // The header is the main pane's top, the window's margin in, across
+      // the details too where they show: they're under it. The preview,
+      // beside them, ends it (ADR 0123); over the transcript, at 720, the
+      // header keeps the transcript's least under it.
       final pane = tester.getRect(find.byType(Pane));
-      expect(header.right, pane.right);
       expect(pane.right, width - NushiTheme.windowPad);
+      final beside = preview && width > 720;
+      final right = beside
+          ? tester.getRect(find.byType(FilesPane)).left
+          : preview
+          ? pane.left + ChatView.leastBesideWide
+          : pane.right;
+      expect(header.right, right);
+      if (preview) {
+        final shown = tester.getRect(find.byType(FilesPane));
+        expect(shown.right, pane.right);
+        expect(shown.top, pane.top);
+      }
       if (find.byType(DetailsPanel).evaluate().isNotEmpty) {
         final details = tester.getRect(find.byType(DetailsPanel));
         expect(details.top, header.bottom);
-        expect(details.right, pane.right);
+        expect(details.right, right);
       }
       expect(header.top, NushiTheme.windowPad);
       expect(header.height, 56);
-      // The segments in full, in the header's middle; at 720 this chat's
+      // The segments in full, in the header's middle; at 720, and beside
+      // the Files pane (820, leaving the header 612 at 1700), this chat's
       // fold has made them a menu field.
       final tabs = find.descendant(
         of: find.byType(ChatHeader),
         matching: find.byType(Segmented<ChatTab>),
       );
-      if (width > 720) {
+      if (width > 720 && !preview) {
         expect(tabs, findsOneWidget);
         expect(tester.getRect(tabs).top, greaterThan(header.top));
         expect(tester.getRect(tabs).bottom, lessThan(header.bottom - 1));

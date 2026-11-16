@@ -139,6 +139,17 @@ class IconTap extends StatelessWidget {
   /// details' and the chat's menu.
   static const header = 8.0;
 
+  /// How far a bar's button's fill (lit, under the pointer, its menu open)
+  /// sits inside its box, 28 points or more (the chat header's, a pane's
+  /// top rows, Files' and the browser's bars), so two side by side keep a
+  /// gap (4) between their fills, as Claude desktop's do; the whole box
+  /// still takes the click. A smaller one (in a card, a row) has none, nor
+  /// a [danger] one, which is a solid button.
+  static const fillInset = 2.0;
+
+  /// The least box that takes [fillInset].
+  static const _insetBox = 28.0;
+
   @override
   Widget build(BuildContext context) {
     final t = NushiTheme.of(context).t;
@@ -160,8 +171,13 @@ class IconTap extends StatelessWidget {
             : look.hover && color == null
             ? t.text
             : color ?? t.textSecondary;
-        final button = Container(
-          padding: EdgeInsets.all(padding),
+        // A red Stop is a solid button, not a lit one: it keeps its size.
+        final inset = !danger && size + padding * 2 >= _insetBox
+            ? fillInset
+            : 0.0;
+        final Widget button = Container(
+          margin: EdgeInsets.all(inset),
+          padding: EdgeInsets.all(padding - inset),
           decoration: BoxDecoration(
             color: danger
                 ? (look.hover

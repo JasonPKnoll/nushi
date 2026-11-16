@@ -8,8 +8,10 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/errors.dart';
 import 'package:nushi/file_text.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
+import 'package:nushi/indent_guides.dart' show indents;
 import 'package:nushi/merge_lines.dart';
 import 'package:nushi/motion.dart';
+import 'package:nushi/settings.dart' show tabSize;
 import 'package:nushi/source_spans.dart';
 import 'package:nushi/syntax.dart';
 import 'package:nushi/tab_indent.dart';
@@ -32,6 +34,12 @@ class FileEdit extends ChangeNotifier {
       tabs = indentsWithTabs(path, file.text) {
     controller = CodeLineEditingController(
       codeLines: CodeLines.fromText(file.text),
+      // In a file indenting with spaces, re_editor's Tab and ⇧Tab step
+      // what it indents by, as its guides do ([indents]); Tab size where
+      // nothing tells.
+      options: CodeLineOptions(
+        indentSize: indents(file.text.split(_lineBreak), tabSize.value).unit,
+      ),
       spanBuilder: _span,
     );
     _lines = controller.codeLines;
@@ -376,6 +384,7 @@ class FileEdit extends ChangeNotifier {
         spansOf(t, line, _spansAt(index, line)),
         fontSize: style.fontSize!,
         column: columnWidth(style, TextScaler.noScaling),
+        tabSize: tabSize.value,
         spacing: style.letterSpacing ?? 0,
       ),
     );
@@ -424,3 +433,6 @@ Future<List<FileEdit>> saveEdits(Daemon d) async {
       if (e.unsaved) e,
   ];
 }
+
+/// A line's end, LF or CRLF.
+final _lineBreak = RegExp(r'\r?\n');

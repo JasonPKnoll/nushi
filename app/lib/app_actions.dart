@@ -26,7 +26,6 @@ import 'package:nushi/native.dart';
 import 'package:nushi/new_chat.dart';
 import 'package:nushi/open_file.dart';
 import 'package:nushi/palette.dart';
-import 'package:nushi/preview_entry.dart';
 import 'package:nushi/preview_marks.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_link_dialog.dart';
@@ -40,6 +39,7 @@ import 'package:nushi/spell_check.dart';
 import 'package:nushi/status_bar.dart';
 import 'package:nushi/terminal_panel.dart';
 import 'package:nushi/update_toast.dart';
+import 'package:nushi/view_options.dart';
 import 'package:nushi/web_views.dart' show webEmbedded;
 import 'package:nushi/widgets.dart';
 
@@ -88,6 +88,10 @@ const nextTypoKey = Cmd(
 /// ⇧⌘E: the Files pane (VS Code's key for its Explorer).
 const filesKey = Cmd(LogicalKeyboardKey.keyE, shift: true);
 
+/// ⇧⌘Y: the Files pane's tree, shown or hidden (Claude desktop's key).
+/// The View menu's item has it too, so it comes while WebKit has the keys.
+const fileTreeKey = Cmd(LogicalKeyboardKey.keyY, shift: true);
+
 /// ⌘S: the preview's file, edited (ADR 0096). The editor leaves it to
 /// the app.
 const saveKey = Cmd(LogicalKeyboardKey.keyS);
@@ -125,10 +129,25 @@ enum Act {
   forward(key: forwardKey),
   details,
   files(key: filesKey, menu: ActMenu.view, menuLabel: 'Files'),
-  chatWidth,
-  // The preview's own key: elsewhere ⌥Z types a character.
+  // The Files pane's options, in its ⋯'s order (view_options.dart): their
+  // View items' labels follow what each is now.
+  fileTree(key: fileTreeKey, menu: ActMenu.view, menuLabel: 'Show File Tree'),
+  // View › File Tree Position's submenu, its values' rows.
+  treeAutomatic(menu: ActMenu.view, menuLabel: 'File Tree Position'),
+  treeLeft,
+  treeRight,
+  collapseFolders(menu: ActMenu.view, menuLabel: 'Collapse All Folders'),
+  previewTabs(menu: ActMenu.view, menuLabel: 'Use Preview Tabs'),
+  // The viewer's own key: elsewhere ⌥Z types a character.
   wrap(shows: wrapKey, menu: ActMenu.view, menuLabel: 'Wrap Lines'),
+  indentGuides(menu: ActMenu.view, menuLabel: 'Show Indent Guides'),
   whitespace(menu: ActMenu.view, menuLabel: 'Show Whitespace'),
+  scrollPastEnd(menu: ActMenu.view, menuLabel: 'Scroll Past End'),
+  // View › Tab Size's submenu, its values' rows.
+  tabSize2(menu: ActMenu.view, menuLabel: 'Tab Size'),
+  tabSize4,
+  tabSize8,
+  chatWidth,
   unifiedDiff(menu: ActMenu.view, menuLabel: 'Show Diffs Unified'),
   terminal(key: toggleTerminalKey),
   rewind(keyText: 'Esc Esc'), // the composer's
@@ -243,21 +262,22 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
   final details = showDetails.value;
   final terminal = shown != null && terminalChats.value.contains(shown.id);
   // The browser tab in sight, under no dialog.
-  final browser = switch (shown?.preview.value) {
-    final BrowserTab tab
+  final browser = switch (shown?.browser.shown.value) {
+    final tab?
         when shown?.shownTab == ChatTab.chat &&
             !(Navigator.maybeOf(context)?.canPop() ?? false) =>
       tab.view,
     _ => null,
   };
   // The file the preview shows, being edited, in sight under no dialog.
-  final edited = switch (shown?.previewFile) {
+  final edited = switch (shown?.shownFile) {
     final path?
         when shown?.shownTab == ChatTab.chat &&
             !(Navigator.maybeOf(context)?.canPop() ?? false) =>
       shown!.edits[path],
     _ => null,
   };
+  final closing = shown == null ? null : tabToClose(shown);
   return [
     AppAction(.newChat, 'New chat', run: () => newChat(context, d, '')),
     AppAction(
@@ -269,14 +289,13 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
     AppAction(
       .closeTab,
       'Close tab',
-      // Only a preview in sight, and never under a dialog: its ⌘W, which
+      // Only a tab in sight, and never under a dialog: its ⌘W, which
       // Flutter's keys don't reach, comes here from the menu bar.
       enabled:
-          shown?.preview.value != null &&
+          closing != null &&
           shown?.shownTab == ChatTab.chat &&
           !(Navigator.maybeOf(context)?.canPop() ?? false),
-      run: () =>
-          unawaited(closeTabSaving(context, shown!, shown.preview.value!)),
+      run: () => unawaited(closeTabSaving(context, shown!, closing!)),
     ),
     AppAction(
       .save,
@@ -316,9 +335,12 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
       shown?.shownTab == ChatTab.changes
           ? 'Find in changes'
           : 'Find in the chat',
+      // Not under a pane expanded over the transcript, where its bar
+      // would open unseen.
       enabled:
           shown != null &&
-          (shown.shownTab == ChatTab.chat || shown.shownTab == ChatTab.changes),
+          (shown.shownTab == ChatTab.chat && shown.covered == null ||
+              shown.shownTab == ChatTab.changes),
       run: () => shown!.shownTab == ChatTab.changes
           ? shown.changesFind.open()
           : shown.find.open(),
@@ -372,24 +394,11 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
       enabled: shown != null && d.daemonApi >= filesApi,
       run: () => showOrHideFiles(shown!),
     ),
+    ...viewActions(shown, d),
     AppAction(
       .chatWidth,
       chatFullWidth.value ? 'Center the chat' : 'Show the chat at full width',
       run: () => chatFullWidth.value = !chatFullWidth.value,
-    ),
-    AppAction(
-      .wrap,
-      '${wrapLabel(wrap: wrapLines.value)} in the preview',
-      run: toggleWrap,
-    ),
-    AppAction(
-      .whitespace,
-      showWhitespace.value
-          ? 'Hide whitespace in the preview'
-          : 'Show whitespace in the preview',
-      // Where a chat shows, as its previews do.
-      enabled: shown != null,
-      run: () => showWhitespace.value = !showWhitespace.value,
     ),
     AppAction(
       .unifiedDiff,

@@ -138,7 +138,9 @@ jobs:
   app:
     name: App tests (macOS, ${{ matrix.shard }}/2)
     runs-on: macos-latest
-    timeout-minutes: 15
+    # 2026-11-16: a shard takes 7-13 minutes and one ran past 15 with every test passing, so 25, two times its longest,
+    # until the shards are balanced by measured time.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
