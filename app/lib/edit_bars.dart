@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/diff_box.dart';
 import 'package:nushi/file_edit.dart';
+import 'package:nushi/files_open.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/preview.dart' show ReadOnlyLine, baseName;
 import 'package:nushi/preview_entry.dart';
@@ -220,15 +221,51 @@ Future<void> closeTabSaving(
   ChatState chat,
   PreviewEntry tab,
 ) async {
-  if (await saveBeforeClosing(context, chat, [tab])) chat.closePreview(tab);
-}
-
-/// Closes the preview and its tabs, their edits saved first.
-Future<void> closePreviewSaving(BuildContext context, ChatState chat) async {
-  if (await saveBeforeClosing(context, chat, chat.previewTabs.value)) {
-    chat.preview.value = null;
+  if (!await saveBeforeClosing(context, chat, [tab])) return;
+  switch (tab) {
+    case final PreviewFile file:
+      chat.files.close(file);
+    case final BrowserTab page:
+      chat.browser.close(page);
   }
 }
+
+/// Closes the browser pane and its tabs (they hold no edits).
+void closeBrowser(ChatState chat) => chat.browser.shown.value = null;
+
+/// What ⌘W closes in [chat]: the tab showing in the pane that has the focus
+/// (the Files pane or the browser), and nothing else, even with none
+/// showing there (Files blank); with neither focused, the tab in the one
+/// whose tab showed last, else in the other; null with no tab showing.
+PreviewEntry? tabToClose(ChatState chat) {
+  // A file shows only while the Files pane does: hidden, its tabs wait. A
+  // page only while no subagent's pane has the browser's place.
+  final file = filesOpen(chat) ? chat.files.shown.value : null;
+  final page = chat.pane.value == null ? chat.browser.shown.value : null;
+  final at = FocusManager.instance.primaryFocus?.context;
+  final focused = switch (at) {
+    final at? when at.findAncestorStateOfType<FileTabsFocus>() != null =>
+      TabKind.file,
+    final at? when at.findAncestorStateOfType<BrowserTabsFocus>() != null =>
+      TabKind.browser,
+    _ => null,
+  };
+  return switch (focused ?? chat.lastTabbed ?? TabKind.file) {
+    // The pane the keys are in: ⌘W stays in it (docs/chats.md).
+    TabKind.file when focused != null => file,
+    TabKind.browser when focused != null => page,
+    TabKind.file => file ?? page,
+    TabKind.browser => page ?? file,
+  };
+}
+
+/// A pane's state that holds file tabs: ⌘W with the focus in it closes
+/// its file (`tabToClose`).
+mixin FileTabsFocus<T extends StatefulWidget> on State<T>;
+
+/// A pane's state that holds browser tabs: ⌘W with the focus in it
+/// closes its tab (`tabToClose`).
+mixin BrowserTabsFocus<T extends StatefulWidget> on State<T>;
 
 /// A file tab's ✕, or, while its file has unsaved edits and the pointer
 /// isn't on the tab ([hover]), a dot in its place (amber in a conflict or

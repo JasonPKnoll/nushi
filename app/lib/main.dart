@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:nushi/alerts.dart';
 import 'package:nushi/app_actions.dart';
 import 'package:nushi/app_log.dart';
+import 'package:nushi/chat.dart';
 import 'package:nushi/chat_area.dart';
 import 'package:nushi/chat_keys.dart';
 import 'package:nushi/comment_drafts_mac.dart';
@@ -45,6 +46,7 @@ import 'package:nushi/tool_parts.dart' show plainPath;
 import 'package:nushi/trust_card.dart';
 import 'package:nushi/type_to_box.dart';
 import 'package:nushi/update_toast.dart';
+import 'package:nushi/view_options.dart';
 import 'package:nushi/widgets.dart' show confirm;
 
 void main() => runZonedGuarded(() {
@@ -92,9 +94,12 @@ class _NushiAppState extends State<NushiApp> {
     watchPairings(_navigator, widget.daemon.client);
     _alerts = ChatAlerts(widget.daemon);
     widget.daemon.addListener(_pinChanged);
+    _followTab();
     sidebarHidden.addListener(_sidebarChanged);
-    wrapLines.addListener(_sidebarChanged);
-    showWhitespace.addListener(_sidebarChanged);
+    // The Files pane's options' labels (view_options.dart).
+    for (final p in _viewPrefs) {
+      p.addListener(_sidebarChanged);
+    }
     diffUnified.addListener(_sidebarChanged);
     // The app coming to the front shows its chat again; the daemon knows
     // whether the window shows (focused or not) or is hidden, and the
@@ -168,16 +173,37 @@ class _NushiAppState extends State<NushiApp> {
   bool _back = false;
   bool _forward = false;
 
+  /// View › Show/Hide File Tree as last built: it follows the shown chat
+  /// and its tab ([_tabOf]), the daemon's tree and the prefs.
+  String? _treeLabel;
+
+  /// The chat whose tab the menu bar follows: the shown one.
+  ChatState? _tabOf;
+
+  /// Follows the shown chat's tab ([_tabOf]).
+  void _followTab() {
+    final shown = widget.daemon.selected;
+    if (identical(shown, _tabOf)) return;
+    _tabOf?.tab.removeListener(_pinChanged);
+    _tabOf = shown?..tab.addListener(_pinChanged);
+  }
+
   void _pinChanged() {
     final d = widget.daemon;
+    _followTab();
     final pinned = (d.selected?.pin ?? 0) > 0;
     final back = d.canGoBack;
     final forward = d.canGoForward;
-    if (pinned != _pinned || back != _back || forward != _forward) {
+    final tree = viewMenuLabel(Act.fileTree, d.selected, d);
+    if (pinned != _pinned ||
+        back != _back ||
+        forward != _forward ||
+        tree != _treeLabel) {
       setState(() {
         _pinned = pinned;
         _back = back;
         _forward = forward;
+        _treeLabel = tree;
       });
     }
   }
@@ -200,14 +226,25 @@ class _NushiAppState extends State<NushiApp> {
   @override
   void dispose() {
     sidebarHidden.removeListener(_sidebarChanged);
-    wrapLines.removeListener(_sidebarChanged);
-    showWhitespace.removeListener(_sidebarChanged);
+    for (final p in _viewPrefs) {
+      p.removeListener(_sidebarChanged);
+    }
     diffUnified.removeListener(_sidebarChanged);
     widget.daemon.removeListener(_pinChanged);
+    _tabOf?.tab.removeListener(_pinChanged);
     _alerts.dispose();
     _lifecycle.dispose();
     super.dispose();
   }
+
+  /// What the View menu's Files options say follows: each option's pref,
+  /// the tree's, and which chats have Files open.
+  static final List<Listenable> _viewPrefs = [
+    for (final o in viewToggles) o.pref,
+    for (final c in viewChoices) c.pref,
+    filesTree,
+    filesChats,
+  ];
 
   PlatformMenuItem _appearance(String label, ThemeMode mode) =>
       PlatformMenuItem(label: label, onSelected: () => appearance.value = mode);
@@ -218,10 +255,10 @@ class _NushiAppState extends State<NushiApp> {
     label: switch (act) {
       Act.pin when _pinned => 'Unpin Chat',
       Act.sidebar when sidebarShut => 'Show Sidebar',
-      Act.wrap when wrapLines.value => 'Don’t Wrap Lines',
-      Act.whitespace when showWhitespace.value => 'Hide Whitespace',
       Act.unifiedDiff when diffUnified.value => 'Show Diffs Side by Side',
-      _ => act.menuLabel!,
+      _ =>
+        viewMenuLabel(act, widget.daemon.selected, widget.daemon) ??
+            act.menuLabel!,
     },
     shortcut: act.key,
     onSelected: () => _run(act),
@@ -231,8 +268,24 @@ class _NushiAppState extends State<NushiApp> {
 
   List<PlatformMenuItem> _items(ActMenu menu) => [
     for (final a in Act.values)
-      if (a.menu == menu) _item(a),
+      if (a.menu == menu)
+        if (viewChoiceOf(a) case final choice?) _choice(choice) else _item(a),
   ];
+
+  /// A Files option of a few values as a submenu, the value now disabled:
+  /// the menu bar draws no checks.
+  PlatformMenu _choice(ViewChoice<Object?> choice) => PlatformMenu(
+    label: choice.viewLabel,
+    menus: [
+      for (final (value, name, _, _) in choice.values)
+        PlatformMenuItem(
+          label: name,
+          onSelected: choice.pref.value == value
+              ? null
+              : () => choice.pref.value = value,
+        ),
+    ],
+  );
 
   /// The window, under the system's menu bar where there's one: the
   /// actions' keys work without it (the Shortcuts in [_makeWindow]).

@@ -9,6 +9,7 @@ import 'package:nushi/arrangement.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/file_mode.dart';
 import 'package:nushi/fonts.dart';
+import 'package:nushi/run_state.dart';
 import 'package:nushi/tile_images.dart';
 import 'package:nushi/tile_look.dart';
 import 'package:nushi/tile_picture.dart';
@@ -18,7 +19,10 @@ import 'package:nushi/tile_picture.dart';
 /// are collapsed and their order, what each chat's Changes view shows, the
 /// side panes' widths (not the details panel's, which is fixed), whether
 /// changed files show flat and diffs unified, which chats show their
-/// terminals and their Files pane, whether it lists ignored files, the
+/// terminals and their Files pane (opened by its own button, not a file's
+/// opening), whether it lists ignored files and
+/// shows its tree and on which side, whether its clicks open preview tabs,
+/// its tab size, indent guides and scrolling past the end, the
 /// terminal's font, the app's and code's fonts, whether the chat takes the
 /// whole width,
 /// whether the sidebar is hidden, the Jira task list's groups and assignee
@@ -69,9 +73,70 @@ final Pref<bool> diffUnified = _plain('unified', false);
 final Pref<Set<String>> terminalChats = _set('terminals', chats: true);
 
 /// The chats whose Files pane is open, and whether the pane lists what git
-/// ignores.
-final Pref<Set<String>> filesChats = _set('files', chats: true);
+/// ignores. Saved only for the chats whose pane was opened by its own
+/// button, key or menu: one a file's opening opened ([filesPassing]) is
+/// left out, as its file tabs are (ADR 0123).
+final Pref<Set<String>> filesChats = Pref(
+  'files',
+  (v) => {..._strings(v) ?? const []},
+  write: (s) => s.difference(filesPassing).toList(),
+  chats: (s) => s,
+  without: (s, gone) => s.difference(gone),
+);
+
+/// The chats whose Files pane a file's opening opened (a path's click,
+/// `show`, ⌘P), not the pane's own button, while the app runs: their open
+/// pane isn't saved.
+final Set<String> filesPassing = runSet();
 final Pref<bool> filesIgnored = _plain('filesIgnored', false);
+
+/// Whether the Files pane shows its tree beside its viewer (on at first;
+/// ⇧⌘Y, its second row's button, its ⋯ and View › Show File Tree): one
+/// for every chat, as Claude desktop's.
+final Pref<bool> filesTree = _plain('filesTree', true);
+
+/// Whether a click in the Files pane's tree opens a provisional tab (on at
+/// first), as Claude desktop's and VS Code's Preview tabs: in italics, the
+/// next click's file takes its place until it's kept (a double click, an
+/// edit, a pin). Off, every file opened keeps its tab.
+final Pref<bool> previewTabs = _plain('previewTabs', true);
+
+/// Whether the Files pane's source and editor draw indent guides (on at
+/// first, as Claude desktop's): a faint line down each indent level.
+final Pref<bool> indentGuides = _plain('indentGuides', true);
+
+/// Whether the Files pane's source and editor scroll on past their last
+/// line, until it's at the top (off at first), as Claude desktop's Scroll
+/// past end.
+final Pref<bool> scrollPastEnd = _plain('scrollPastEnd', false);
+
+/// The columns between tab stops in the Files pane's source and editor
+/// (ADR 0096): 2, 4 (at first) or 8, Claude desktop's Tab size. Anything
+/// else saved reads as 4.
+final tabSize = Pref<int>(
+  'tabSize',
+  (v) => v is int && tabSizes.contains(v) ? v : 4,
+);
+
+/// The tab sizes there are.
+const tabSizes = [2, 4, 8];
+
+/// Which side of the Files pane its tree is on, as Claude desktop's File
+/// tree position: Automatic (the side away from the transcript, the
+/// right while the panes are right of it), Left or Right.
+final filesTreeSide = Pref<TreeSide>(
+  'filesTreeSide',
+  (v) => TreeSide.values.asNameMap()[v] ?? TreeSide.automatic,
+  write: (side) => side.name,
+);
+
+/// The Files pane's tree's side ([filesTreeSide]).
+enum TreeSide { automatic, left, right }
+
+/// Whether the tree is at the Files pane's right on [side]: Automatic puts
+/// it away from the transcript, which is left of every side pane (ADR
+/// 0123). The one place to change should the panes' order change.
+bool treeOnRight(TreeSide side) => side != TreeSide.left;
 
 /// The Jira site used last (shown in the Jira view, or an issue picked from
 /// it for a chat): a key typed alone is looked for there.
@@ -337,12 +402,23 @@ final Pref<Set<String>> cleanUpLater = _set('cleanUpLater', chats: true);
 
 /// The widths panes were dragged to, by pane (see `Resizable`). Not the
 /// details panel's, which is fixed (ADR 0092): an older `details` width is
-/// ignored, and dropped by the next save.
+/// ignored, and dropped by the next save. The preview's, from when files
+/// and browser tabs shared it, is the browser's (ADR 0094).
 final paneWidths = Pref<Map<String, double>>(
   'panes',
-  (v) => _entries(v, (w) => w is num ? w.toDouble() : null)..remove('details'),
+  readPaneWidths,
   rewrite: true,
 );
+
+/// [paneWidths] as read from `app.json`'s [v].
+@visibleForTesting
+Map<String, double> readPaneWidths(Object? v) {
+  final widths = _entries(v, (w) => w is num ? w.toDouble() : null)
+    ..remove('details');
+  final preview = widths.remove('preview');
+  if (preview != null) widths.putIfAbsent('browser', () => preview);
+  return widths;
+}
 
 /// Whether the chat takes the pane's whole width rather than a column in
 /// its middle (ADR 0074).

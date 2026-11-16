@@ -10,8 +10,8 @@ import 'package:nushi/submenu.dart';
 import 'package:nushi/theme/theme.dart';
 
 /// One row of a [Menu]: [icon] (if any), [label], then [detail] dimmed on
-/// the same line, its key [shortcut] and a check on the right when
-/// [checked]; in red when it
+/// the same line, and a check on the right when [checked], or with a key
+/// [shortcut] the check and then the key, at the right; in red when it
 /// is [danger] (it deletes or loses something). Picking it runs [onPick]; with
 /// [submenu] it opens those rows beside it instead, its [detail] (the value
 /// it sets) at the right before a chevron, as macOS and Claude draw one; an
@@ -597,9 +597,16 @@ Widget _button(
     trailingIcon: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (e.shortcut.isNotEmpty)
+        // A row with a key has its check before it and the key at the
+        // row's end, as Claude desktop's Show file tree ✓ ⇧⌘Y.
+        if (e.shortcut.isNotEmpty) ...[
+          if (e.checked)
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: Icon(Icons.check, size: _check, color: t.accentInk),
+            ),
           Padding(
-            padding: const EdgeInsets.only(left: 24),
+            padding: EdgeInsets.only(left: e.checked ? 10 : 24),
             child: keyText(
               e.shortcut,
               // The label's font; its keys' symbols from the bundled code
@@ -607,7 +614,7 @@ Widget _button(
               theme.ui(t.textMuted).thenFonts(const [NushiTheme.codeFont]),
             ),
           ),
-        if (checks)
+        ] else if (checks)
           // The accent's, as Claude's and the app's other checks.
           SizedBox(
             width: _check,

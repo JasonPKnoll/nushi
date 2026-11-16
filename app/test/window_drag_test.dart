@@ -9,10 +9,10 @@ import 'package:nushi/chat_menu.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/phase_pill.dart';
 import 'package:nushi/preview_entry.dart';
-import 'package:nushi/preview_tabs.dart';
 import 'package:nushi/status.dart';
 
 import 'fake_daemon.dart';
@@ -375,13 +375,14 @@ void main() {
             child: Row(
               children: [
                 Expanded(
-                  child: PreviewTabs(
+                  child: PaneTabs(
                     chat: chat,
                     tabs: const [
                       PreviewFile('docs/a.md'),
                       PreviewFile('docs/b.md'),
                     ],
                     current: const PreviewFile('docs/a.md'),
+                    chips: false,
                   ),
                 ),
                 IconTap(Icons.close, tooltip: 'Close', onTap: () {}),

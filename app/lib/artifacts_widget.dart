@@ -164,7 +164,7 @@ class _FileRow extends StatelessWidget {
     final when = changed;
     return Hover(
       builder: (context, {required hover}) => Tap(
-        onTap: () => chat.openPreview(f),
+        onTap: () => chat.openInFiles(f),
         selected: open,
         tooltip: [
           f,

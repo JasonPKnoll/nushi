@@ -13,7 +13,7 @@ Claude Code's Workflow tool launches a script that runs many subagents in phases
 - **A running workflow is the chat's work**: it counts in `ChatStatus.background` and in `workflows`, the app shows the chat working (dot, status bar, phone), and auto-sleep, restarts and the other quiet checks wait for it. A turn of Claude's own (after a background task) counts too (`own_turn`). The composer still goes by `busy`: Claude takes prompts while a run goes.
 - **Stop** asks Claude to stop the run by its task id (`TaskStop`, which takes it, as recorded).
 - **The app**: a card where the call is (name, description, phase progress, who runs, time; done, failed or stopped at the end), a Workflow pane like the subagent pane (the phase tree, and an agent's steps). The phone shows the card's progress line and the working state, no pane.
-- **In right-panes' layout** (ADR 0123, on the right-panes branch): the Workflow pane is a `PaneSpec('workflow', 420, min 280, wide)` picked in `openPanes` where the subagent's is (`workflowPaneOpen`), `_taskPane` calls `taskPane(...)`, and `chatPanes`' switch builds it as the subagent's (`'subagent' || 'workflow' => _taskPane(...)`): its default case is the browser, whose shown tab is null then, so a workflow pane left to it throws as it opens. A test there opens one.
+- **In the side panes' layout** (ADR 0123): the Workflow pane is `ChatPanes.workflow` (420, at least 280, wide), picked in `openPanes` where a subagent's is (`workflowPaneOpen`), and `chatPanes` builds both with `taskPane(...)`.
 - **Other agents**: only Claude has workflows; `model.Workflow` and `chats.WorkflowReader` name nothing of Claude's, so another harness could feed them.
 
 ## Consequences

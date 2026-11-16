@@ -25,7 +25,7 @@ String shownPath(String folder, String path) {
 
 /// The path line: [path] in a quiet line, tinted under the pointer; a click
 /// copies it and says so. [trailing] sits at its right end (the source
-/// button). [inset] and [end] are its sides' room.
+/// button). [inset], [end] and [top] are its sides' room.
 class PathLine extends StatelessWidget {
   const new({
     required this.folder,
@@ -34,6 +34,7 @@ class PathLine extends StatelessWidget {
     this.trailing,
     this.inset = PathLine.textInset - textPad,
     this.end = 4,
+    this.top = 6,
   });
 
   final String folder;
@@ -41,6 +42,7 @@ class PathLine extends StatelessWidget {
   final Widget? trailing;
   final double inset;
   final double end;
+  final double top;
 
   /// Where the path's text starts from the line's left by default: the
   /// preview's text's edge.
@@ -59,7 +61,7 @@ class PathLine extends StatelessWidget {
     final theme = NushiTheme.of(context);
     final t = theme.t;
     return Padding(
-      padding: EdgeInsets.fromLTRB(inset, 6, end, 0),
+      padding: EdgeInsets.fromLTRB(inset, top, end, 0),
       child: Row(
         spacing: 8,
         children: [

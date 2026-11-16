@@ -107,30 +107,32 @@ void main() {
     }, variant: macOnly);
   }
 
-  // A side chat lies over the transcript where it did by the 264-point
-  // panel: beside it at 1470 with the sidebar (1202 for the chat's pane,
-  // 502 left beside the panel and the side chat), over it at 1450 (482).
-  for (final (width, beside) in [(1470.0, true), (1450.0, false)]) {
+  // A side chat goes right of the details (ADR 0123): both beside the
+  // transcript at 1470 with the sidebar (1202 for the chat's pane, 502
+  // left beside the panel and the side chat); at 1450 (482) the details
+  // tuck away and the side chat stays beside it.
+  for (final (width, rail) in [(1470.0, true), (1450.0, false)]) {
     testWidgets('with the sidebar and a side chat, ${width.toInt()} wide: '
-        'the side chat lies ${beside ? 'beside' : 'over'} the transcript', (
-      tester,
-    ) async {
+        'the details ${rail ? 'show' : 'tuck away'}, the side chat beside '
+        'the transcript', (tester) async {
       final (d, _) = await railApp(tester, size: Size(width, 900));
       sidebarHidden.value = false;
       d.chats['c']!.side.value = ChatState('s', '/Users/me')..title = 'Side';
       await tester.pumpAndSettle();
-      expect(railPanel, findsOne);
       final side = tester.getRect(find.byType(SideChat));
       final transcript = tester.getRect(
         find.byWidgetPredicate((w) => w is Transcript && w.items == null).first,
       );
-      expect(side.right, tester.getRect(railPanel).left);
-      expect(
-        transcript.right,
-        beside ? lessThanOrEqualTo(side.left) : greaterThan(side.left),
-      );
-      if (beside) {
+      expect(side.right, width - NushiTheme.windowPad);
+      if (rail) {
+        expect(railPanel, findsOne);
+        expect(tester.getRect(railPanel).right, side.left);
+        expect(transcript.right, tester.getRect(railPanel).left);
         await render(tester, find.byType(NushiApp), 'details_rail_1470_side');
+      } else {
+        expect(railPanel, findsNothing);
+        expect(transcript.right, side.left);
+        expect(showDetails.value, isTrue);
       }
       await closeView(tester, d);
     }, variant: macOnly);

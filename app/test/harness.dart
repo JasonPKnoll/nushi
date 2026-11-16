@@ -12,7 +12,6 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
-import 'package:nushi/preview_entry.dart';
 import 'package:nushi/theme/theme.dart';
 
 /// The time the app sees in every test ([clock], set before each by
@@ -197,15 +196,12 @@ Future<void> untilReal(
   }
 }
 
-/// A chat's preview tabs by name: a file's as its tab names it, a browser
-/// tab's address.
-extension PreviewNames on ChatState {
-  List<String> get previewNames => [
-    for (final e in previewTabs.value)
-      switch (e) {
-        PreviewFile(:final path) => path,
-        final BrowserTab b => b.address.value,
-      },
+/// A chat's file tabs, as each names its file, and its browser tabs, by
+/// address.
+extension TabNames on ChatState {
+  List<String> get fileNames => [for (final f in files.tabs.value) f.path];
+  List<String> get browserNames => [
+    for (final b in browser.tabs.value) b.address.value,
   ];
 }
 

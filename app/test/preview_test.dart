@@ -7,12 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/phone/preview_screen.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/tool_calls.dart';
@@ -271,7 +271,7 @@ void main() {
   ) async {
     final asked = <String>[];
     final d = await _app(tester, asked: asked);
-    final pane = find.byType(PreviewPane);
+    final pane = find.byType(FilesPane);
     expect(pane, findsNothing);
 
     await tester.tap(
@@ -335,13 +335,13 @@ void main() {
     d.dispose();
   }, variant: _mac);
 
-  test('a preview and a subagent take one place', () {
-    final c = ChatState('c', '/Users/me/nushi')..openPreview('a.md');
-    expect(c.previewFile, 'a.md');
+  test('a file and a subagent sit side by side', () {
+    final c = ChatState('c', '/Users/me/nushi')..openInFiles('a.md');
+    expect(c.shownFile, 'a.md');
     c.pane.value = 'agent';
-    expect(c.preview.value, isNull);
-    c.openPreview('b.md');
-    expect((c.pane.value, c.previewFile), (null, 'b.md'));
+    expect(c.shownFile, 'a.md');
+    c.openInFiles('b.md');
+    expect((c.pane.value, c.shownFile), ('agent', 'b.md'));
   });
 
   testWidgets('the pane with a Markdown file, dark, wide', (tester) async {

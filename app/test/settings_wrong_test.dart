@@ -24,7 +24,9 @@ void main() {
           'opened', 'pins', 'pullSeen', 'cleanUpLater', 'panes',
           'termFont', 'termSize', 'appFont', 'codeFont', 'appearance',
           'alertNeedsYou', 'alertFinished', 'alertFailed', 'alertSound',
-          'dockBadge', 'dismissedUpdate',
+          'dockBadge', 'dismissedUpdate', 'files', 'filesIgnored', //
+          'filesTree', 'filesTreeSide', 'previewTabs', 'tabSize',
+          'indentGuides', 'scrollPastEnd', 'wrap', 'whitespace',
         ])
           key: key.endsWith('Font') ? 7 : 'wrong',
       }),
@@ -57,5 +59,16 @@ void main() {
     expect(alertNeedsYou.value, isTrue);
     expect(alertSound.value, isFalse);
     expect(chatsKept(), isEmpty);
+    // The Files pane's.
+    expect(filesChats.value, isEmpty);
+    expect(filesIgnored.value, isFalse);
+    expect(filesTree.value, isTrue);
+    expect(filesTreeSide.value, TreeSide.automatic);
+    expect(previewTabs.value, isTrue);
+    expect(tabSize.value, 4);
+    expect(indentGuides.value, isTrue);
+    expect(scrollPastEnd.value, isFalse);
+    expect(wrapLines.value, isTrue);
+    expect(showWhitespace.value, isFalse);
   });
 }

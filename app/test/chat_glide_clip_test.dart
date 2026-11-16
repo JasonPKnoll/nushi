@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/details_panel.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panes.dart';
@@ -217,6 +218,32 @@ void main() {
       await _glide(tester, spills, 'glide_${w}_side_out', () {
         d.chats['c']!.side.value = null;
       });
+      await closeView(tester, d);
+      expect(spills, isEmpty);
+    }, variant: _mac);
+
+    testWidgets('$w wide with the details: the composer stays off the '
+        'sidebar, uncut, as panes tuck them away and give them back', (
+      tester,
+    ) async {
+      final d = await _app(tester, width);
+      showDetails.value = true;
+      await tester.pumpAndSettle();
+      final c = d.chats['c']!;
+      // Panes that need the details' room at this width (ADR 0123).
+      final side = width > 1100;
+      final files = width != 1400;
+      final spills = <String>[];
+      await _glide(tester, spills, 'glide_${w}_tuck', () {
+        if (side) c.side.value = ChatState('s', '/Users/me')..title = 'Side';
+        if (files) filesChats.value = {'c'};
+      });
+      expect(find.byType(DetailsPanel), findsNothing);
+      await _glide(tester, spills, 'glide_${w}_untuck', () {
+        c.side.value = null;
+        filesChats.value = {};
+      });
+      expect(find.byType(DetailsPanel), findsOneWidget);
       await closeView(tester, d);
       expect(spills, isEmpty);
     }, variant: _mac);

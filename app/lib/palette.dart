@@ -111,7 +111,7 @@ Future<void> showArtifacts(BuildContext context, ChatState chat) async {
   PaletteRow row(String f) => PaletteRow(
     'file:$f',
     baseName(f),
-    () => chat.openPreview(f),
+    () => chat.openInFiles(f),
     detail: fileDetail(f, fileChanged(absoluteIn(chat.folder, f))),
     icon: Icons.description_outlined,
   );
@@ -131,7 +131,7 @@ Future<void> showArtifacts(BuildContext context, ChatState chat) async {
 /// and scrolled to; where the window has no room for the panel, the
 /// palette lists them instead.
 void revealArtifacts(BuildContext context, ChatState chat) {
-  if (!chat.panelFits) {
+  if (!chat.panelFits()) {
     unawaited(showArtifacts(context, chat));
     return;
   }

@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/controls.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/menu.dart';
 import 'package:nushi/palette.dart';
-import 'package:nushi/preview_pane.dart';
-import 'package:nushi/preview_tabs.dart';
+import 'package:nushi/pane_tabs.dart';
 import 'package:nushi/source_editor.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -309,20 +309,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(e.theirs, isNotNull);
     expect(unsavedDot, findsOneWidget);
-    // The pane's Close: asked, Cancel keeps the tabs and the text.
-    await tester.tap(find.byTooltip('Close').first);
+    // The pane's ×: it hides, asking nothing; the tabs, the text and its
+    // conflict are kept (nothing saves in a conflict), and come back.
+    final writes = fake.writes.length;
+    await tester.tap(
+      find.descendant(
+        of: find.byType(FilesPane),
+        matching: find.byTooltip('Close'),
+      ),
+    );
     await tester.pumpAndSettle();
+    expect(find.byType(FilesPane), findsNothing);
+    expect(find.text('Discard your changes to main.go?'), findsNothing);
+    expect(fake.writes, hasLength(writes));
+    expect(chatC(d).fileNames, ['main.go', 'b.go']);
+    expect(chatC(d).edits['main.go'], same(e));
+    expect(e.unsaved, isTrue);
+    showOrHideFiles(chatC(d));
+    await tester.pumpAndSettle();
+    expect(unsavedDot, findsOneWidget);
+    expect(e.theirs, isNotNull);
+    // ⌘W asks; Cancel keeps the tab and the text.
+    await cmd(tester, LogicalKeyboardKey.keyW);
     expect(find.text('Discard your changes to main.go?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(chatC(d).previewNames, ['main.go', 'b.go']);
+    expect(chatC(d).fileNames, ['main.go', 'b.go']);
     expect(chatC(d).edits['main.go'], same(e));
-    // ⌘W asks too; Discard closes the tab.
+    // Asked again, Discard closes the tab.
     await cmd(tester, LogicalKeyboardKey.keyW);
     expect(find.text('Discard your changes to main.go?'), findsOneWidget);
     await tester.tap(find.text('Discard'));
     await tester.pumpAndSettle();
-    expect(chatC(d).previewNames, ['b.go']);
+    expect(chatC(d).fileNames, ['b.go']);
     expect(chatC(d).edits.containsKey('main.go'), isFalse);
     await endEditor(tester, d);
   }, variant: onMac);
@@ -348,7 +367,7 @@ void main() {
       await mouse.moveTo(
         tester.getCenter(
           find.descendant(
-            of: find.byType(PreviewTabs),
+            of: find.byType(PaneTabs),
             matching: find.text('main.go'),
           ),
         ),
@@ -362,7 +381,7 @@ void main() {
       await tester.pumpAndSettle();
       fake.down = false;
       await tester.pumpAndSettle();
-      expect(chatC(d).previewNames, ['b.go']);
+      expect(chatC(d).fileNames, ['b.go']);
       expect(fake.writes, isEmpty);
       expect(utf8.decode(fake.files['main.go']!), goSource);
       await endEditor(tester, d);
@@ -395,8 +414,8 @@ void main() {
     await typeIn(tester, editOf(d), 'x');
     chatC(d).pane.value = 'task';
     await tester.pumpAndSettle();
-    expect(chatC(d).previewNames, ['main.go']);
-    expect(chatC(d).preview.value, isNotNull);
+    expect(chatC(d).fileNames, ['main.go']);
+    expect(chatC(d).files.shown.value, isNotNull);
     chatC(d).pane.value = null;
     await endEditor(tester, d);
   }, variant: onMac);
@@ -457,7 +476,7 @@ void main() {
       await untilReal(tester, () => e.highlighted);
       await tester.pumpAndSettle();
       await expectLater(
-        find.byType(PreviewPane),
+        find.byType(FilesPane),
         matchesGoldenFile('goldens/file_edit_conflict_${brightness.name}.png'),
       );
       for (final width in [1700.0, 720.0]) {

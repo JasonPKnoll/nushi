@@ -4,10 +4,22 @@ import 'dart:typed_data';
 import 'package:flutter/painting.dart';
 import 'package:nushi/theme/theme.dart';
 
-/// A tab reaches the next multiple of this many columns, in the preview's
-/// source and its editor alike (ADR 0096): Go's and a Makefile's indent
-/// reads as gofmt's and most editors' four. One width, not a setting.
-const tabSize = 4;
+/// The columns between tab stops where none is asked for (the phone's
+/// source): Go's and a Makefile's indent reads as gofmt's and most
+/// editors' four. The Mac's Files pane has it as a setting (`tabSize`),
+/// for its source and its editor alike (ADR 0096).
+const defaultTabSize = 4;
+
+/// The room under a source's last line with Scroll past end on (Claude
+/// desktop's and VS Code's): scrolled to its end, the last line [line]
+/// high sits at the top of a [viewport] high view, under its [top] inset;
+/// never less than the [bottom] inset it has otherwise.
+double pastEndPadding(
+  double viewport,
+  double line, {
+  required double top,
+  required double bottom,
+}) => max(bottom, viewport - line - top);
 
 /// What one column of [style] advances: a character of the code font,
 /// which is monospaced, as [scaler] draws it.
@@ -49,14 +61,16 @@ int columnsOf(int c) {
   return 1;
 }
 
-/// How many columns a tab at [column] spans: to the next stop.
-int tabColumns(int column) => tabSize - column % tabSize;
+/// How many columns a tab at [column] spans: to the next stop, every
+/// [size] columns.
+int tabColumns(int column, int size) => size - column % size;
 
 /// [runs], a line's text in styled runs from its start, with each tab
-/// drawn to the next stop. Flutter draws a tab as a space; the tab's run
-/// takes a font size ([fontSize] the line's) at which that space spans
-/// the tab's columns, [column] wide each, with [spacing] (the letter
-/// spacing the runs inherit, already in [column]) after it. Not letter
+/// drawn to the next stop, every [tabSize] columns. Flutter draws a tab as
+/// a space; the tab's run takes a font size ([fontSize] the line's) at
+/// which that space spans the tab's columns, [column] wide each, with
+/// [spacing] (the letter spacing the runs inherit, already in [column])
+/// after it. Not letter
 /// spacing, which would be simpler: Skia's paragraph shifts a line by half
 /// the letter spacing of its first glyph, a leading tab's, and puts its
 /// carets out of step with it. The line's height must be held by a strut
@@ -67,6 +81,7 @@ List<TextSpan> tabStops(
   List<TextSpan> runs, {
   required double fontSize,
   required double column,
+  required int tabSize,
   double spacing = 0,
 }) {
   if (!runs.any((r) => r.text?.contains('\t') ?? false)) return runs;
@@ -92,7 +107,7 @@ List<TextSpan> tabStops(
       if (i > from) {
         out.add(TextSpan(text: text.substring(from, i), style: run.style));
       }
-      final n = tabColumns(at);
+      final n = tabColumns(at, tabSize);
       out.add(
         TextSpan(
           text: '\t',

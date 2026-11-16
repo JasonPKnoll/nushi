@@ -5,6 +5,7 @@ import 'package:nushi/artifacts_widget.dart';
 import 'package:nushi/background_tasks_widget.dart';
 import 'package:nushi/changes_span.dart';
 import 'package:nushi/chat.dart';
+import 'package:nushi/clock.dart';
 import 'package:nushi/context_cache.dart';
 import 'package:nushi/context_report.dart';
 import 'package:nushi/daemon.dart';
@@ -116,9 +117,7 @@ class _DetailsPanelState extends State<DetailsPanel> with FollowsChanges {
     final last = contextAskedAt(chat.id);
     var wait = const Duration(seconds: 1);
     if (last != null) {
-      final next = last
-          .add(const Duration(minutes: 1))
-          .difference(DateTime.now());
+      final next = last.add(const Duration(minutes: 1)).difference(clock());
       if (next > wait) wait = next;
     }
     _timer = Timer(wait, () {

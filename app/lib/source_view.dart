@@ -5,6 +5,7 @@ import 'dart:ui' show BoxHeightStyle;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import 'package:nushi/indent_guides.dart';
 import 'package:nushi/preview_text.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_spans.dart';
@@ -33,12 +34,26 @@ class SourceView extends StatefulWidget {
     super.key,
     this.padding,
     this.wrap = true,
+    this.tabSize = defaultTabSize,
+    this.guides = false,
+    this.pastEnd = false,
   });
 
   final String text;
   final String path;
   final EdgeInsets? padding;
   final bool wrap;
+
+  /// The columns between tab stops.
+  final int tabSize;
+
+  /// Whether its indent guides are drawn (the Mac's Files pane's Indent
+  /// guides).
+  final bool guides;
+
+  /// Whether it scrolls on past its last line, to the top (the Mac's Files
+  /// pane's Scroll past end).
+  final bool pastEnd;
 
   @override
   State<SourceView> createState() => _SourceViewState();
@@ -50,6 +65,7 @@ class _SourceViewState extends State<SourceView> {
   List<Uint32List?>? _spans;
   int _reads = 0; // a highlight lands only for the latest read
   int? _columns; // the widest line's, worked out when first unwrapped
+  Indents? _indents; // each line's indent, worked out when guides show
 
   /// Each wrapping's list, to find the line at its top (a key of their
   /// own: one shared would carry the scroll offset across); and its
@@ -75,6 +91,7 @@ class _SourceViewState extends State<SourceView> {
     // The file changed: read again where it scrolled to.
     if (old.text != widget.text || old.path != widget.path) _read();
     if (old.wrap != widget.wrap) _keepTopLine();
+    if (old.tabSize != widget.tabSize) _columns = _indents = null;
   }
 
   @override
@@ -96,6 +113,7 @@ class _SourceViewState extends State<SourceView> {
     if (_lines.length > 1 && _lines.last.isEmpty) _lines.removeLast();
     _spans = null;
     _columns = null;
+    _indents = null;
     if (sourceLanguage(widget.path, _text) case final language?) {
       highlightSides(language, '', _text).then((s) {
         if (mounted && read == _reads && s[1] != null) {
@@ -181,13 +199,13 @@ class _SourceViewState extends State<SourceView> {
   int get _widest => _columns ??= _lines.fold<int>(0, (widest, line) {
     final n = min(line.length, _maxLine);
     final note = line.length > _maxLine ? 24 : 0;
-    final most = line.contains('\t') ? tabSize : 2;
+    final most = line.contains('\t') ? widget.tabSize : 2;
     if (most * n + note <= widest) return widest;
     var w = 0;
     for (var i = 0; i < n; i++) {
       final c = line.codeUnitAt(i);
       w += c == 0x09
-          ? tabColumns(w)
+          ? tabColumns(w, widget.tabSize)
           : c >= 0x1100 && (c < 0xD800 || c > 0xDFFF)
           ? 2
           : 1;
@@ -233,6 +251,7 @@ class _SourceViewState extends State<SourceView> {
             spansOf(t, line, _spans?.elementAtOrNull(i)),
             fontSize: style.fontSize!,
             column: char,
+            tabSize: widget.tabSize,
             spacing: spacing,
           ),
           if (cut)
@@ -245,36 +264,60 @@ class _SourceViewState extends State<SourceView> {
     }
 
     String number(int i) => '${i + 1}'.padLeft(digits);
+    // Indent guides, a level's columns apart (the file's own, [indents]).
+    final counted = widget.guides
+        ? (_indents ??= indents(_lines, widget.tabSize))
+        : null;
+    final step = (counted?.unit ?? widget.tabSize) * char;
+    int level(int i) => counted?.levels[i] ?? 0;
+    // Scrolled past the end, the last line can come to the top.
+    EdgeInsets padded(double viewport) {
+      final pad = widget.padding ?? EdgeInsets.zero;
+      if (!widget.pastEnd) return pad;
+      return pad.copyWith(
+        bottom: pastEndPadding(
+          viewport,
+          _lineHeight,
+          top: pad.top,
+          bottom: pad.bottom,
+        ),
+      );
+    }
+
     if (widget.wrap) {
       return SelectionArea(
         child: SelectionContainer(
           delegate: _wholeWrapped,
-          child: ListView.builder(
-            key: _wrapped,
-            controller: _down,
-            padding: widget.padding,
-            itemCount: _lines.length,
-            itemBuilder: (context, i) => Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SelectionContainer.disabled(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 14),
-                    child: Text(number(i), style: gutter),
-                  ),
-                ),
-                Expanded(
-                  child: _Line(
-                    Text.rich(
-                      text(i),
-                      strutStyle: strut,
-                      selectionColor: Colors.transparent,
+          child: LayoutBuilder(
+            builder: (context, box) => ListView.builder(
+              key: _wrapped,
+              controller: _down,
+              padding: padded(box.maxHeight),
+              itemCount: _lines.length,
+              itemBuilder: (context, i) => Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SelectionContainer.disabled(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Text(number(i), style: gutter),
                     ),
-                    whole: _lines[i],
-                    column: char,
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: _Line(
+                      Text.rich(
+                        text(i),
+                        strutStyle: strut,
+                        selectionColor: Colors.transparent,
+                      ),
+                      whole: _lines[i],
+                      column: char,
+                      level: level(i),
+                      step: step,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -309,7 +352,7 @@ class _SourceViewState extends State<SourceView> {
                       controller: _down,
                       padding: EdgeInsets.only(
                         top: pad.top,
-                        bottom: pad.bottom,
+                        bottom: padded(box.maxHeight).bottom,
                       ),
                       itemExtent: _lineHeight,
                       itemCount: _lines.length,
@@ -326,6 +369,8 @@ class _SourceViewState extends State<SourceView> {
                               ),
                               whole: _lines[i],
                               column: char,
+                              level: level(i),
+                              step: step,
                             ),
                           ),
                           Positioned(

@@ -63,6 +63,10 @@ abstract final class Waits {
 
   /// A draft's change is written this long after the last.
   static const save = Duration(milliseconds: 500);
+
+  /// What changes every frame while it's dragged (a terminal's size as a
+  /// pane's edge moves) is sent at most this often.
+  static const coalesce = Duration(milliseconds: 100);
 }
 
 /// One clock for the motions that run once ([ClockRun]) and the reply's

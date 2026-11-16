@@ -6,7 +6,7 @@ import 'package:nushi/widgets.dart';
 
 // The app's one look for tabs (ADR 0071): plain text, the one showing in the
 // primary color with a line under it, no box and no tint. The preview pane's
-// file tabs (`preview_tabs.dart`) are drawn from these pieces too.
+// file tabs (`pane_tabs.dart`) are drawn from these pieces too.
 
 /// The color of a tab's text: the primary text on the one [showing], the
 /// others muted, a step up under the pointer.

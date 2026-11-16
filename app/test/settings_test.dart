@@ -67,6 +67,12 @@ final _saved = <String, Object?>{
   'alertSound': true,
   'dockBadge': false,
   'wrap': false,
+  'filesTree': false,
+  'filesTreeSide': 'left',
+  'previewTabs': false,
+  'tabSize': 8,
+  'indentGuides': false,
+  'scrollPastEnd': true,
   'dismissedUpdate': '0.1.17',
   'fromANewerApp': {'kept': true},
   'worktrees': ['/a'],
@@ -115,6 +121,12 @@ List<ValueNotifier<Object?>> get _all => [
   alertSound,
   dockBadge,
   wrapLines,
+  filesTree,
+  filesTreeSide,
+  previewTabs,
+  tabSize,
+  indentGuides,
+  scrollPastEnd,
   dismissedUpdate,
 ];
 
@@ -130,14 +142,22 @@ void main() {
     expect(showDetails.value, isFalse);
     expect(terminalChats.value, {'x', 'y'});
     // The details panel's width is fixed now (ADR 0092): an older one goes.
-    expect(paneWidths.value, {'preview': 600});
+    // The preview's, from when files and browser tabs shared it, is the
+    // browser's (ADR 0094).
+    expect(paneWidths.value, {'browser': 600});
     expect(terminalFontSize.value, 14);
     expect(githubDays.value, 30);
     expect(dismissedUpdate.value, '0.1.17');
     expect(wrapLines.value, isFalse);
+    expect(filesTree.value, isFalse);
+    expect(filesTreeSide.value, TreeSide.left);
+    expect(previewTabs.value, isFalse);
+    expect(tabSize.value, 8);
+    expect(indentGuides.value, isFalse);
+    expect(scrollPastEnd.value, isTrue);
     // A built-in named by its id is the theme shown (ADR 0086).
     expect(colorTheme.value, 'tokyo-night');
-    expect(_all.map((p) => p.value), hasLength(41)); // each made
+    expect(_all.map((p) => p.value), hasLength(47)); // each made
     showDetails.value = true;
     await pumpEventQueue();
     expect(readSaved(), {
@@ -145,9 +165,19 @@ void main() {
         ..remove('worktrees')
         ..remove('subagentWide')),
       'details': true,
-      'panes': {'preview': 600.0},
+      'panes': {'browser': 600.0},
     });
     expect(_appJson.statSync().mode & 0x1ff, 0x180);
+  });
+
+  test("the preview's width is the browser's unless it has its own; the "
+      "Changes list's stays", () {
+    expect(readPaneWidths({'preview': 640}), {'browser': 640});
+    expect(readPaneWidths({'preview': 640, 'browser': 500, 'files': 333}), {
+      'browser': 500,
+      'files': 333,
+    });
+    expect(readPaneWidths('x'), isEmpty);
   });
 
   test('a chat forgotten from every pref kept by chat, in one go', () {

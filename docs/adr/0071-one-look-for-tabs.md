@@ -25,3 +25,5 @@ The owner dislikes the segmented pill (`Segmented`): a rounded box with a filled
 - A narrower control with tighter padding: it would move what's beside it, and every fold number would need measuring again.
 
 **Amendment (2026-11-11):** the chat header's Chat, Changes and Pull request are the filled segmented control again (`Segmented(roomy:)`, a card-filled track with the picked segment raised), as the mock the owner approved has it; the other tab bars stay `PlainTabs` until their views are restyled, and `PlainTabs` no longer has to measure as the pill does ([ADR 0111](0111-surfaces-and-floating-panes.md)). Changes' scopes followed with its restyle, as the mock has them; a pull request's sections, the preview's and History's stay `PlainTabs`.
+
+**Amendment (2026-11-15):** the Files pane's file tabs are plain tabs, and the browser pane's always chips: the two kinds no longer share a row ([ADR 0123](0123-side-panes-right-of-the-rail.md)), so a file's tab is never a chip.

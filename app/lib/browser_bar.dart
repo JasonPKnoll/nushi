@@ -56,6 +56,17 @@ class BrowserBar extends StatelessWidget {
   static const _icon = 21.0;
   static const _iconPadding = 4.0;
 
+  /// A button's room in the row: its box and the gap after it.
+  static const double _button = _icon + 2 * _iconPadding + 3;
+
+  /// The least the address keeps beside the buttons before they go (in a
+  /// pane squeezed in a narrow window, ADR 0123): Not secure first, then
+  /// Back and Forward, then Reload; their keys stay.
+  static const double _fieldLeast = 48;
+
+  /// Not secure's room: it goes before the buttons do.
+  static const double _notSecureRoom = 80;
+
   /// The key of the address field's box, its fill and border.
   static const ValueKey<String> fieldKey = ValueKey('address field');
 
@@ -88,57 +99,66 @@ class BrowserBar extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: t.line)),
       ),
-      child: Row(
-        spacing: 3,
-        children: [
-          if (webEmbedded) ...[
-            step(LineIcon.back, 'Back', host?.canBack, () => host!.back()),
-            step(
-              LineIcon.forward,
-              'Forward',
-              host?.canForward,
-              () => host!.forward(),
-            ),
-            IconTap.line(
-              LineIcon.reload,
-              tooltip: withKey('Reload', Act.reloadPage.shortcut ?? ''),
-              size: _icon,
-              padding: _iconPadding,
-              color: t.text,
-              onTap: host == null ? null : () => host.reload().ignore(),
-            ),
-          ],
-          ValueListenableBuilder(
-            valueListenable: page,
-            builder: (context, at, _) => notSecure(at)
-                ? Padding(
-                    padding: const EdgeInsets.only(left: 4, right: 2),
-                    child: Text(
-                      'Not secure',
-                      maxLines: 1,
-                      softWrap: false,
-                      style: theme.ui(t.textSecondary, size: 12),
-                    ),
-                  )
-                : const SizedBox(width: 2),
-          ),
-          Expanded(
-            child: SizedBox(
-              height: fieldHeight,
-              child: ListenableBuilder(
-                listenable: Listenable.merge([focus, page]),
-                builder: (context, _) {
-                  final shown = hostOf(page.value);
-                  return _field(
-                    theme,
-                    focus.hasFocus || shown.isEmpty ? null : shown,
-                    outside: isWebPage(Uri.tryParse(page.value)),
-                  );
-                },
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final steps = box.maxWidth >= 3 * _button + _fieldLeast;
+          final reload = box.maxWidth >= _button + _fieldLeast;
+          final warn =
+              box.maxWidth >= 3 * _button + _fieldLeast + _notSecureRoom;
+          return Row(
+            spacing: 3,
+            children: [
+              if (webEmbedded && steps) ...[
+                step(LineIcon.back, 'Back', host?.canBack, () => host!.back()),
+                step(
+                  LineIcon.forward,
+                  'Forward',
+                  host?.canForward,
+                  () => host!.forward(),
+                ),
+              ],
+              if (webEmbedded && reload)
+                IconTap.line(
+                  LineIcon.reload,
+                  tooltip: withKey('Reload', Act.reloadPage.shortcut ?? ''),
+                  size: _icon,
+                  padding: _iconPadding,
+                  color: t.text,
+                  onTap: host == null ? null : () => host.reload().ignore(),
+                ),
+              ValueListenableBuilder(
+                valueListenable: page,
+                builder: (context, at, _) => notSecure(at) && warn
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 4, right: 2),
+                        child: Text(
+                          'Not secure',
+                          maxLines: 1,
+                          softWrap: false,
+                          style: theme.ui(t.textSecondary, size: 12),
+                        ),
+                      )
+                    : const SizedBox(width: 2),
               ),
-            ),
-          ),
-        ],
+              Expanded(
+                child: SizedBox(
+                  height: fieldHeight,
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([focus, page]),
+                    builder: (context, _) {
+                      final shown = hostOf(page.value);
+                      return _field(
+                        theme,
+                        focus.hasFocus || shown.isEmpty ? null : shown,
+                        outside: isWebPage(Uri.tryParse(page.value)),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

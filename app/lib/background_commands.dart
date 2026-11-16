@@ -98,6 +98,7 @@ class BackgroundCommandPane extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             PaneHeader(
+              end: PaneHeader.buttonsEnd,
               child: Row(
                 children: [
                   Icon(Icons.terminal, size: 14, color: t.textSecondary),
@@ -111,11 +112,18 @@ class BackgroundCommandPane extends StatelessWidget {
                     ),
                   ),
                   if (it != null && commandRunning(it))
-                    stopButton(context, daemon, chat, id),
+                    stopButton(
+                      context,
+                      daemon,
+                      chat,
+                      id,
+                      padding: IconTap.header,
+                    ),
                   IconTap(
                     Icons.close,
                     tooltip: 'Close',
                     size: 15,
+                    padding: IconTap.header,
                     onTap: onClose,
                   ),
                 ],

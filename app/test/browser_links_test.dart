@@ -112,9 +112,9 @@ void main() {
     final browser = outside();
     final d = await app(tester);
     await tapLink(tester, 'the dev server');
-    final tab = d.chats['c']!.preview.value;
+    final tab = d.chats['c']!.browser.shown.value;
     expect(tab, isA<BrowserTab>());
-    expect((tab! as BrowserTab).address.value, 'http://localhost:5173/');
+    expect(tab!.address.value, 'http://localhost:5173/');
     expect(find.byType(BrowserPane), findsOneWidget);
     expect(fakes.hosts.single.opened, [Uri.parse('http://localhost:5173/')]);
     expect(browser, isEmpty);
@@ -131,7 +131,7 @@ void main() {
     await tester.tap(find.text('Fetch the tea list'));
     await tester.pumpAndSettle();
     await tapLink(tester, 'the list');
-    final tabs = d.chats['c']!.previewTabs.value.cast<BrowserTab>();
+    final tabs = d.chats['c']!.browser.tabs.value;
     expect([for (final t in tabs) t.address.value], ['http://localhost:5173/']);
     expect(browser, [Uri.parse('https://tea.example/list')]);
     await closeView(tester, d);
@@ -144,7 +144,7 @@ void main() {
     final d = await app(tester);
     await tapLink(tester, 'the dev server');
     expect(browser, [Uri.parse('http://localhost:5173/')]);
-    expect(d.chats['c']!.preview.value, isNull);
+    expect(d.chats['c']!.browser.shown.value, isNull);
     await closeView(tester, d);
   }, variant: macOnly);
 
@@ -154,10 +154,10 @@ void main() {
     browserFakes();
     final browser = outside();
     final d = await app(tester, width: 720);
-    expect(d.chats['c']!.previewFits(), isFalse);
+    expect(d.chats['c']!.browserFits(), isFalse);
     await tapLink(tester, 'the dev server');
     expect(browser, [Uri.parse('http://localhost:5173/')]);
-    expect(d.chats['c']!.preview.value, isNull);
+    expect(d.chats['c']!.browser.shown.value, isNull);
     await closeView(tester, d);
   }, variant: macOnly);
 
@@ -167,16 +167,16 @@ void main() {
     final browser = outside();
     final d = await app(tester, width: 1200, listing: true);
     final c = d.chats['c']!;
-    expect(c.previewFits(), isTrue);
+    expect(c.browserFits(), isTrue);
     // Neither lays the chat area out again: the room is worked out as the
     // link is clicked.
     filesChats.value = {'c'};
     c.side.value = ChatState('s', '/Users/me')..title = 'Side';
     await tester.pumpAndSettle();
-    expect(c.previewFits(), isFalse);
+    expect(c.browserFits(), isFalse);
     await tapLink(tester, 'the dev server');
     expect(browser, [Uri.parse('http://localhost:5173/')]);
-    expect(c.preview.value, isNull);
+    expect(c.browser.shown.value, isNull);
     await closeView(tester, d);
   }, variant: macOnly);
 

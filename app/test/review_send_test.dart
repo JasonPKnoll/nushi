@@ -156,7 +156,7 @@ void main() {
   testWidgets('Changes: Send to agent (n), and the cards waiting with the '
       'way back to the chat, 720 wide', (tester) async {
     final d = await _app(tester, 720);
-    await tester.tap(_inHeader('Changes'));
+    d.chats['c']!.tab.value = ChatTab.changes;
     await tester.pumpAndSettle();
     // The short label: the pane beside the sidebar is 512 wide here.
     expect(find.text('Send (2)'), findsOne);
@@ -164,7 +164,7 @@ void main() {
     await tester.pumpAndSettle();
     // Sending shows the chat; back in Changes, the cards wait there too.
     expect(d.chats['c']!.tab.value.name, 'chat');
-    await tester.tap(_inHeader('Changes'));
+    d.chats['c']!.tab.value = ChatTab.changes;
     await tester.pumpAndSettle();
     expect(find.text('Send (2)'), findsNothing);
     expect(

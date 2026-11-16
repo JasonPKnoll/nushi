@@ -126,7 +126,7 @@ Future<(FakeDaemon, ChatState)> _pane(
       ),
       home: Scaffold(
         body: ValueListenableBuilder(
-          valueListenable: c.preview,
+          valueListenable: c.browser.shown,
           builder: (context, tab, _) => tab is BrowserTab
               ? BrowserPane(
                   key: ObjectKey(tab),
@@ -196,26 +196,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(s.starts.single.index, 1);
     expect(s.starts.single.hash, 'hash-web-3000');
-    expect(c.previewTabs.value, hasLength(2));
+    expect(c.browser.tabs.value, hasLength(2));
     s.rows[1] = s.rows[1].deepCopy()
       ..state = DevServerState.DEV_SERVER_STATE_RUNNING;
     await _changed(tester, d);
     // The tab already at its origin shows; none is added.
-    expect(c.previewTabs.value, hasLength(2));
-    expect(
-      (c.preview.value! as BrowserTab).address.value,
-      'http://localhost:3000',
-    );
+    expect(c.browser.tabs.value, hasLength(2));
+    expect(c.browser.shown.value!.address.value, 'http://localhost:3000');
     // A click on a running server's name shows its page; ■ stops it.
-    c.showPreviewTab(c.previewTabs.value.last);
+    c.showBrowserTab(c.browser.tabs.value.last);
     await tester.pumpAndSettle();
     await _openMenu(tester);
     await tester.tap(find.text('web'));
     await tester.pumpAndSettle();
-    expect(
-      (c.preview.value! as BrowserTab).address.value,
-      'http://localhost:3000',
-    );
+    expect(c.browser.shown.value!.address.value, 'http://localhost:3000');
     await _openMenu(tester);
     await tester.tap(find.byTooltip('Stop'));
     await tester.pumpAndSettle();
@@ -230,7 +224,7 @@ void main() {
       'opening', (tester) async {
     final s = _Servers()..rows = [_server('web')];
     final (d, c) = await _pane(tester, s);
-    final server = c.preview.value;
+    final server = c.browser.shown.value;
     c.openBrowserTab('about:blank');
     await tester.pumpAndSettle();
     await _openMenu(tester);
@@ -239,15 +233,15 @@ void main() {
     s.rows[0] = s.rows[0].deepCopy()
       ..state = DevServerState.DEV_SERVER_STATE_RUNNING;
     await _changed(tester, d);
-    expect(c.preview.value, same(server));
-    expect(c.previewTabs.value, hasLength(2));
+    expect(c.browser.shown.value, same(server));
+    expect(c.browser.tabs.value, hasLength(2));
     expect(_shown.devServers.errorOf('c'), isNull);
     // With only the blank tab, the server's page opens in a new one.
     c
-      ..closePreview(server!)
+      ..browser.close(server!)
       ..showServer('http://localhost:3000');
     await tester.pumpAndSettle();
-    expect(c.previewTabs.value.map((t) => (t as BrowserTab).address.value), [
+    expect(c.browser.tabs.value.map((t) => t.address.value), [
       'about:blank',
       'http://localhost:3000',
     ]);
@@ -287,7 +281,7 @@ void main() {
     s.rows[0] = s.rows[0].deepCopy()
       ..state = DevServerState.DEV_SERVER_STATE_RUNNING;
     await _changed(tester, d);
-    expect(c.previewTabs.value, hasLength(1));
+    expect(c.browser.tabs.value, hasLength(1));
     await _close(tester);
   }, variant: macOnly);
 

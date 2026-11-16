@@ -19,6 +19,12 @@ import 'package:nushi/theme/theme.dart';
 /// it's nothing. What it's given at its first build is there at once
 /// unless it [arrives] (a pane opened beside a view that was there), and
 /// under Reduce Motion everything is.
+///
+/// Not [shown], a child goes as one taken away does, but stays: once gone
+/// it's kept, laid out but not drawn, taking no pointer or focus, its
+/// tickers stopped, and it comes back as the same widget when shown again
+/// (the details rail, tucked away while the panes need its room, ADR 0123).
+/// Taken away while tucked, it's gone at once.
 class Presence extends StatefulWidget {
   const new({
     required this.child,
@@ -29,10 +35,12 @@ class Presence extends StatefulWidget {
     this.curve = Motion.settle,
     this.leave = Motion.leave,
     this.arrives = false,
+    this.shown = true,
   });
 
   final Widget? child;
   final bool arrives;
+  final bool shown;
   final Widget Function(
     BuildContext context,
     Animation<double> run,
@@ -62,7 +70,7 @@ class _PresenceState extends State<Presence>
       vsync: this,
       duration: widget.enter,
       reverseDuration: widget.exit,
-      value: _last == null || widget.arrives ? 0 : 1,
+      value: _last == null || widget.arrives || !widget.shown ? 0 : 1,
     )..addStatusListener(_ran);
     // Going, the run goes back through [Presence.leave]: it gathers speed.
     _curved = CurvedAnimation(
@@ -75,7 +83,9 @@ class _PresenceState extends State<Presence>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_last == null || _run.value > 0 || _run.isAnimating) return;
+    if (_last == null || !widget.shown || _run.value > 0 || _run.isAnimating) {
+      return;
+    }
     if (reduceMotion(context)) {
       _run.value = 1;
     } else {
@@ -84,10 +94,11 @@ class _PresenceState extends State<Presence>
   }
 
   void _ran(AnimationStatus status) {
-    if (status == AnimationStatus.dismissed &&
-        widget.child == null &&
-        _last != null) {
+    if (status != AnimationStatus.dismissed || _last == null) return;
+    if (widget.child == null) {
       setState(() => _last = null);
+    } else if (!widget.shown) {
+      setState(() {}); // tucked: kept, not drawn
     }
   }
 
@@ -95,14 +106,21 @@ class _PresenceState extends State<Presence>
   void didUpdateWidget(Presence old) {
     super.didUpdateWidget(old);
     final still = reduceMotion(context);
-    if (widget.child case final child?) {
+    if (widget.child case final child? when !widget.shown) {
+      _last = child;
+      if (still) {
+        _run.value = 0;
+      } else if (_run.isForwardOrCompleted) {
+        _run.reverse().ignore();
+      }
+    } else if (widget.child case final child?) {
       _last = child;
       if (still) {
         _run.value = 1;
       } else if (!_run.isForwardOrCompleted) {
         _run.forward().ignore();
       }
-    } else if (still) {
+    } else if (still || _run.isDismissed) {
       _last = null;
       _run.value = 0;
     } else if (_run.isForwardOrCompleted && _last != null) {
@@ -121,12 +139,19 @@ class _PresenceState extends State<Presence>
   Widget build(BuildContext context) {
     final child = _last;
     if (child == null) return const SizedBox.shrink();
-    final going = widget.child == null;
+    final going = widget.child == null || !widget.shown;
+    final tucked = going && _run.isDismissed;
     return IgnorePointer(
       ignoring: going,
       child: ExcludeFocus(
         excluding: going,
-        child: widget.builder(context, _curved, child),
+        child: Offstage(
+          offstage: tucked,
+          child: TickerMode(
+            enabled: !tucked,
+            child: widget.builder(context, _curved, child),
+          ),
+        ),
       ),
     );
   }
@@ -400,9 +425,14 @@ class Glide extends StatefulWidget {
     super.key,
     this.sides,
     this.clip = false,
+    this.scene,
   });
 
   final Object? token;
+
+  /// A change of it, with [token]'s, is a new scene (another of a chat's
+  /// tabs): it's drawn where it is at once.
+  final Object? scene;
   final EdgeInsets Function(double width)? sides;
   final bool clip;
   final Widget child;
@@ -423,7 +453,11 @@ class _GlideState extends State<Glide> with SingleTickerProviderStateMixin {
   @override
   void didUpdateWidget(Glide old) {
     super.didUpdateWidget(old);
-    if (widget.token == old.token || reduceMotion(context)) return;
+    if (widget.token == old.token ||
+        widget.scene != old.scene ||
+        reduceMotion(context)) {
+      return;
+    }
     _armed++;
     _run.forward(from: 0).ignore();
   }

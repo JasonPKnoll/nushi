@@ -6,20 +6,24 @@ import 'package:flutter/widgets.dart'
     show TextEditingController, WidgetsBinding;
 
 import 'package:nushi/agents.dart';
-import 'package:nushi/browser_address.dart' show isWebPage;
+import 'package:nushi/browser_tabs.dart';
 import 'package:nushi/chat_colors.dart';
 import 'package:nushi/chat_look.dart';
+import 'package:nushi/chat_paths.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/code_runs.dart';
 import 'package:nushi/draft.dart';
 import 'package:nushi/file_edit.dart';
 import 'package:nushi/file_links.dart';
+import 'package:nushi/file_tabs.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/outbox.dart';
 import 'package:nushi/preview_entry.dart';
 import 'package:nushi/related_worktrees.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/transcript_find.dart';
+
+export 'package:nushi/chat_paths.dart';
 
 /// A chat's state in a word, worked out in one place ([ChatState.phase]):
 /// the Mac's dot and word, the phone's row and the status bar read it, so
@@ -40,6 +44,10 @@ enum ChatPhase {
 /// What shows in a chat's place on the Mac: its transcript, its changes,
 /// or its pull request.
 enum ChatTab { chat, changes, pull }
+
+/// The two kinds of tab beside a chat: a file's (the Files pane's) and a
+/// browser's.
+enum TabKind { file, browser }
 
 /// What a chat's agent asked to show beside it: a file (ADR 0068) or a page
 /// on this Mac (ADR 0100).
@@ -68,22 +76,16 @@ typedef ServerEntry = ({String name, String source, bool fromMain});
 /// current by the chat's later events.
 class ChatState extends ChangeNotifier {
   new(this.id, this.folder) {
-    // A subagent's pane takes the preview's place, unless a file there
-    // has unsaved edits: then both show (ADR 0096).
+    // A subagent's pane takes the browser's place; a file's tabs stay
+    // (ADR 0094, 0096).
     pane.addListener(() {
-      if (pane.value != null && !edits.values.any((e) => e.unsaved)) {
-        preview.value = null;
-      }
-    });
-    // However the preview closes, its tabs go with it.
-    preview.addListener(() {
-      if (preview.value == null) previewTabs.value = const [];
+      if (pane.value != null) browser.shown.value = null;
     });
     // A file's tab closed: its edits go with it (the closing asked first).
-    previewTabs.addListener(_dropEdits);
+    files.tabs.addListener(_dropEdits);
   }
 
-  /// The files of its preview being edited (ADR 0096), by their tabs'
+  /// The files being edited in its file tabs (ADR 0096), by their tabs'
   /// names: each until its tab closes, so a tab shown again, or the chat
   /// picked again, has its unsaved edits still.
   final edits = <String, FileEdit>{};
@@ -91,10 +93,18 @@ class ChatState extends ChangeNotifier {
   /// Says an edit came or went, for the tabs' marks.
   final editsChanged = ValueNotifier<int>(0);
 
-  /// [path]'s edit, made with [make] if it has none.
+  /// [path]'s edit, made with [make] if it has none. Its first unsaved
+  /// change keeps its tab, were it a provisional one ([FileTabs.keep]).
   FileEdit edit(String path, FileEdit Function() make) {
     if (edits[path] case final e?) return e;
     final e = edits[path] = make();
+    void edited() {
+      if (!e.unsaved) return;
+      e.removeListener(edited);
+      files.keep(PreviewFile(path));
+    }
+
+    e.addListener(edited);
     editsChanged.value++;
     return e;
   }
@@ -110,9 +120,7 @@ class ChatState extends ChangeNotifier {
   }
 
   void _dropEdits() {
-    final open = {
-      for (final f in previewTabs.value.whereType<PreviewFile>()) f.path,
-    };
+    final open = {for (final f in files.tabs.value) f.path};
     for (final path in [...edits.keys]) {
       if (!open.contains(path)) dropEdit(path);
     }
@@ -370,25 +378,22 @@ class ChatState extends ChangeNotifier {
   /// BackgroundCommandPane).
   final pane = ValueNotifier<String?>(null);
 
-  /// The preview tab showing in [pane]'s place, one or the other: a file
-  /// (as its tool row names it) or a browser tab (ADR 0094).
-  final preview = ValueNotifier<PreviewEntry?>(null);
+  /// Its open files (ADR 0070): their tabs and the one showing.
+  late final files = FileTabs();
 
-  /// The preview's tabs, in the order opened, [preview] the one showing:
-  /// with two or more the pane shows them (ADR 0070). In the app's memory,
-  /// as [preview] is, and empty when it's null.
-  final previewTabs = ValueNotifier<List<PreviewEntry>>(const []);
+  /// Its browser tabs (ADR 0094): their tabs and the one showing.
+  late final browser = BrowserTabs();
 
-  /// The file the preview shows, as its tab names it; null when it shows
-  /// none (closed, or a browser tab).
-  String? get previewFile => switch (preview.value) {
-    PreviewFile(:final path) => path,
-    _ => null,
-  };
+  /// Counts the files asked to open ([openInFiles]), the one showing too:
+  /// an expanded browser gives way to each (ADR 0094).
+  final filesOpened = ValueNotifier<int>(0);
 
-  /// The files whose preview shows its Source, while the app runs: a file's
-  /// view is made again each time it shows.
-  final previewSources = <String>{};
+  /// The file its file tabs show, as its tab names it; null with none.
+  String? get shownFile => files.shown.value?.path;
+
+  /// Which kind of tab was shown last, a file's or a browser's: what ⌘W
+  /// closes when the focus is in neither pane.
+  TabKind? lastTabbed;
 
   /// Messages this app sent that the daemon hasn't shown back yet.
   late final outbox = Outbox(notifyListeners);
@@ -406,15 +411,22 @@ class ChatState extends ChangeNotifier {
   /// here so the app's keys and the palette reach it wherever the focus is.
   final tab = ValueNotifier<ChatTab>(ChatTab.chat);
 
-  /// Whether its pane, as last laid out, has room for the details panel.
-  bool panelFits = true;
+  /// Whether its pane has room for the details panel beside the transcript
+  /// and the panes open, worked out when asked (its chat area's, which sets
+  /// it).
+  bool Function() panelFits = fitsAlways;
 
-  /// Whether its pane has room for a preview beside the transcript, worked
-  /// out when asked (its chat area's, which sets it): a side chat or the
-  /// Files pane opens without laying the area out again.
-  bool Function() previewFits = fitsAlways;
+  /// Whether its pane has room for the Files pane beside the transcript, or
+  /// it's open, worked out when asked (its chat area's, which sets it): a
+  /// side chat opens without laying the area out again.
+  bool Function() filesFit = fitsAlways;
 
-  /// [previewFits] before a chat area works it out.
+  /// Whether its pane has room for the browser beside the transcript, as
+  /// [filesFit].
+  bool Function() browserFits = fitsAlways;
+
+  /// [filesFit], [browserFits] and [panelFits] before a chat area works
+  /// them out.
   static bool fitsAlways() => true;
 
   /// The tabs it has: Pull request only while it has one.
@@ -438,160 +450,85 @@ class ChatState extends ChangeNotifier {
   /// null while it's closed. In the app's memory only.
   final serverLogs = ValueNotifier<ServerEntry?>(null);
 
-  /// Shows [path] in the preview: the tab of the same file if it has one,
-  /// however each is named ([relativeIn]: relative to the folder or
-  /// absolute, with `.`, `..` and doubled slashes), or a new one last.
-  void openPreview(String path) {
-    final file = relativeIn(folder, path);
-    final open = previewTabs.value
-        .whereType<PreviewFile>()
-        .where((f) => relativeIn(folder, f.path) == file)
-        .firstOrNull;
-    _show(open ?? PreviewFile(path));
+  /// The side pane expanded over its whole chat pane (ADR 0094, 0123), as
+  /// its chat area has it; null with none, or no area showing it. What
+  /// works on the transcript (its find) waits while one covers it.
+  String? covered;
+
+  /// Shows [path] in its Files pane (ADR 0123), the one way a file opens:
+  /// the pane opens on the Chat tab if it's closed, on the tab of the same
+  /// file if it has one, however each is named ([relativeIn]), or a new one
+  /// last. Without [keep] (a click in the tree) and with [previewTabs] on
+  /// it's a provisional tab, which the next such open takes the place of.
+  void openInFiles(String path, {bool keep = true}) {
+    tab.value = ChatTab.chat;
+    files.open(path, folder: folder, keep: keep || !previewTabs.value);
+    // Opened by a file, it isn't kept for the next launch (its tabs
+    // aren't either), unless the pane's own button opens it later.
+    if (!filesChats.value.contains(id)) {
+      filesPassing.add(id);
+      filesChats.value = {...filesChats.value, id};
+    }
+    lastTabbed = TabKind.file;
+    filesOpened.value++;
     sawFile(path);
   }
 
-  /// Opens a new browser tab last, at [address] ('' for a new tab's page),
-  /// and shows it, on the Chat tab (the pane is beside the chat). Browser
-  /// tabs are never matched up: each open is its own.
-  BrowserTab openBrowserTab([String address = '']) {
-    final browser = BrowserTab(address);
-    tab.value = ChatTab.chat;
-    _restoreBrowsers();
-    _show(browser);
-    return browser;
-  }
-
-  /// Shows a server's address at [url] ('http://localhost:3000'): the
-  /// browser tab already at that origin, loaded again if it showed that it
-  /// couldn't load (the server wasn't up), else a new one (Servers menu,
-  /// ADR 0098), on the Chat tab.
-  void showServer(String url) {
-    // Uri.origin throws for any page but http(s) to a host (about:blank).
-    final server = Uri.tryParse(url);
-    final origin = isWebPage(server) ? server!.origin : null;
-    final open = previewTabs.value.whereType<BrowserTab>().where((b) {
-      final at = Uri.tryParse(b.address.value);
-      return isWebPage(at) && at!.origin == origin;
-    }).lastOrNull;
-    if (open == null) {
-      openBrowserTab(url);
-      return;
-    }
-    tab.value = ChatTab.chat;
-    _show(open);
-    open.view?.retry();
-  }
-
-  /// Shows a page its agent asked for ([ShowPage]): a server's address
-  /// as [showServer] does; a page within a site in the tab already at it
-  /// (loaded again if it didn't load), else a new one.
-  void showPage(String url) {
-    final at = Uri.tryParse(url);
-    if (at == null || (at.path.isEmpty || at.path == '/') && !at.hasQuery) {
-      showServer(url);
-      return;
-    }
-    final open = previewTabs.value
-        .whereType<BrowserTab>()
-        .where((b) => b.address.value == url)
-        .lastOrNull;
-    if (open == null) {
-      openBrowserTab(url);
-      return;
-    }
-    tab.value = ChatTab.chat;
-    _show(open);
-    open.view?.retry();
-  }
-
-  /// Whether a browser tab shows: the preview's, on the Chat tab.
-  bool get browserShown =>
-      preview.value is BrowserTab && shownTab == ChatTab.chat;
-
-  /// The browser tabs [hideBrowser] put away, and the one that showed:
-  /// back in the preview as the browser shows again.
-  ({List<BrowserTab> tabs, BrowserTab shown})? _hidden;
-
-  /// The globe: hides the browser while it shows, else shows it.
-  void showOrHideBrowser() => browserShown ? hideBrowser() : showBrowser();
-
-  /// Shows the browser tabs [hideBrowser] put away, the one that showed,
-  /// else the last browser tab opened, or a new one if it has none, on the
-  /// Chat tab.
-  void showBrowser() {
-    tab.value = ChatTab.chat;
-    if (preview.value is BrowserTab) return;
-    final last =
-        _restoreBrowsers() ??
-        previewTabs.value.whereType<BrowserTab>().lastOrNull;
-    if (last == null) {
-      openBrowserTab();
-    } else {
-      _show(last);
-    }
-  }
-
-  /// Puts the preview's browser tabs away, at their addresses, for
-  /// [showBrowser] to bring back. A file's tab left shows (the last), else
-  /// the preview closes.
-  void hideBrowser() {
-    if (preview.value case final BrowserTab shown) {
-      final tabs = previewTabs.value.whereType<BrowserTab>().toList();
-      final rest = [
-        for (final e in previewTabs.value)
-          if (e is! BrowserTab) e,
-      ];
-      _hidden = (tabs: tabs, shown: shown);
-      if (rest.isEmpty) {
-        preview.value = null;
-        return;
-      }
-      previewTabs.value = rest;
-      preview.value = rest.last;
-    }
-  }
-
-  /// Adds the tabs [hideBrowser] put away back after the preview's, and
-  /// gives the one that showed; null with none put away.
-  BrowserTab? _restoreBrowsers() {
-    final hidden = _hidden;
-    if (hidden == null) return null;
-    _hidden = null;
-    previewTabs.value = [...previewTabs.value, ...hidden.tabs];
-    return hidden.shown;
-  }
-
-  /// Shows [tab], one of the preview's tabs.
-  void showPreviewTab(PreviewEntry tab) => switch (tab) {
-    PreviewFile(:final path) => openPreview(path),
-    BrowserTab() => _show(tab),
+  /// Shows [entry], one of its file or browser tabs: a click on its tab,
+  /// which doesn't keep a provisional one (a double click does, ADR 0070).
+  void showTab(PreviewEntry entry) => switch (entry) {
+    PreviewFile(:final path) => openInFiles(path, keep: false),
+    final BrowserTab b => showBrowserTab(b),
   };
 
-  /// Shows [entry], adding its tab last if it has none.
-  void _show(PreviewEntry entry) {
+  /// Opens a new browser tab last, at [address] ('' for a new tab's page),
+  /// and shows it, on the Chat tab (the pane is beside the chat).
+  BrowserTab openBrowserTab([String address = '']) {
+    _browsing();
+    return browser.open(address);
+  }
+
+  /// Shows a server's address at [url] in a browser tab, on the Chat tab
+  /// ([BrowserTabs.showServer], ADR 0098).
+  void showServer(String url) {
+    _browsing();
+    browser.showServer(url);
+  }
+
+  /// Shows a page its agent asked for ([ShowPage]) in a browser tab, on
+  /// the Chat tab ([BrowserTabs.showPage]).
+  void showPage(String url) {
+    _browsing();
+    browser.showPage(url);
+  }
+
+  /// Shows [tab], one of its browser tabs.
+  void showBrowserTab(BrowserTab tab) {
+    _browsing();
+    browser.showTab(tab);
+  }
+
+  /// A browser tab is about to show: on the Chat tab, in the subagent
+  /// pane's place.
+  void _browsing() {
+    tab.value = ChatTab.chat;
     pane.value = null;
-    if (!previewTabs.value.contains(entry)) {
-      previewTabs.value = [...previewTabs.value, entry];
-    }
-    preview.value = entry;
+    lastTabbed = TabKind.browser;
   }
 
-  /// Closes [tab]. If it showed, the one after it shows, or the last; with
-  /// none left the preview closes.
-  void closePreview(PreviewEntry tab) {
-    final at = previewTabs.value.indexOf(tab);
-    if (at < 0) return;
-    final rest = [...previewTabs.value]..removeAt(at);
-    if (rest.isEmpty) {
-      preview.value = null;
-      return;
-    }
-    previewTabs.value = rest;
-    if (preview.value == tab) preview.value = rest[min(at, rest.length - 1)];
+  /// Whether a browser tab shows, on the Chat tab.
+  bool get browserShown =>
+      browser.shown.value != null && shownTab == ChatTab.chat;
+
+  /// The globe: hides the browser while it shows, else shows it, on the
+  /// Chat tab ([BrowserTabs.show]).
+  void showOrHideBrowser() {
+    if (browserShown) return browser.hide();
+    _browsing();
+    browser.show();
   }
 
-  /// When the user last opened each file (as [preview] names it), while
+  /// When the user last opened each file (as its tab names it), while
   /// the app runs: one opened in the last hour is among the chat's recent
   /// artifacts (`chatArtifacts`).
   final opened = ValueNotifier<Map<String, DateTime>>(const {});
@@ -946,36 +883,3 @@ bool _waits(Item it) =>
     (it.kind == ItemKind.ITEM_KIND_PERMISSION ||
         it.kind == ItemKind.ITEM_KIND_QUESTION) &&
     it.status == 'pending';
-
-/// [path] (relative to [folder], or absolute) as an absolute path.
-String absoluteIn(String folder, String path) =>
-    path.startsWith('/') ? path : '$folder/$path';
-
-/// [path] (relative to [folder], or absolute) as the daemon names a tool
-/// call's file (chats' `rel`): relative to [folder] when inside it, else
-/// absolute; lexically, links not followed. A show call's path is the
-/// agent's own, often absolute, and one file must have one name wherever
-/// the chat's artifacts are compared.
-String relativeIn(String folder, String path) {
-  if (!folder.startsWith('/')) return path;
-  final file = _cleaned(absoluteIn(folder, path));
-  final root = _cleaned(folder);
-  final inside = root == '/' ? '/' : '$root/';
-  return file.length > inside.length && file.startsWith(inside)
-      ? file.substring(inside.length)
-      : file;
-}
-
-/// An absolute [path] without its empty, `.` and `..` parts, as Go's
-/// `filepath.Clean` makes it.
-String _cleaned(String path) {
-  final parts = <String>[];
-  for (final p in path.split('/')) {
-    if (p == '..') {
-      if (parts.isNotEmpty) parts.removeLast();
-    } else if (p.isNotEmpty && p != '.') {
-      parts.add(p);
-    }
-  }
-  return '/${parts.join('/')}';
-}

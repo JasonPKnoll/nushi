@@ -70,15 +70,15 @@ void main() {
     final tab = c.openBrowserTab('https://example.com/');
     await tester.pumpAndSettle();
     await typeAddress(tester, 'file:///Users/me/nushi/docs/My%20plan.md');
-    expect(c.previewFile, '/Users/me/nushi/docs/My plan.md');
-    expect(c.previewTabs.value.first, tab);
+    expect(c.shownFile, '/Users/me/nushi/docs/My plan.md');
+    expect(c.browser.tabs.value.first, tab);
     expect(tab.address.value, 'https://example.com/');
     // The tab's page loaded only what it was opened at.
     expect(fakes.hosts.single.opened, [Uri.parse('https://example.com/')]);
-    c.showPreviewTab(tab);
+    c.showBrowserTab(tab);
     await tester.pumpAndSettle();
     await typeAddress(tester, '/Users/me/nushi/README.md');
-    expect(c.previewFile, '/Users/me/nushi/README.md');
+    expect(c.shownFile, '/Users/me/nushi/README.md');
     expect(fakes.opened, isEmpty);
     await closeView(tester, d);
   }, variant: macOnly);

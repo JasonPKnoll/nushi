@@ -178,6 +178,7 @@ final List<ShortcutActivator> _linuxTerminalPasses = [
   paletteKeyToo, // Ctrl+Shift+P
   sideChatKey, // Ctrl+Shift+B
   filesKey, // Ctrl+Shift+E
+  fileTreeKey, // Ctrl+Shift+Y
   settingsKey, // Ctrl+,
   toggleTerminalKey, // Ctrl+`
   chatTabKey, // Ctrl+Alt+1 (Ctrl+Shift+1 on Windows)

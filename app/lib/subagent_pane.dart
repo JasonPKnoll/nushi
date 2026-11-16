@@ -43,6 +43,7 @@ class SubagentPane extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             PaneHeader(
+              end: PaneHeader.buttonsEnd,
               child: Row(
                 children: [
                   Expanded(
@@ -51,11 +52,18 @@ class SubagentPane extends StatelessWidget {
                         : subagentName(context, s, size: 12),
                   ),
                   if (s != null && subagentStoppable(s))
-                    stopButton(context, daemon, chat, id),
+                    stopButton(
+                      context,
+                      daemon,
+                      chat,
+                      id,
+                      padding: IconTap.header,
+                    ),
                   IconTap(
                     Icons.close,
                     tooltip: 'Close',
                     size: 15,
+                    padding: IconTap.header,
                     onTap: onClose,
                   ),
                 ],

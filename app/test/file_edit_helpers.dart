@@ -2,6 +2,8 @@
 /// chat with files on its fake disk, and ways to type and press keys.
 library;
 
+import 'dart:async';
+
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +56,8 @@ const tabbed =
 String sumOf(List<int> b) => sha256.convert(b).toString();
 
 /// The Mac app on that chat ([more] chats beside it), [files] on its
-/// fake disk, [open] in the preview.
+/// fake disk, [open] in the preview; the tree lists [folder] at the
+/// chat's folder (empty without it).
 Future<(Daemon, FakeDaemon)> openEditor(
   WidgetTester tester,
   Map<String, List<int>?> files, {
@@ -62,6 +65,7 @@ Future<(Daemon, FakeDaemon)> openEditor(
   double width = 1700,
   Brightness brightness = Brightness.light,
   List<Chat> more = const [],
+  List<FolderEntry> folder = const [],
 }) async {
   viewport(tester, Size(width, 900), brightness: brightness);
   showDetails.value = false;
@@ -77,12 +81,25 @@ Future<(Daemon, FakeDaemon)> openEditor(
       ),
       _ => null,
     });
+  if (folder.isNotEmpty) {
+    fake.streams = (input) {
+      if (input is! WatchChatFolderRequest) return null;
+      final s = StreamController<WatchChatFolderResponse>();
+      addTearDown(s.close);
+      s.add(
+        WatchChatFolderResponse(
+          folders: [FolderListing(path: input.path, entries: folder)],
+        ),
+      );
+      return s.stream;
+    };
+  }
   fake.files.addAll(files);
   final d = await fake.connect(tester);
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
-  open.forEach(d.chats['c']!.openPreview);
+  open.forEach(d.chats['c']!.openInFiles);
   await tester.pumpAndSettle();
   return (d, fake);
 }

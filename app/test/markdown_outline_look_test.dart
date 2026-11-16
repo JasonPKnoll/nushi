@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/phone/preview_screen.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/rail.dart';
 import 'package:nushi/rail_menu.dart';
@@ -26,9 +26,10 @@ void main() {
     ('light', Brightness.light),
   ]) {
     testWidgets('golden: the rail and its menu, $name', (tester) async {
-      final d = await outlineApp(tester, width: 1200, brightness: brightness);
+      // Wide enough for the Files pane at 820, its viewer 560.
+      final d = await outlineApp(tester, brightness: brightness);
       await expectLater(
-        find.byType(PreviewPane),
+        find.byType(FileView),
         matchesGoldenFile('goldens/markdown_outline_$name.png'),
       );
       await closeView(tester, d);

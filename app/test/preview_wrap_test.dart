@@ -6,15 +6,19 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/app_actions.dart';
+import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/files_bar.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
+import 'package:nushi/panes.dart' show PaneHeader;
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/phone/preview_screen.dart';
 import 'package:nushi/preview.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/preview_path.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_view.dart';
@@ -97,15 +101,40 @@ Future<Daemon> _app(
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));
   await tester.pumpAndSettle();
-  d.chats['c']!.openPreview(file);
+  d.chats['c']!.openInFiles(file);
   await tester.pumpAndSettle();
   return d;
 }
 
 Finder _inPane(Finder f) =>
-    find.descendant(of: find.byType(PreviewPane), matching: f);
+    find.descendant(of: find.byType(FilesPane), matching: f);
 
-Finder get _wrapButton => _inPane(find.byIcon(Icons.wrap_text));
+/// Opens the Files pane's ⋯ and says whether Word wrap is checked.
+Future<bool> _wordWrap(WidgetTester tester) async {
+  if (find.text('Word wrap').evaluate().isEmpty) {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(FilesBar),
+        matching: find.byTooltip('More'),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+  final row = find.ancestor(
+    of: find.text('Word wrap'),
+    matching: find.byType(MenuItemButton),
+  );
+  return find
+      .descendant(of: row, matching: find.byIcon(Icons.check))
+      .evaluate()
+      .isNotEmpty;
+}
+
+/// The palette's wrapping row's title, as it reads now.
+String _palette(WidgetTester tester, Daemon d) => appActions(
+  tester.element(find.byType(FilesPane)),
+  d,
+).firstWhere((a) => a.act == Act.wrap).title;
 
 /// The View menu's items' labels, and picks the one called [pick].
 List<String> _viewMenu(WidgetTester tester, {String? pick}) {
@@ -159,23 +188,32 @@ Future<void> _altZ(WidgetTester tester) async {
 void main() {
   setUpAll(loadFonts);
 
-  testWidgets('the button, ⌥Z and View › Wrap Lines turn wrapping over, '
-      'in step, and it’s remembered', (tester) async {
+  testWidgets('⋯ › Word wrap, ⌥Z, View › Wrap Lines and the palette turn '
+      'wrapping over, in step, and it’s remembered', (tester) async {
     final d = await _app(tester);
     expect(wrapLines.value, isTrue, reason: 'on at first');
-    expect(find.byTooltip('Don’t wrap lines\u2002⌥Z'), findsOneWidget);
+    // No wrap button of its own on the Mac: the ⋯ has it.
+    expect(
+      find.byWidgetPredicate((w) => w is IconTap && w.icon == Icons.wrap_text),
+      findsNothing,
+    );
     expect(_viewMenu(tester), contains('Don’t Wrap Lines'));
+    expect(_palette(tester, d), 'Don’t wrap lines in Files');
     expect(_across(tester), isNull);
+    expect(await _wordWrap(tester), isTrue);
 
-    await tester.tap(_wrapButton);
+    await tester.tap(find.text('Word wrap'));
     await tester.pumpAndSettle();
     expect(wrapLines.value, isFalse);
     expect(readSaved()['wrap'], isFalse);
-    expect(find.byTooltip('Wrap lines\u2002⌥Z'), findsOneWidget);
     expect(_viewMenu(tester), contains('Wrap Lines'));
+    expect(_palette(tester, d), 'Wrap lines in Files');
     expect(_across(tester), isNotNull);
+    expect(await _wordWrap(tester), isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
 
-    // A click in the source gives the pane the focus, for ⌥Z.
+    // A click in the source gives the viewer the focus, for ⌥Z.
     await tester.tap(find.byType(SourceView));
     await tester.pumpAndSettle();
     await _altZ(tester);
@@ -187,38 +225,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(wrapLines.value, isFalse);
     expect(readSaved()['wrap'], isFalse);
-    expect(find.byTooltip('Wrap lines\u2002⌥Z'), findsOneWidget);
+    expect(await _wordWrap(tester), isFalse);
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('a rendered file has no wrap button until its Source shows, '
-      'and ⌥Z leaves its rendering alone', (tester) async {
-    final d = await _app(tester, file: 'docs/notes.md');
-    expect(_wrapButton, findsNothing);
-    await tester.tap(find.byType(PreviewBody));
-    await _altZ(tester);
-    expect(wrapLines.value, isTrue);
-    final source = tester.getRect(_inPane(find.byType(SourceButton)));
-    await tester.tap(_inPane(find.byType(SourceButton)));
-    await tester.pumpAndSettle();
-    expect(_wrapButton, findsOneWidget);
-    // In the title row: the source button didn't move from under the
-    // pointer.
-    expect(tester.getRect(_inPane(find.byType(SourceButton))), source);
-    expect(tester.getRect(_wrapButton).bottom, lessThan(source.top));
-    await closeView(tester, d);
-  }, variant: _mac);
-
-  testWidgets('a pane too narrow for its buttons has wrapping in its ⋯', (
+  testWidgets('⌥Z leaves a rendered file alone, and wraps its Source', (
     tester,
   ) async {
-    final d = await _app(tester);
-    paneWidths.value = {'preview': 300};
+    wrapLines.value = false;
+    final d = await _app(tester, file: 'docs/notes.md');
+    await tester.tap(find.byType(PreviewBody));
+    await _altZ(tester);
+    expect(wrapLines.value, isFalse);
+    await tester.tap(_inPane(find.byType(SourceButton)));
     await tester.pumpAndSettle();
-    expect(_wrapButton, findsNothing);
+    await tester.tap(find.byType(SourceView));
+    await tester.pumpAndSettle();
+    await _altZ(tester);
+    expect(wrapLines.value, isTrue);
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('⌥Z typed in the tree’s search field is a character, not '
+      'wrapping', (tester) async {
+    filesTree.value = true;
+    final d = await _app(tester);
+    await tester.tap(_inPane(find.byType(TextField)));
+    await tester.pumpAndSettle();
+    await _altZ(tester);
+    expect(wrapLines.value, isTrue);
+    await closeView(tester, d);
+  }, variant: _mac);
+
+  testWidgets('a pane too narrow for its buttons still has Word wrap in its '
+      '⋯', (tester) async {
+    // The pane squeezed in a window too narrow for it (ADR 0123), on its
+    // own here.
+    viewport(tester, const Size(900, 600));
+    final d = await _fake().connect(tester);
+    final c = d.chats['c']!..openInFiles('src/tea.go');
+    await tester.pumpWidget(
+      themed(
+        Center(
+          child: SizedBox(
+            width: 210,
+            height: 500,
+            child: FilesPane(chat: c, daemon: d, onClose: () {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(_inPane(find.byTooltip('More')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Don’t wrap lines'));
+    await tester.tap(find.text('Word wrap'));
     await tester.pumpAndSettle();
     expect(wrapLines.value, isFalse);
     expect(_across(tester), isNotNull);
@@ -400,12 +460,12 @@ void main() {
       }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
     }
 
-    testWidgets('the title row with the wrap button, $name', (tester) async {
-      viewport(tester, const Size(700, 200));
+    testWidgets("the Files pane's top rows, its bar's buttons at the end, "
+        '$name', (tester) async {
+      viewport(tester, const Size(900, 200));
       final d = await _fake().connect(tester);
-      final c = d.chats['c']!..openPreview('src/tea.go');
-      // The row on its own: the pane, cut to its title row (the path line
-      // under it has its own golden, markdown_outline_test.dart).
+      final c = d.chats['c']!..openInFiles('src/tea.go');
+      // The pane on its own, cut to its two rows.
       await tester.pumpWidget(
         MaterialApp(
           theme: NushiTheme(
@@ -417,18 +477,21 @@ void main() {
                 key: const ValueKey('row'),
                 child: ClipRect(
                   child: SizedBox(
-                    width: 560,
-                    height: 44,
+                    width: 820,
+                    height: PaneHeader.height + FilesBar.height,
                     child: OverflowBox(
                       alignment: Alignment.topCenter,
-                      maxHeight: 120,
-                      child: SizedBox(
-                        height: 120,
-                        child: PreviewPane(
-                          chat: c,
-                          daemon: d,
-                          path: 'src/tea.go',
-                          onClose: () {},
+                      maxHeight: 200,
+                      // On a pane's fill, as the chat's area backs it.
+                      child: ColoredBox(
+                        color:
+                            (brightness == Brightness.dark
+                                    ? Tokens.dark
+                                    : Tokens.light)
+                                .base,
+                        child: SizedBox(
+                          height: 200,
+                          child: FilesPane(chat: c, daemon: d, onClose: () {}),
                         ),
                       ),
                     ),
@@ -442,7 +505,7 @@ void main() {
       await tester.pumpAndSettle();
       await expectLater(
         find.byKey(const ValueKey('row')),
-        matchesGoldenFile('goldens/preview_title_row_$name.png'),
+        matchesGoldenFile('goldens/files_top_row_$name.png'),
       );
       await closeView(tester, d);
     }, variant: _mac);

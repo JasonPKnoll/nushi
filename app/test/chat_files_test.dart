@@ -10,6 +10,7 @@ import 'package:nushi/chat_files.dart';
 import 'package:nushi/clock.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/details_panel.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/open_file.dart';
@@ -17,7 +18,6 @@ import 'package:nushi/palette.dart';
 import 'package:nushi/phone/artifacts_screen.dart';
 import 'package:nushi/phone/platform.dart';
 import 'package:nushi/phone/preview_screen.dart';
-import 'package:nushi/preview_pane.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/tool_calls.dart';
 
@@ -139,7 +139,7 @@ Future<Daemon> _app(WidgetTester tester) async {
 
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
-Finder get _pane => find.byType(PreviewPane);
+Finder get _pane => find.byType(FilesPane);
 
 Finder _inPane(Finder f) => find.descendant(of: _pane, matching: f);
 
@@ -296,9 +296,11 @@ void main() {
     expect(row, findsOneWidget);
     final view = tester.getRect(panel);
     expect(view.contains(tester.getCenter(row)), isTrue); // in view
+    final keys = FocusManager.instance.primaryFocus;
     await tester.tap(row);
     await tester.pumpAndSettle();
-    expect(d.chats['c']!.previewFile, 'notes/sub.md');
+    expect(d.chats['c']!.shownFile, 'notes/sub.md');
+    expect(FocusManager.instance.primaryFocus, same(keys));
     d.dispose();
   }, variant: _mac);
 
@@ -319,7 +321,7 @@ void main() {
       find.descendant(of: find.byType(Palette), matching: find.text('sub.md')),
     );
     await tester.pumpAndSettle();
-    expect(d.chats['c']!.previewFile, 'notes/sub.md');
+    expect(d.chats['c']!.shownFile, 'notes/sub.md');
     expect(showDetails.value, isFalse);
     d.dispose();
   }, variant: _mac);
@@ -328,6 +330,7 @@ void main() {
     tester,
   ) async {
     final d = await _app(tester);
+    final keys = FocusManager.instance.primaryFocus;
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyP);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
@@ -369,6 +372,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(box, findsNothing);
     expect(_inPane(find.text('plan.md')), findsOneWidget);
+    // The keys are back where they were: Files, opening, took none.
+    expect(FocusManager.instance.primaryFocus, same(keys));
     // Code isn't an artifact, but ⌘P opens it.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyP);
@@ -393,7 +398,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(_inPane(find.text('deploy')), findsOneWidget);
-    expect(d.chats['c']!.previewFile, 'scripts/deploy');
+    expect(d.chats['c']!.shownFile, 'scripts/deploy');
     d.dispose();
   }, variant: _mac);
 
