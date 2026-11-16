@@ -109,14 +109,16 @@ void main() {
   });
 
   test('only a file inside the chat’s folder opens', () {
-    final real = Directory.systemTemp
+    // The folder and a link to it, both in a temp folder of the test's
+    // own: nothing with a name another run could have made.
+    final temp = Directory.systemTemp
         .createTempSync('nf')
         .resolveSymbolicLinksSync();
-    addTearDown(() => Directory(real).deleteSync(recursive: true));
-    Directory('$real/sub').createSync();
-    final link = '${Directory.systemTemp.path}/nf-link-$pid';
+    addTearDown(() => Directory(temp).deleteSync(recursive: true));
+    final real = '$temp/real';
+    Directory('$real/sub').createSync(recursive: true);
+    final link = '$temp/link';
     Link(link).createSync(real);
-    addTearDown(() => Link(link).deleteSync());
     expect(findingPath(link, 'calc/./calc.go'), 'calc/calc.go');
     expect(findingPath(link, 'calc/../go.mod'), 'go.mod');
     expect(findingPath(link, '$link/calc/calc.go'), 'calc/calc.go');
