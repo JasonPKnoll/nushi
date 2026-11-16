@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -103,8 +102,9 @@ func TestBranchNamedAfterTheChat(t *testing.T) {
 	// Mid-turn the title comes, and the branch waits for the turn's end.
 	id3, wt3 := start()
 	a.send(id3, "title: Slow work\nwait")
+	// The branch is named, or not, as the title is kept, under the chat's
+	// lock: with the title shown, it has had its chance.
 	until("the agent's title", func() bool { return a.get(id3).Chat.Title == "Slow work" })
-	time.Sleep(50 * time.Millisecond)
 	if r := a.get(id3); !r.Status.Busy || r.Chat.Worktree.Branch != wt3.Branch || head(wt3.Path) != wt3.Branch {
 		t.Fatalf("mid-turn: %v, the worktree on %q", r, head(wt3.Path))
 	}
