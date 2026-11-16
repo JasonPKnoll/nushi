@@ -117,9 +117,18 @@ jobs:
           path: ~/Library/Caches/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-${{ steps.week.outputs.week }}
           restore-keys: golangci-lint-${{ runner.os }}-${{ hashFiles('tools/lint/go.sum', '.golangci.yml') }}-
-      # The lint and the tests side by side (the tests wait on processes and timers much of their time), each one's
-      # output whole when it ends; -k runs the rest after a failure, to see them all. Then the window's placement maths.
-      - run: make -k -j2 --output-sync=target lint-go test-go test-window
+      # The lint beside the tests (they wait on processes and timers much of their time), its output after theirs
+      # (macOS's make 3.81 can't keep two jobs' output apart); then the window's placement maths. Each runs whatever
+      # the others did, to see every failure.
+      - run: |
+          make lint-go > "$RUNNER_TEMP/lint-go.log" 2>&1 &
+          lint=$!
+          make test-go && tests=0 || tests=$?
+          wait "$lint" && lint=0 || lint=$?
+          echo "make lint-go, beside the tests (exit $lint):"
+          cat "$RUNNER_TEMP/lint-go.log"
+          make test-window && window=0 || window=$?
+          [ "$tests$lint$window" = 000 ]
       - if: ${{ !cancelled() && github.event_name == 'push' && steps.lint-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
