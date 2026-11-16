@@ -1,145 +1,164 @@
-// The hero's background: the mark as an orrery. Its amber sun sits at the centre, its broken rings (four arcs
-// each, as in docs/brand/mark.svg) lie in a plane seen from a little above, and on them the agents Nushi runs
-// orbit as planets, each named. The cursor tilts the view at once; a planet's name brightens as the cursor nears
-// it (names show only then). What's near the camera is a little out of focus; behind, a few stars at every depth shift with the view.
-// Plain canvas, no library. One still frame under Reduce Motion; paused off screen.
+// The hero's orrery: the mark (docs/brand/mark.svg) in 3D. Its amber sun at the centre, its broken rings (four
+// arcs each) lying in a plane, and on them the agents Nushi runs as planets, lit from the sun's side and named
+// when the cursor comes near. It's drawn on three stacked canvases, far, in focus and near, the far one a little
+// blurred and the near one more (CSS filters), so it has a depth of field. The cursor tilts the view at once;
+// scrolling turns the camera to look down on the plane, until it's the mark seen flat, and moves stars at
+// every depth at their own speed. Plain canvas, no library. One still frame under Reduce Motion; paused off screen.
 (() => {
-  const canvas = document.querySelector('.field');
-  if (!canvas || !canvas.getContext) return;
-  const ctx = canvas.getContext('2d');
+  const box = document.querySelector('.field');
+  if (!box) return;
+  const layer = (name) => {
+    const c = document.createElement('canvas');
+    c.className = name;
+    box.append(c);
+    return c.getContext('2d');
+  };
+  const far = layer('far'), mid = layer('mid'), near = layer('near');
+  if (!mid) return;
+  const all = [far, mid, near];
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const MIST = '238,241,245';
   const AMBER = '245,165,36';
 
-  // Rings by radius (the outer is 1); planets by ring, a start angle and a size.
+  // Rings by radius (the outer is 1); planets by ring: name, start angle, size.
   const rings = [
-    { r: 0.42, planets: [['Claude', 0.4, 5], ['Pi', 3.6, 4]] },
-    { r: 0.7, planets: [['Codex', 1.2, 5.5], ['OpenCode', 3.3, 4.5], ['PiG', 5.2, 4]] },
-    { r: 1.0, planets: [['Ante', 2.2, 5.5], ['oh-my-pi', 5.6, 4.5]] },
+    { r: 0.42, planets: [['Claude', 0.4, 7], ['Pi', 3.6, 5]] },
+    { r: 0.7, planets: [['Codex', 1.2, 7.5], ['OpenCode', 3.3, 6], ['PiG', 5.2, 5]] },
+    { r: 1.0, planets: [['Ante', 2.2, 7], ['oh-my-pi', 5.6, 6]] },
   ];
-  rings.forEach((g) => { g.speed = 0.03 / g.r ** 1.5; g.turn = Math.random() * 6.28; });
+  rings.forEach((g) => { g.speed = 0.035 / g.r ** 1.5; g.turn = Math.random() * 6.28; });
 
   const rnd = (a, b) => a + Math.random() * (b - a);
-  const stars = Array.from({ length: innerWidth < 700 ? 30 : 60 }, () => ({
-    x: rnd(-1, 1), y: rnd(-1, 1), z: rnd(0.2, 1), // z: 1 far, small and still; 0.2 near, soft and quick
+  const stars = Array.from({ length: innerWidth < 700 ? 40 : 90 }, () => ({
+    x: rnd(-0.1, 1.1), y: rnd(-0.1, 1.1), z: rnd(0, 1), // z: 0 near (big, soft, quick), 1 far (tiny, slow)
   }));
 
-  let w = 0, h = 0, S = 1, cx = 0, cy = 0;
+  let w = 0, h = 0, S = 1, cx = 0, cy0 = 0;
   function size() {
     const dpr = Math.min(devicePixelRatio || 1, 2);
-    const box = canvas.getBoundingClientRect();
-    w = box.width; h = box.height;
-    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    S = Math.min(w * 0.47, 720);
-    cx = w / 2;
-    // The sun rises from behind the top edge of the app's screenshot.
-    const shot = document.querySelector('.hero-shot');
-    cy = shot ? shot.getBoundingClientRect().top - box.top + 8 : h * 0.4;
+    const r = box.getBoundingClientRect();
+    w = r.width; h = r.height;
+    for (const c of all) {
+      c.canvas.width = Math.round(w * dpr); c.canvas.height = Math.round(h * dpr);
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    const text = document.querySelector('.hero-text')?.getBoundingClientRect();
+    if (w > 820 && text) {
+      const left = Math.max(16, (w - 1180) / 2);
+      S = Math.min(w * 0.22, 330);
+      cx = Math.min(left + 1180 * 0.79, w - S * 0.8);
+      cy0 = text.top - r.top + text.height * 0.5;
+    } else {
+      S = Math.min(w * 0.4, 170);
+      cx = w / 2;
+      cy0 = 150;
+    }
   }
 
   const mouse = { x: 0, y: 0, in: false };
   addEventListener('pointermove', (e) => {
-    const box = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - box.left; mouse.y = e.clientY - box.top;
+    const r = box.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
     mouse.in = mouse.y > 0 && mouse.y < h;
   }, { passive: true });
   document.addEventListener('pointerleave', () => { mouse.in = false; });
 
-  let t = 0, yaw = 0, tilt = 0.3;
-  // A point on the ring plane at radius r and angle a, to the screen: x, y, depth (-1 near … 1 far), scale.
+  let t = 0, yaw = 0, tilt = 0.4, scrolled = 0, cy = 0;
+  // A point on the ring plane at radius r and angle a: screen x, y, depth z (-1 near … 1 far), scale p.
   function place(r, a) {
     const x0 = r * Math.cos(a + yaw), z0 = r * Math.sin(a + yaw);
     const y = -z0 * Math.sin(tilt), z = z0 * Math.cos(tilt);
-    const p = 3 / (3 + z);
+    const p = 2.4 / (2.4 + z);
     return { x: cx + x0 * S * p, y: cy + y * S * p, z, p };
   }
+  const layerOf = (z) => (z > 0.3 ? far : z < -0.4 ? near : mid);
 
   function step(dt) {
     t += dt;
+    const rect = box.getBoundingClientRect();
+    scrolled = Math.max(0, -rect.top);
+    const k = Math.min(1, scrolled / (innerHeight * 0.9)); // 0 at the top, 1 a screen down
     const tx = mouse.in ? mouse.x / w - 0.5 : 0;
-    const ty = mouse.in ? mouse.y / h - 0.5 : 0;
-    const ease = 1 - Math.exp(-dt * 10);
-    yaw += (tx * 0.3 - yaw) * ease;
-    tilt += (0.3 + ty * 0.2 - tilt) * ease;
+    const ty = mouse.in ? mouse.y / innerHeight - 0.5 : 0;
+    const ease = 1 - Math.exp(-dt * 12);
+    yaw += (tx * 0.35 + k * 0.5 - yaw) * ease;
+    tilt += (0.42 + k * 0.95 + ty * 0.2 - tilt) * ease; // scrolling turns the camera to look straight down
+    cy = cy0 + scrolled * 0.45;                         // and the orrery falls behind the page, slower
     for (const g of rings) g.turn += g.speed * dt;
   }
 
-  function soft(x, y, r, blur, rgb, alpha) {
-    if (blur < 0.5) {
-      ctx.fillStyle = `rgba(${rgb},${alpha})`;
-      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
-      return;
-    }
-    const R = r + blur;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, R);
-    const a = alpha * Math.min(1, (r * 1.8) / R + 0.15);
-    g.addColorStop(0, `rgba(${rgb},${a})`);
-    g.addColorStop(0.6, `rgba(${rgb},${a * 0.7})`);
-    g.addColorStop(1, `rgba(${rgb},0)`);
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(x, y, R, 0, 6.2832); ctx.fill();
-  }
-
-  // A ring's four arcs, as in the mark, turning with its planets; only the half on one side of the sun.
-  function ring(g, far) {
-    ctx.lineCap = 'round';
+  function ring(g) {
     for (let k = 0; k < 4; k++) {
       const from = g.turn * 0.5 + k * (Math.PI / 2) + 0.16, span = Math.PI / 2 - 0.32;
-      let prev = null;
-      for (let i = 0; i <= 28; i++) {
-        const q = place(g.r, from + (span * i) / 28);
-        if (prev && (q.z > 0) === far) {
-          ctx.strokeStyle = `rgba(${MIST},${0.05 + 0.08 * (1 - q.z) / 2})`;
-          ctx.lineWidth = 1.3 * q.p;
-          ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(q.x, q.y); ctx.stroke();
-        }
+      let prev = place(g.r, from);
+      for (let i = 1; i <= 30; i++) {
+        const q = place(g.r, from + (span * i) / 30);
+        const c = layerOf((q.z + prev.z) / 2);
+        c.strokeStyle = `rgba(${MIST},${0.07 + 0.12 * (1 - q.z) / 2})`;
+        c.lineWidth = 1.8 * q.p;
+        c.lineCap = 'round';
+        c.beginPath(); c.moveTo(prev.x, prev.y); c.lineTo(q.x, q.y); c.stroke();
         prev = q;
       }
     }
   }
 
-  function planets(far) {
-    ctx.font = '500 13px Inter, ui-sans-serif, system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
-    for (const g of rings) {
-      for (const [name, at, size] of g.planets) {
-        const q = place(g.r, at + g.turn);
-        if ((q.z > 0) !== far) continue;
-        const r = size * q.p;
-        const blur = Math.max(0, -q.z) * 5; // the near side of the plane is a little out of focus
-        soft(q.x, q.y, r, blur, MIST, 0.3 + 0.25 * (1 - q.z) / 2);
-        const d = mouse.in ? Math.hypot(q.x - mouse.x, q.y - mouse.y) : 1e9;
-        const lit = Math.max(0, 1 - d / 220);
-        ctx.fillStyle = `rgba(${MIST},${(0.55 * lit) * (0.6 + 0.4 * (1 - q.z) / 2)})`;
-        ctx.fillText(name, q.x + r + 8, q.y);
-      }
-    }
+  // A planet as a small sphere lit from the sun: its bright side faces the centre.
+  function planet(c, q, r) {
+    const dx = cx - q.x, dy = cy - q.y, d = Math.hypot(dx, dy) || 1;
+    const hx = q.x + (dx / d) * r * 0.5, hy = q.y + (dy / d) * r * 0.5;
+    const g = c.createRadialGradient(hx, hy, r * 0.1, q.x, q.y, r);
+    g.addColorStop(0, `rgba(${MIST},0.85)`);
+    g.addColorStop(0.7, 'rgba(120,145,158,0.55)');
+    g.addColorStop(1, 'rgba(47,74,87,0.35)');
+    c.fillStyle = g;
+    c.beginPath(); c.arc(q.x, q.y, r, 0, 6.2832); c.fill();
   }
 
   function sun() {
-    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, S * 0.3);
-    glow.addColorStop(0, `rgba(${AMBER},0.3)`);
-    glow.addColorStop(0.25, `rgba(${AMBER},0.06)`);
+    const R = S * 0.5;
+    const glow = mid.createRadialGradient(cx, cy, 0, cx, cy, R);
+    glow.addColorStop(0, `rgba(${AMBER},0.38)`);
+    glow.addColorStop(0.18, `rgba(${AMBER},0.14)`);
     glow.addColorStop(1, `rgba(${AMBER},0)`);
-    ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(cx, cy, S * 0.3, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = `rgba(${AMBER},0.75)`;
-    ctx.beginPath(); ctx.arc(cx, cy, Math.max(7, S * 0.018), 0, 6.2832); ctx.fill();
+    mid.fillStyle = glow;
+    mid.beginPath(); mid.arc(cx, cy, R, 0, 6.2832); mid.fill();
+    mid.fillStyle = `rgba(${AMBER},0.9)`;
+    mid.beginPath(); mid.arc(cx, cy, Math.max(6, S * 0.045), 0, 6.2832); mid.fill();
   }
 
   function draw() {
-    ctx.clearRect(0, 0, w, h);
+    for (const c of all) c.clearRect(0, 0, w, h);
     for (const s of stars) {
-      const x = cx + (s.x - yaw * (1 - s.z) * 0.6) * w * 0.6;
-      const y = cy * 0.9 + (s.y - (tilt - 0.3) * (1 - s.z) * 0.8) * h * 0.55;
-      soft(x, y, 1.1 + (1 - s.z) * 1.4, (1 - s.z) * 5, MIST, 0.06 + 0.16 * s.z);
+      const c = s.z > 0.55 ? far : s.z < 0.2 ? near : mid;
+      const x = s.x * w - yaw * (1 - s.z) * 120;
+      const y = s.y * h * 0.8 - scrolled * (1 - s.z) * 0.5 - (tilt - 0.42) * (1 - s.z) * 60;
+      c.fillStyle = `rgba(${MIST},${0.08 + 0.22 * s.z})`;
+      c.beginPath(); c.arc(x, y, 0.7 + (1 - s.z) * 2.2, 0, 6.2832); c.fill();
     }
-    for (const g of rings) ring(g, true);
-    planets(true);
-    sun();
-    for (const g of rings) ring(g, false);
-    planets(false);
+    for (const g of rings) ring(g);
+    // Planets far to near; the sun among them by depth, so it hides what passes behind it.
+    const bodies = [];
+    for (const g of rings) for (const [name, at, size] of g.planets) {
+      const q = place(g.r, at + g.turn);
+      bodies.push({ q, name, r: size * q.p * (S / 330) ** 0.5 });
+    }
+    bodies.sort((a, b) => b.q.z - a.q.z);
+    let sunDrawn = false;
+    for (const b of bodies) {
+      if (!sunDrawn && b.q.z <= 0) { sun(); sunDrawn = true; }
+      planet(layerOf(b.q.z), b.q, b.r);
+    }
+    if (!sunDrawn) sun();
+    mid.font = '500 13px Inter, ui-sans-serif, system-ui, sans-serif';
+    mid.textBaseline = 'middle';
+    for (const b of bodies) {
+      const d = mouse.in ? Math.hypot(b.q.x - mouse.x, b.q.y - mouse.y) : 1e9;
+      const lit = Math.max(0, 1 - d / 160);
+      if (lit <= 0) continue;
+      mid.fillStyle = `rgba(${MIST},${0.75 * lit})`;
+      mid.fillText(b.name, b.q.x + b.r + 8, b.q.y);
+    }
   }
 
   let running = false, visible = true, last = 0;
@@ -155,10 +174,10 @@
     if (!want) running = false;
   }
 
-  size(); draw();
-  addEventListener('resize', () => { size(); draw(); });
-  document.fonts?.ready.then(draw);
-  new IntersectionObserver(([e]) => { visible = e.isIntersecting; go(); }).observe(canvas);
+  size(); step(1); draw();
+  addEventListener('resize', () => { size(); step(1); draw(); });
+  document.fonts?.ready.then(() => { size(); draw(); });
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; go(); }).observe(box);
   document.addEventListener('visibilitychange', go);
   go();
 })();
