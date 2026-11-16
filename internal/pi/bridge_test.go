@@ -42,6 +42,9 @@ type client struct {
 	mu      sync.Mutex
 	updates []acp.SessionNotification
 	forms   []acp.CreateElicitationRequest
+	// asking, when set, gets a channel for each question, which is
+	// answered once the test closes it.
+	asking chan chan struct{}
 }
 
 func (c *client) SessionUpdate(_ context.Context, n *acp.SessionNotification) error {
@@ -58,7 +61,13 @@ func (c *client) RequestPermission(context.Context, *acp.RequestPermissionReques
 func (c *client) CreateElicitation(_ context.Context, r *acp.CreateElicitationRequest) (*acp.CreateElicitationResponse, error) {
 	c.mu.Lock()
 	c.forms = append(c.forms, *r)
+	asking := c.asking
 	c.mu.Unlock()
+	if asking != nil {
+		held := make(chan struct{})
+		asking <- held
+		<-held
+	}
 	blue := "Blue"
 	return &acp.CreateElicitationResponse{Accept: &acp.ElicitationAcceptAction{Content: map[string]acp.ElicitationContentValue{"answer": {String: &blue}}}}, nil
 }

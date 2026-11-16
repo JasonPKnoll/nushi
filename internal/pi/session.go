@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	acp "github.com/afrase/acp-go/unstable"
@@ -44,6 +45,12 @@ type session struct {
 	// client's messages (acp.SequenceFromContext): a prompt from before
 	// it that begins its turn after it is cancelled already.
 	cancelSeq uint64
+	// unsent counts the Stops whose abort hasn't gone to pi yet, and
+	// allSent is closed once none is left: no turn begins before, as pi
+	// would take an abort written after the next prompt as that prompt's
+	// Stop.
+	unsent  int
+	allSent chan struct{}
 }
 
 // turn is a running turn: Nushi's prompt (result, which nobody reads for
@@ -389,8 +396,11 @@ func (s *session) prompt(ctx context.Context, text string, images []image) (*acp
 func (s *session) nextTurn(ctx context.Context) (*turn, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for s.turn != nil {
+	for s.turn != nil || s.unsent > 0 {
 		idle := s.idle
+		if s.turn == nil {
+			idle = s.allSent
+		}
 		s.mu.Unlock()
 		select {
 		case <-idle:
@@ -413,7 +423,11 @@ func (s *session) nextTurn(ctx context.Context) (*turn, error) {
 	return t, nil
 }
 
-// cancel stops the running turn; pi answers once it settled. A turn
+// cancel stops the running turn, unless a Stop already did; pi answers
+// once it settled. With no turn it sends pi nothing: a prompt from before
+// it is cancelled as its turn begins (nextTurn), and an abort with nothing
+// to stop could reach pi after the next prompt and stop that; for the same
+// reason no turn begins until a Stop's abort has gone (unsent). A turn
 // with no run seen (an extension's command, which may wait on itself) is
 // answered at once, but holds the session until pi answers the abort,
 // which it does once a run it had started settled (docs/facts/pig.md):
@@ -432,14 +446,20 @@ func (s *session) cancel(seq uint64) {
 	s.mu.Lock()
 	s.cancelSeq = max(s.cancelSeq, seq)
 	t := s.turn
-	early := t != nil && !t.ran
-	var sent, taken chan struct{}
-	if t != nil {
-		t.cancelled, sent, taken = true, t.sent, t.taken
+	if t == nil || t.cancelled { // nothing to stop, or stopped already
+		s.mu.Unlock()
+		return
 	}
+	early := !t.ran
+	t.cancelled = true
+	sent, taken := t.sent, t.taken
 	if early {
 		s.answerLocked(t, &acp.PromptResponse{StopReason: "cancelled"}, nil)
 	}
+	if s.unsent == 0 {
+		s.allSent = make(chan struct{})
+	}
+	s.unsent++
 	s.mu.Unlock()
 	go func() {
 		if sent != nil {
@@ -455,7 +475,10 @@ func (s *session) cancel(seq uint64) {
 			}
 			timer.Stop()
 		}
-		after, _ := s.p.callAfter(context.Background(), map[string]any{"type": "abort"}, nil) // a dead pi has no run to abort
+		if hold := beforeAbort.Load(); hold != nil {
+			(*hold)()
+		}
+		after, _ := s.p.callWritten(context.Background(), map[string]any{"type": "abort"}, nil, s.abortSent) // a dead pi has no run to abort
 		if !early {
 			return
 		}
@@ -467,6 +490,20 @@ func (s *session) cancel(seq uint64) {
 		s.endLocked(t, nil, nil)
 	}()
 }
+
+// abortSent counts a Stop's abort as gone to pi (or failed to).
+func (s *session) abortSent() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.unsent--
+	if s.unsent == 0 {
+		close(s.allSent)
+	}
+}
+
+// beforeAbort, when set, is called as a Stop's abort is about to go to
+// pi: a test holds it there.
+var beforeAbort atomic.Pointer[func()]
 
 // steer hands text to the running turn, which takes it after the tools
 // running now; false when no turn runs (a stopped one that waits for pi's
