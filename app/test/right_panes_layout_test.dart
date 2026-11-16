@@ -521,16 +521,20 @@ void main() {
     for (final (i, least) in [240.0, 200.0, 300.0].indexed) {
       expect(panes[i].width, closeTo(least * 732 / 740, 0.01));
     }
-    // Inside Files, its viewer and its tree narrowed alike too (ADR 0123).
+    // Inside Files, under its viewer's least, the tree has given all its
+    // width to the viewer, sliding under its edge (ADR 0123).
     final files = panes[1].width;
     expect(
-      _rect(tester, find.byType(FilesTree)).width,
-      closeTo(files * 200 / 500, 0.01),
+      _rect(
+        tester,
+        find.ancestor(
+          of: find.byType(FilesTree),
+          matching: find.byKey(const ValueKey('tree')),
+        ),
+      ).width,
+      0,
     );
-    expect(
-      _rect(tester, find.byType(FileView)).width,
-      closeTo(files * 300 / 500, 0.01),
-    );
+    expect(_rect(tester, find.byType(FileView)).width, closeTo(files, 0.01));
     // Wider, they're back at their least or more.
     viewport(tester, Size(windowFor(1500, sidebar: true), 900));
     await tester.pumpAndSettle();

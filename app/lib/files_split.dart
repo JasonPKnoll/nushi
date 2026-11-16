@@ -17,11 +17,14 @@ const double filesViewerLeast = 300;
 
 /// The tree's width in a Files pane [w] wide, [saved] the width it was
 /// dragged to: the viewer gives first, down to [filesViewerLeast]; then
-/// the tree, down to [filesTreeLeast]. Under both (the pane squeezed in a
-/// narrow window) the two narrow alike, so no edge jumps.
+/// the tree, down to [filesTreeLeast]. Under both (the pane squeezed over
+/// the transcript in a narrow window) the tree gives on, to nothing: the
+/// viewer keeps its least, then has the whole pane, so a file in it reads.
+/// Point by point, so no edge jumps; the same with a file open or none, so
+/// opening one never moves the tree.
 double treeWidth(double w, double saved) {
   const least = filesTreeLeast + filesViewerLeast;
-  if (w < least) return w * filesTreeLeast / least;
+  if (w < least) return max(0, w - filesViewerLeast);
   return saved.clamp(filesTreeLeast, treeMost(w));
 }
 

@@ -30,8 +30,9 @@ export 'package:nushi/files_open.dart';
 /// open files ([FileView]), blank with none ([FilesBlank]), and the tree of
 /// the chat's folder at the pane's right ([FilesTree]), its edge dragged.
 /// Opening a file never moves the tree. The viewer gives its width first
-/// as the pane narrows, then the tree ([treeWidth]). With a daemon older
-/// than the tree (`filesApi`) the viewer is alone.
+/// as the pane narrows, then the tree ([treeWidth]); squeezed narrower
+/// still, the tree gives on, the viewer keeping its least. With a daemon
+/// older than the tree (`filesApi`) the viewer is alone.
 class FilesPane extends StatefulWidget {
   const new({
     required this.chat,
@@ -147,9 +148,12 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
       LayoutBuilder(
         builder: (context, box) {
           final w = box.maxWidth;
-          // Under the least of both, the two narrow alike (treeWidth).
+          // Under the least of both the tree gives on, the viewer keeping
+          // its least (treeWidth).
           final squeezed = w < filesTreeLeast + filesViewerLeast;
           final most = squeezed ? treeWidth(w, filesTreeInitial) : treeMost(w);
+          // Squeezed out, the blank names the way that's left.
+          final named = tree && most > 0;
           final least = squeezed ? most : filesTreeLeast;
           return ValueListenableBuilder(
             valueListenable: filesTreeSide,
@@ -163,7 +167,7 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
                 key: const ValueKey('viewer'),
                 child: FocusTraversalGroup(
                   child: shown == null
-                      ? FilesBlank(tree: tree)
+                      ? FilesBlank(tree: named)
                       : FileView(key: ObjectKey(shown), shown: shown),
                 ),
               );
@@ -236,7 +240,8 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
 
 /// The viewer with no file open, as Claude desktop's: a folder, "Open
 /// files appear here" and how to open one; without the [tree] (a daemon
-/// older than it), the way that's there, Go to file's key.
+/// older than it, or one squeezed out), the way that's there, Go to file's
+/// key.
 class FilesBlank extends StatelessWidget {
   const new({required this.tree, super.key});
 

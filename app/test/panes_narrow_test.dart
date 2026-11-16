@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/browser_pane.dart';
+import 'package:nushi/file_view.dart';
 import 'package:nushi/files_pane.dart';
+import 'package:nushi/files_tree.dart';
+import 'package:nushi/settings.dart' show filesTree;
 import 'package:nushi/side_chat.dart';
 import 'package:nushi/subagent_pane.dart';
 
@@ -45,14 +48,41 @@ String _where(Element e) {
       chain;
 }
 
-PanesOpen _with({bool subagent = false, bool browser = false}) => (
+PanesOpen _with({
+  bool subagent = false,
+  bool browser = false,
+  int previews = 1,
+}) => (
   side: true,
   files: true,
   subagent: subagent,
   command: false,
-  previews: 1,
+  previews: previews,
   browser: browser ? 1 : 0,
 );
+
+/// Overflows reported only as [_overflows] finds them: a row reports its
+/// overflow once, in whichever frame it first has one (a pane sliding in,
+/// too), so the settled rows are what's checked, each window afresh. The
+/// handler that was, to put back.
+void Function(FlutterErrorDetails)? _settledRowsOnly() {
+  final was = FlutterError.onError;
+  FlutterError.onError = (d) {
+    if (!d.toString().contains('overflowed')) was?.call(d);
+  };
+  addTearDown(() => FlutterError.onError = was);
+  return was;
+}
+
+/// The width the Files pane gives its tree (its edge's box).
+double _treeRoom(WidgetTester tester) => tester
+    .getSize(
+      find.ancestor(
+        of: find.byType(FilesTree),
+        matching: find.byKey(const ValueKey('tree')),
+      ),
+    )
+    .width;
 
 void main() {
   for (final (name, open) in [
@@ -64,14 +94,7 @@ void main() {
           'nothing overflows from 600 to 900', (tester) async {
         browserFakes();
         final found = <String>[];
-        // A row reports its overflow once, in whichever frame it first
-        // has one (a pane sliding in, too): the settled rows are what's
-        // checked, each window afresh.
-        final was = FlutterError.onError;
-        FlutterError.onError = (d) {
-          if (!d.toString().contains('overflowed')) was?.call(d);
-        };
-        addTearDown(() => FlutterError.onError = was);
+        final was = _settledRowsOnly();
         for (var w = 900.0; w >= 600; w -= 10) {
           final (d, _) = await panesApp(
             tester,
@@ -87,4 +110,57 @@ void main() {
       }, variant: _mac);
     }
   }
+
+  for (final sidebar in [true, false]) {
+    testWidgets('side chat, Files and the browser in a 720 window, sidebar '
+        "${sidebar ? 'shown' : 'hidden'}: Files' viewer has all of it, the "
+        'tree slid away, its choice kept', (tester) async {
+      browserFakes();
+      _settledRowsOnly();
+      final (d, _) = await panesApp(
+        tester,
+        width: 720,
+        sidebar: sidebar,
+        open: _with(browser: true),
+      );
+      final files = tester.getSize(find.byType(FilesPane)).width;
+      // Narrowed alike, its viewer had 83 here and its tree 57, the file's
+      // name breaking a letter or two a line.
+      expect(files, lessThan(300));
+      expect(tester.getSize(find.byType(FileView)).width, closeTo(files, 0.01));
+      expect(_treeRoom(tester), 0);
+      expect(filesTree.value, isTrue);
+      expect(_overflows(tester), isEmpty);
+      await closeView(tester, d);
+    }, variant: _mac);
+  }
+
+  testWidgets("squeezed between the viewer's least and both's, the tree "
+      'gives on; with no file the blank names ⌘P once it has gone', (
+    tester,
+  ) async {
+    browserFakes();
+    _settledRowsOnly();
+    // A chat of 969, 980 past the title buttons: the three need 1100,
+    // and Files narrows to 400.
+    final (d, _) = await panesApp(
+      tester,
+      width: 1185,
+      open: _with(browser: true),
+    );
+    expect(tester.getSize(find.byType(FilesPane)).width, closeTo(400, 0.01));
+    expect(tester.getSize(find.byType(FileView)).width, closeTo(300, 0.01));
+    expect(_treeRoom(tester), closeTo(100, 0.01));
+    await closeView(tester, d);
+
+    final (e, _) = await panesApp(
+      tester,
+      width: 720,
+      open: _with(browser: true, previews: 0),
+    );
+    expect(_treeRoom(tester), 0);
+    expect(find.textContaining('Go to a file with ⌘P'), findsOneWidget);
+    expect(_overflows(tester), isEmpty);
+    await closeView(tester, e);
+  }, variant: _mac);
 }

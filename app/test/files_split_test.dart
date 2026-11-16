@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/files_split.dart';
 
 // How the Files pane shares its width between its viewer and its tree
-// (ADR 0123): the viewer gives first, then the tree, and under both they
-// narrow alike, so no edge ever jumps.
+// (ADR 0123): the viewer gives first, then the tree, and under both the
+// tree gives on, so no edge ever jumps.
 
 void main() {
   test('the tree at its saved width, the viewer giving first', () {
@@ -13,8 +13,9 @@ void main() {
       (560.0, 260.0),
       (520.0, 220.0),
       (500.0, 200.0),
-      (400.0, 160.0),
-      (100.0, 40.0),
+      (400.0, 100.0),
+      (300.0, 0.0),
+      (100.0, 0.0),
     ]) {
       expect(treeWidth(w, 260), tree, reason: '$w');
     }
@@ -28,14 +29,16 @@ void main() {
   });
 
   test('the viewer keeps its least while there is room for it; under '
-      'that the two share alike', () {
-    for (var w = 500.0; w <= 1400; w += 1) {
+      'that it has the whole pane', () {
+    for (var w = 300.0; w <= 1400; w += 1) {
       for (final saved in [200.0, 260.0, 480.0]) {
         expect(w - treeWidth(w, saved), greaterThanOrEqualTo(300));
       }
     }
-    for (var w = 10.0; w < 500; w += 1) {
-      expect(treeWidth(w, 260) / w, closeTo(0.4, 1e-9), reason: '$w');
+    // Narrowed alike, a 720 window's squeezed Files had a viewer of 83, its
+    // file's name breaking a letter or two a line.
+    for (var w = 10.0; w <= 300; w += 1) {
+      expect(treeWidth(w, 260), 0, reason: '$w');
     }
   });
 
@@ -70,13 +73,16 @@ void main() {
     }
   });
 
-  test('no jump at the seam where the two start to narrow alike', () {
+  test('no jump at the seams where the tree gives on and where it has '
+      'gone', () {
     for (final saved in [200.0, 260.0, 480.0]) {
-      final at = [
-        for (final w in [499.5, 500.0, 500.5]) treeWidth(w, saved),
-      ];
-      expect((at[1] - at[0]).abs(), lessThanOrEqualTo(0.5));
-      expect((at[2] - at[1]).abs(), lessThanOrEqualTo(0.5));
+      for (final seam in [500.0, 300.0]) {
+        final at = [
+          for (final w in [seam - 0.5, seam, seam + 0.5]) treeWidth(w, saved),
+        ];
+        expect((at[1] - at[0]).abs(), lessThanOrEqualTo(0.5));
+        expect((at[2] - at[1]).abs(), lessThanOrEqualTo(0.5));
+      }
     }
   });
 
