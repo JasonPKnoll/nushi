@@ -288,8 +288,8 @@ func TestDebugLinesOfABridge(t *testing.T) {
 	}
 }
 
-// fakeAgent answers each request after delay, or with an error for
-// session/new.
+// fakeAgent answers session/load after 80 ms, session/new with an error,
+// and initialize.
 func fakeAgent(t *testing.T, log *slog.Logger) *Agent {
 	t.Helper()
 	toAgentR, toAgentW := io.Pipe()
@@ -310,8 +310,9 @@ func fakeAgent(t *testing.T, log *slog.Logger) *Agent {
 	return Connect(acp.NewAgentConn(fromAgentR, toAgentW, func(*acp.AgentConn) acp.Client { return quiet{} }, acp.WithLogger(slog.New(calls))), log)
 }
 
-// A call that failed, or was slow, is a WARN; any other a DEBUG, which
-// isn't logged at INFO.
+// A call that failed, or was slow, is a WARN. The slow one here takes at
+// least 80 ms, past Slow on any machine; that a quicker one isn't logged
+// is TestQuickCallsNotLogged's, which no machine's load can slow.
 func TestCallsLogged(t *testing.T) {
 	defer func(s time.Duration) { Slow = s }(Slow)
 	Slow = 50 * time.Millisecond
@@ -335,7 +336,38 @@ func TestCallsLogged(t *testing.T) {
 			t.Errorf("no %q in\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "rpc=initialize") {
-		t.Errorf("a quick call logged at INFO:\n%s", got)
+}
+
+// A call, or a request from the agent, that took Slow is a WARN, unless
+// it's one that takes as long as it takes; a quicker one is a DEBUG,
+// which isn't logged at INFO. The lines are acp-go's, made here with the
+// time each took: how long a real call takes is the machine's to choose.
+func TestQuickCallsNotLogged(t *testing.T) {
+	log, b := newLog(slog.LevelInfo)
+	calls := &callLog{}
+	calls.inner.Store(handlerOf(log))
+	for _, c := range []struct {
+		msg, rpc string
+		took     time.Duration
+	}{
+		{"acp: call", "session/load", Slow},
+		{"acp: request handled", "fs/read_text_file", Slow},
+		{"acp: call", "initialize", Slow - 1},
+		{"acp: call", "session/prompt", Slow},
+		{"acp: request handled", "session/request_permission", Slow},
+	} {
+		r := slog.NewRecord(time.Now(), slog.LevelDebug, c.msg, 0)
+		r.AddAttrs(slog.String("rpc", c.rpc), slog.Duration("took", c.took))
+		testcheck.NoErr(t, calls.Handle(context.Background(), r))
+	}
+	got := b.String()
+	for _, want := range []string{`level=WARN msg="acp call slow" rpc=session/load took=` + Slow.String(),
+		`level=WARN msg="acp request from the agent slow" rpc=fs/read_text_file took=` + Slow.String()} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %q in\n%s", want, got)
+		}
+	}
+	if strings.Count(got, "\n") != 2 {
+		t.Errorf("a quick call, or one that may take long, logged at INFO:\n%s", got)
 	}
 }
