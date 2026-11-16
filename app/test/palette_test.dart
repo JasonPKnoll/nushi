@@ -302,7 +302,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(fake.calls.whereType<ForkChatRequest>(), hasLength(2));
 
+    await pick('reload', 'Reload chat');
+    expect(fake.calls.whereType<ReloadChatRequest>().single.chatId, 'a');
+
     await _keys(tester, LogicalKeyboardKey.keyK, meta: true);
+    // The archived chat after every other row, before any query sorts.
+    final rows = tester.widget<Palette>(find.byType(Palette)).rows;
+    expect(rows.map((r) => r.id), contains('chat:b'));
+    expect(rows.last.id, 'chat:c');
     await _type(tester, 'release');
     expect(
       find.descendant(
