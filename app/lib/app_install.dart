@@ -52,8 +52,15 @@ extension RestartsDaemon on AppInstall {
 /// one (development), which the daemon's dev mode follows, as the Mac's
 /// `openHelper` passes it.
 Map<String, String> launchEnvironment(Map<String, String> env, String dir) => {
-  for (final MapEntry(:key, :value) in env.entries)
-    if (!key.startsWith('NUSHI_') && !key.startsWith('NUSHID_')) key: value,
+  ...withoutNushi(env),
   'NUSHID_DATA': dir,
   'NUSHI_DATA': ?env['NUSHI_DATA'],
+};
+
+/// [env] without Nushi's own variables, every `NUSHI_*` and `NUSHID_*`:
+/// what a program the app starts gets, so a development run's data folder
+/// or token never reaches it.
+Map<String, String> withoutNushi(Map<String, String> env) => {
+  for (final MapEntry(:key, :value) in env.entries)
+    if (!key.startsWith('NUSHI_') && !key.startsWith('NUSHID_')) key: value,
 };

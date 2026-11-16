@@ -2,6 +2,8 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:nushi/app_install.dart';
+
 /// What Windows's shell associates with a scheme or an extension
 /// (shlwapi's `AssocQueryStringW`), and starting a program the way the
 /// Linux runner does (ADR 0124): with the app's environment less Nushi's
@@ -75,10 +77,7 @@ String systemProgram(String name) =>
 Future<void> startOutside(String program, List<String> args) => Process.start(
   program,
   args,
-  environment: {
-    for (final MapEntry(:key, :value) in Platform.environment.entries)
-      if (!key.startsWith('NUSHI_') && !key.startsWith('NUSHID_')) key: value,
-  },
+  environment: withoutNushi(Platform.environment),
   includeParentEnvironment: false,
   mode: ProcessStartMode.detached,
 );
