@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/slides.dart';
 import 'package:nushi/toast.dart';
 
 import 'harness.dart';
@@ -78,6 +79,12 @@ void main() {
     showToast(toasts, 'one');
     await tester.pump();
     expect(shown(), 'one');
+    // Whole on its first frame, not fading in.
+    final faded = find.ancestor(
+      of: find.byType(ToastLine),
+      matching: find.byType(Faded),
+    );
+    expect(tester.widget<Faded>(faded).opacity, 1);
     toasts.hide();
     await tester.pump();
     expect(shown(), isNull);
