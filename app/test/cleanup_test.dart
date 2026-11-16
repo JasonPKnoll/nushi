@@ -346,9 +346,11 @@ void main() {
 
   testWidgets("the chat's ⋯ has Clean up… for a worktree chat", (tester) async {
     final (d, _) = await _open(tester);
+    // The pull request widget's cue has one already.
+    expect(find.text('Clean up…'), findsOne);
     await tester.tap(find.byTooltip('Chat menu').first);
     await tester.pumpAndSettle();
-    expect(find.text('Clean up…'), findsWidgets);
+    expect(find.text('Clean up…'), findsNWidgets(2)); // the menu's too
     d.dispose();
   }, variant: _mac);
 
