@@ -16,6 +16,7 @@ import 'package:nushi/theme/theme.dart';
 import 'package:nushi/tool_parts.dart';
 import 'package:nushi/transcript.dart';
 import 'package:nushi/widgets.dart';
+import 'package:nushi/workflow_card.dart';
 import 'package:nushi/workflows.dart';
 
 /// The daemon's API that has GetWorkflow and GetWorkflowAgent (ADR 0127).
@@ -126,14 +127,13 @@ class _WorkflowPaneState extends State<WorkflowPane> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      w == null
-                          ? 'Workflow'
-                          : 'Workflow: ${w.name.isEmpty ? w.runId : w.name}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.ui(t.text, size: 12, weight: .w600),
-                    ),
+                    child: call == null
+                        ? Text(
+                            'Workflow',
+                            maxLines: 1,
+                            style: theme.ui(t.text, size: 12, weight: .w600),
+                          )
+                        : workflowName(context, call, size: 12),
                   ),
                   if (w != null && workflowLive(w))
                     stopButton(context, widget.daemon, widget.chat, widget.id),

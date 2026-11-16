@@ -100,7 +100,7 @@ class WorkflowCard extends StatelessWidget {
                             alignment: Alignment.centerLeft,
                             child: Shine(
                               on: live && !w.stalled && !still,
-                              child: _name(context, call),
+                              child: workflowName(context, call),
                             ),
                           ),
                         ),
@@ -182,8 +182,9 @@ class WorkflowCard extends StatelessWidget {
 }
 
 /// "Workflow: review-changes", the kind in bold and the subagents'
-/// accent, on one line.
-Widget _name(BuildContext context, Item call) {
+/// accent, on one line: the card's and its pane's head, as [subagentName]
+/// for a subagent.
+Widget workflowName(BuildContext context, Item call, {double size = 13}) {
   final theme = NushiTheme.of(context);
   final t = theme.t;
   final w = call.workflow;
@@ -192,11 +193,15 @@ Widget _name(BuildContext context, Item call) {
       children: [
         TextSpan(
           text: 'Workflow: ',
-          style: theme.ui(t.subagentAccent, weight: FontWeight.w600),
+          style: theme.ui(
+            t.subagentAccent,
+            size: size,
+            weight: FontWeight.w600,
+          ),
         ),
         TextSpan(
           text: w.name.isNotEmpty ? w.name : w.runId,
-          style: theme.ui(t.text),
+          style: theme.ui(t.text, size: size),
         ),
       ],
     ),
