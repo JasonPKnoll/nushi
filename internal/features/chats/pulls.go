@@ -217,31 +217,6 @@ func (s *Service) UnlinkPull(chatID string, pull model.ChatGitHub) error {
 	return nil
 }
 
-// FoundPull takes what the chat's folder is on: its branch and the pull
-// request whose head that is (nil for none). That one is linked only when
-// a tool call of the chat pushed the branch (pushed.go); a new chat in a
-// folder whose branch has a pull request takes nothing. Those found for
-// another branch go (one opened in the chat or linked by hand stays).
-func (s *Service) FoundPull(chatID, branch string, pull *model.ChatGitHub) error {
-	c, err := s.listed(chatID)
-	if err != nil {
-		return err
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	linked := c.record.LinkedPulls()
-	kept := slices.DeleteFunc(slices.Clone(linked), func(p model.ChatGitHub) bool { return p.Branch != "" && p.Branch != branch })
-	if len(kept) != len(linked) {
-		c.saveLocked(func(s *model.ChatRecord) { setPulls(s, kept) })
-	}
-	if pull == nil || pull.Branch != branch || !c.record.PushedBranch(branch) {
-		return nil
-	}
-	p := *pull
-	p.Opened = false
-	return c.addPullLocked(p, false)
-}
-
 // pullAddressRE is a pull request's address on any host: the host, the
 // repository's owner/name and the number.
 var pullAddressRE = regexp.MustCompile(`https://([A-Za-z0-9.-]+(?::\d{1,5})?)/([A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100})/pull/(\d{1,9})\b`)

@@ -67,8 +67,15 @@ type ChatRecord struct {
 	// Pushed are the branches a completed tool call of the chat pushed
 	// (git push, gh pr create, create_pull_request): the folder's branch
 	// then, oldest first, at most MaxPushed. Only such a branch's pull
-	// request is found by its head (ADR 0059's amendment of 2026-11-16).
-	Pushed []string `json:",omitempty"`
+	// request is found by its head, and only one opened in the chat's life
+	// (Lived; ADR 0059's amendment of 2026-11-16).
+	Pushed []BranchPush `json:",omitempty"`
+	// Since is when the chat's line began, for which pull requests are its
+	// own (Lived): a fork's is its parent's; zero is Created.
+	Since time.Time `json:",omitzero"`
+	// ArchivedAt is when the chat was last archived; zero while it isn't,
+	// or for one archived before it was kept.
+	ArchivedAt time.Time `json:",omitzero"`
 	// Ultracode is the chat's Ultracode option (its agent's standing
 	// multi-agent workflows), off by default.
 	Ultracode bool `json:",omitempty"`
@@ -108,14 +115,6 @@ type ChatRecord struct {
 
 // MaxPulls is how many pull requests a chat holds at most (ADR 0117).
 const MaxPulls = 10
-
-// MaxPushed is how many pushed branches a chat remembers (Pushed).
-const MaxPushed = 20
-
-// PushedBranch says a tool call of the chat pushed branch.
-func (s ChatRecord) PushedBranch(branch string) bool {
-	return branch != "" && slices.Contains(s.Pushed, branch)
-}
 
 // PullLink is the chat's primary pull request: the one it was started
 // from, else its first; nil when it has none.

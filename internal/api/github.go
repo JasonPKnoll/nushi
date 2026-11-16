@@ -123,6 +123,9 @@ func (s *server) GetGitHubItems(ctx context.Context, req *connect.Request[nushiv
 		refs = append(refs, ref(r))
 	}
 	items, unseen, signIn, err := s.GitHub.Items(ctx, refs, req.Msg.Quiet)
+	if id := req.Msg.ChatId; id != "" && len(items) > 0 {
+		s.Chats.DropStrayPulls(id, items) // when each was opened is known now: no ask of its own
+	}
 	out := &nushiv1.GetGitHubItemsResponse{Items: ghItemsProto(items), SignIn: signIn}
 	for _, r := range unseen {
 		out.Unseen = append(out.Unseen, &nushiv1.GitHubRef{Host: r.Host, Repo: r.Repo, Number: int32(r.Number)})

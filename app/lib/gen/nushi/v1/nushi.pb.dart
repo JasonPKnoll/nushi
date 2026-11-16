@@ -28118,8 +28118,9 @@ class FindChatPullResponse extends $pb.GeneratedMessage {
   $pb.PbList<GitHubLink> get pulls => $_getList(6);
 
   /// The pull request whose head is the branch, when found but not one of
-  /// the chat's: the chat didn't push the branch (only those are linked,
-  /// API 119), or it was unlinked. Looked for with suggest, or when the
+  /// the chat's: the chat didn't push the branch or it was opened outside
+  /// the chat's life (only the others are linked, API 119), or it was
+  /// unlinked. Looked for with suggest, or when the
   /// chat pushed the branch.
   @$pb.TagNumber(8)
   GitHubLink get branchPull => $_getN(7);
@@ -28284,10 +28285,12 @@ class GetGitHubItemsRequest extends $pb.GeneratedMessage {
   factory GetGitHubItemsRequest({
     $core.Iterable<GitHubRef>? refs,
     $core.bool? quiet,
+    $core.String? chatId,
   }) {
     final result = GetGitHubItemsRequest._();
     if (refs != null) result.refs.addAll(refs);
     if (quiet != null) result.quiet = quiet;
+    if (chatId != null) result.chatId = chatId;
     return result;
   }
 
@@ -28307,6 +28310,7 @@ class GetGitHubItemsRequest extends $pb.GeneratedMessage {
     ..pPM<GitHubRef>(1, _omitFieldNames ? '' : 'refs',
         subBuilder: GitHubRef.$_createMessage)
     ..aOB(2, _omitFieldNames ? '' : 'quiet')
+    ..aOS(3, _omitFieldNames ? '' : 'chatId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -28346,6 +28350,19 @@ class GetGitHubItemsRequest extends $pb.GeneratedMessage {
   $core.bool hasQuiet() => $_has(1);
   @$pb.TagNumber(2)
   void clearQuiet() => $_clearField(2);
+
+  /// The chat whose pull requests' rows these are: one of them found by
+  /// its branch's head but opened outside the chat's life (before it
+  /// began, after it was archived) is dropped from it, not as unlinked.
+  /// API 119.
+  @$pb.TagNumber(3)
+  $core.String get chatId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set chatId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasChatId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearChatId() => $_clearField(3);
 }
 
 class GetGitHubItemsResponse extends $pb.GeneratedMessage {

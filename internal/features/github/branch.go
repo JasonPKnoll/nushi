@@ -15,11 +15,12 @@ import (
 // BranchPull is a folder's branch on GitHub: the repository it's a clone
 // of (Host empty when none is on a host Nushi can reach), the branch
 // checked out, whether that's the repository's default branch, and the
-// pull request whose head it is (nil when none).
+// pull request whose head it is (nil when none) and when it was opened.
 type BranchPull struct {
 	Host, Repo, Branch string
 	Default            bool
 	Pull               *model.ChatGitHub
+	Created            time.Time
 }
 
 // headsFresh is how long a branch's pull requests are taken as current
@@ -105,6 +106,7 @@ func (s *Service) FindPull(ctx context.Context, folder string, poll bool, look f
 		if p, ok := pick(pulls); ok {
 			out.Repo = r.name
 			out.Pull = &model.ChatGitHub{Host: r.host, Repo: r.name, Number: p.Number, Pull: true, ID: p.ID, Branch: branch}
+			out.Created = p.Created
 			return out, nil
 		}
 	}

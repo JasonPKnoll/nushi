@@ -28,9 +28,10 @@ func pullsProto(s model.ChatRecord) []*nushiv1.GitHubLink {
 }
 
 // FindChatPull looks for the pull request of a chat's branch and links it
-// when found, only for a branch a tool call of the chat pushed (ADR 0059's
-// amendment of 2026-11-16): GitHub isn't asked for another, unless the
-// client asks to suggest it (branch_pull, not linked). One linked by hand
+// when found, only for a branch a tool call of the chat pushed and one
+// opened in the chat's life (ADR 0059's amendment of 2026-11-16): GitHub
+// isn't asked for another branch, unless the client asks to suggest it
+// (branch_pull, not linked), nor for an archived chat. One linked by hand
 // or unlinked stays as it is, and one found for a branch the folder has
 // left goes.
 func (s *server) FindChatPull(ctx context.Context, req *connect.Request[nushiv1.FindChatPullRequest]) (*connect.Response[nushiv1.FindChatPullResponse], error) {
@@ -38,7 +39,7 @@ func (s *server) FindChatPull(ctx context.Context, req *connect.Request[nushiv1.
 	if err != nil {
 		return nil, notFound(err)
 	}
-	if sess.Scratch {
+	if sess.Scratch || sess.Archived {
 		return connect.NewResponse(&nushiv1.FindChatPullResponse{Pull: linkProto(sess.PullLink()), Pulls: pullsProto(sess)}), nil
 	}
 	look := func(branch string) bool { return req.Msg.Suggest || sess.PushedBranch(branch) }
@@ -48,7 +49,7 @@ func (s *server) FindChatPull(ctx context.Context, req *connect.Request[nushiv1.
 		out.Error = err.Error()
 	}
 	if err == nil && found.Host != "" {
-		err = s.Chats.FoundPull(req.Msg.ChatId, found.Branch, found.Pull)
+		err = s.Chats.FoundPull(req.Msg.ChatId, found.Branch, found.Pull, found.Created)
 		if err == nil {
 			sess, err = s.Chats.Session(req.Msg.ChatId)
 		}

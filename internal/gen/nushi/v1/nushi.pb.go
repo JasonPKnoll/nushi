@@ -21596,8 +21596,9 @@ type FindChatPullResponse struct {
 	// All of the chat's pull requests, as Chat.pulls. API 118.
 	Pulls []*GitHubLink `protobuf:"bytes,7,rep,name=pulls,proto3" json:"pulls,omitempty"`
 	// The pull request whose head is the branch, when found but not one of
-	// the chat's: the chat didn't push the branch (only those are linked,
-	// API 119), or it was unlinked. Looked for with suggest, or when the
+	// the chat's: the chat didn't push the branch or it was opened outside
+	// the chat's life (only the others are linked, API 119), or it was
+	// unlinked. Looked for with suggest, or when the
 	// chat pushed the branch.
 	BranchPull    *GitHubLink `protobuf:"bytes,8,opt,name=branch_pull,json=branchPull,proto3" json:"branch_pull,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -21804,7 +21805,12 @@ type GetGitHubItemsRequest struct {
 	Refs  []*GitHubRef           `protobuf:"bytes,1,rep,name=refs,proto3" json:"refs,omitempty"`
 	// The app's own asking, not the user's: held back while the rate limit
 	// runs low.
-	Quiet         bool `protobuf:"varint,2,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	Quiet bool `protobuf:"varint,2,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	// The chat whose pull requests' rows these are: one of them found by
+	// its branch's head but opened outside the chat's life (before it
+	// began, after it was archived) is dropped from it, not as unlinked.
+	// API 119.
+	ChatId        string `protobuf:"bytes,3,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -21851,6 +21857,13 @@ func (x *GetGitHubItemsRequest) GetQuiet() bool {
 		return x.Quiet
 	}
 	return false
+}
+
+func (x *GetGitHubItemsRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
 }
 
 type GetGitHubItemsResponse struct {
@@ -26853,10 +26866,11 @@ const file_nushi_v1_nushi_proto_rawDesc = "" +
 	"\x04pull\x18\x02 \x01(\v2\x14.nushi.v1.GitHubLinkR\x04pull\x12\x10\n" +
 	"\x03add\x18\x03 \x01(\bR\x03add\x12,\n" +
 	"\x06unlink\x18\x04 \x01(\v2\x14.nushi.v1.GitHubLinkR\x06unlink\"\x16\n" +
-	"\x14LinkChatPullResponse\"V\n" +
+	"\x14LinkChatPullResponse\"o\n" +
 	"\x15GetGitHubItemsRequest\x12'\n" +
 	"\x04refs\x18\x01 \x03(\v2\x13.nushi.v1.GitHubRefR\x04refs\x12\x14\n" +
-	"\x05quiet\x18\x02 \x01(\bR\x05quiet\"\xa0\x01\n" +
+	"\x05quiet\x18\x02 \x01(\bR\x05quiet\x12\x17\n" +
+	"\achat_id\x18\x03 \x01(\tR\x06chatId\"\xa0\x01\n" +
 	"\x16GetGitHubItemsResponse\x12*\n" +
 	"\x05items\x18\x01 \x03(\v2\x14.nushi.v1.GitHubItemR\x05items\x12+\n" +
 	"\x06unseen\x18\x02 \x03(\v2\x13.nushi.v1.GitHubRefR\x06unseen\x12\x14\n" +

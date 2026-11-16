@@ -6516,13 +6516,14 @@ const GetGitHubItemsRequest$json = {
       '10': 'refs'
     },
     {'1': 'quiet', '3': 2, '4': 1, '5': 8, '10': 'quiet'},
+    {'1': 'chat_id', '3': 3, '4': 1, '5': 9, '10': 'chatId'},
   ],
 };
 
 /// Descriptor for `GetGitHubItemsRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getGitHubItemsRequestDescriptor = $convert.base64Decode(
     'ChVHZXRHaXRIdWJJdGVtc1JlcXVlc3QSJwoEcmVmcxgBIAMoCzITLm51c2hpLnYxLkdpdEh1Yl'
-    'JlZlIEcmVmcxIUCgVxdWlldBgCIAEoCFIFcXVpZXQ=');
+    'JlZlIEcmVmcxIUCgVxdWlldBgCIAEoCFIFcXVpZXQSFwoHY2hhdF9pZBgDIAEoCVIGY2hhdElk');
 
 @$core.Deprecated('Use getGitHubItemsResponseDescriptor instead')
 const GetGitHubItemsResponse$json = {

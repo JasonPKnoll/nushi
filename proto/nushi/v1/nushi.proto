@@ -3437,8 +3437,9 @@ message FindChatPullResponse {
   // All of the chat's pull requests, as Chat.pulls. API 118.
   repeated GitHubLink pulls = 7;
   // The pull request whose head is the branch, when found but not one of
-  // the chat's: the chat didn't push the branch (only those are linked,
-  // API 119), or it was unlinked. Looked for with suggest, or when the
+  // the chat's: the chat didn't push the branch or it was opened outside
+  // the chat's life (only the others are linked, API 119), or it was
+  // unlinked. Looked for with suggest, or when the
   // chat pushed the branch.
   GitHubLink branch_pull = 8;
 }
@@ -3462,6 +3463,11 @@ message GetGitHubItemsRequest {
   // The app's own asking, not the user's: held back while the rate limit
   // runs low.
   bool quiet = 2;
+  // The chat whose pull requests' rows these are: one of them found by
+  // its branch's head but opened outside the chat's life (before it
+  // began, after it was archived) is dropped from it, not as unlinked.
+  // API 119.
+  string chat_id = 3;
 }
 
 message GetGitHubItemsResponse {

@@ -3,8 +3,8 @@ package chats
 import (
 	"context"
 	"fmt"
-	"slices"
 	"testing"
+	"time"
 
 	acp "github.com/afrase/acp-go/unstable"
 
@@ -52,12 +52,21 @@ func TestPushed(t *testing.T) {
 	}
 }
 
+// branches are the branches of pushes.
+func branches(pushes []model.BranchPush) []string {
+	out := []string{}
+	for _, p := range pushes {
+		out = append(out, p.Branch)
+	}
+	return out
+}
+
 // TestFoundPullOnlyPushed (ADR 0059's amendment of 2026-11-16): a new chat
 // on a branch with a pull request links nothing; once a tool call of its
 // pushed the branch, that branch's is linked, and not in another chat on
 // the same folder that didn't push; it goes when the branch changes and
-// comes back with it; a fork keeps the pushed branches; a replayed push
-// isn't one.
+// comes back with it; a fork keeps the pushed branches and its parent's
+// life; a replayed push isn't one.
 func TestFoundPullOnlyPushed(t *testing.T) {
 	svc, _, c := newChat(t, `{"sessionId":"s1"}`, &memModes{})
 	other, err := svc.Start(t.Context(), "", c.record.Folder, false)
@@ -66,6 +75,7 @@ func TestFoundPullOnlyPushed(t *testing.T) {
 	c.mu.Lock()
 	c.worktrees = wts
 	c.mu.Unlock()
+	opened := time.Now().Add(time.Hour)
 	all := func(id string) string {
 		s, err := svc.Session(id)
 		testcheck.NoErr(t, err)
@@ -77,7 +87,7 @@ func TestFoundPullOnlyPushed(t *testing.T) {
 			l := pullLink(n, branch)
 			p = &l
 		}
-		testcheck.NoErr(t, svc.FoundPull(id, branch, p))
+		testcheck.NoErr(t, svc.FoundPull(id, branch, p, opened))
 	}
 	update := func(u acp.SessionUpdate) {
 		testcheck.NoErr(t, c.SessionUpdate(t.Context(), &acp.SessionNotification{SessionID: acp.SessionID(c.sid), Update: u}))
@@ -104,8 +114,10 @@ func TestFoundPullOnlyPushed(t *testing.T) {
 	}
 
 	run("t2", "git push -u origin sub")
-	if s, _ := svc.Session(c.id); !slices.Equal(s.Pushed, []string{"sub"}) {
-		t.Fatalf("pushed: %v", s.Pushed)
+	run("t3", "git push")
+	s, _ := svc.Session(c.id)
+	if p := s.Pushed; fmt.Sprint(branches(p)) != "[sub]" || p[0].First.IsZero() || p[0].Last.Before(p[0].First) {
+		t.Fatalf("pushed: %+v", p)
 	}
 	found(c.id, "sub", 7)
 	found(other, "sub", 7)
@@ -121,8 +133,9 @@ func TestFoundPullOnlyPushed(t *testing.T) {
 		t.Fatalf("back on its branch: %s", got)
 	}
 
-	s, _ := svc.Session(c.id)
-	if f := forkRecord("f", "s2", s); !slices.Equal(f.Pushed, []string{"sub"}) || fmt.Sprint(numbers(f.AllPulls())) != "[7]" {
+	s, _ = svc.Session(c.id)
+	f := forkRecord("f", "s2", s)
+	if fmt.Sprint(branches(f.Pushed)) != "[sub]" || fmt.Sprint(numbers(f.AllPulls())) != "[7]" || !f.Since.Equal(s.Created) || !f.Lived(s.Created) {
 		t.Fatalf("the fork: %+v", f)
 	}
 }
@@ -139,9 +152,9 @@ func TestFoundPullOthersStay(t *testing.T) {
 	c.openedPullLocked(model.Item{Kind: model.ToolCall, Status: "completed", Input: `{"command": "gh pr create"}`, Text: "https://github.com/a/b/pull/12"})
 	c.mu.Unlock()
 	testcheck.NoErr(t, svc.AddPull(c.id, pullLink(8, "")))
-	testcheck.NoErr(t, svc.FoundPull(c.id, "main", nil))
+	testcheck.NoErr(t, svc.FoundPull(c.id, "main", nil, time.Time{}))
 	p3 := pullLink(3, "sub")
-	testcheck.NoErr(t, svc.FoundPull(c.id, "sub", &p3))
+	testcheck.NoErr(t, svc.FoundPull(c.id, "sub", &p3, time.Time{}))
 	if s, _ := svc.Session(c.id); fmt.Sprint(numbers(s.AllPulls())) != "[3 12 8]" {
 		t.Fatalf("%v", numbers(s.AllPulls()))
 	}
@@ -155,12 +168,12 @@ func TestFoundPullOthersStay(t *testing.T) {
 	}
 	c.mu.Unlock()
 	s, _ := svc.Session(c.id)
-	if len(s.Pushed) != model.MaxPushed || s.Pushed[0] != "b1" || s.PushedBranch("b0") {
-		t.Fatalf("%v", s.Pushed)
+	if len(s.Pushed) != model.MaxPushed || s.Pushed[0].Branch != "b1" || s.PushedBranch("b0") {
+		t.Fatalf("%v", branches(s.Pushed))
 	}
 	testcheck.NoErr(t, svc.UnlinkPull(c.id, pullLink(8, "")))
 	p8 := pullLink(8, "b5")
-	testcheck.NoErr(t, svc.FoundPull(c.id, "b5", &p8))
+	testcheck.NoErr(t, svc.FoundPull(c.id, "b5", &p8, time.Time{}))
 	if s, _ := svc.Session(c.id); fmt.Sprint(numbers(s.AllPulls())) != "[3 12]" {
 		t.Fatalf("found again once unlinked: %v", numbers(s.AllPulls()))
 	}
