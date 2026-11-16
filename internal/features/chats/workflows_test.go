@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"path/filepath"
 	"slices"
@@ -626,6 +627,23 @@ func TestReadingAWorkflow(t *testing.T) {
 	}
 	if _, _, _, err := f.svc.Workflow(f.c.id, "nope"); !errors.Is(err, ErrNoWorkflow) {
 		t.Errorf("no such call: %v", err)
+	}
+}
+
+// GetWorkflow lists a run's first maxWorkflowAgents agents, and says
+// there are more.
+func TestAWorkflowsAgentsAreCapped(t *testing.T) {
+	f := workflowChat(t, Timing{}, runningAs)
+	f.files.mu.Lock()
+	for i := range maxWorkflowAgents + 100 {
+		f.files.agents = append(f.files.agents, model.WorkflowAgent{ID: fmt.Sprintf("a%d", i), State: "done"})
+	}
+	f.files.mu.Unlock()
+	f.waitStatus(t, func(st model.Status) bool { return st.Workflows == 1 })
+	_, agents, more, err := f.svc.Workflow(f.c.id, wfCall)
+	testcheck.NoErr(t, err)
+	if len(agents) != 500 || !more || agents[0].ID != "a0" || agents[499].ID != "a499" {
+		t.Errorf("%d agents (%s to %s), more %v", len(agents), agents[0].ID, agents[len(agents)-1].ID, more)
 	}
 }
 
