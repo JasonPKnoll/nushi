@@ -84,7 +84,7 @@ By default, review cards tell the agent not to reply on GitHub, and failed-check
 ## Reply, review and resolve
 
 - In a thread, use **Reply**, **Resolve** or **Unresolve**.
-- In **Files**, select lines to write an inline comment.
+- In **Files**, hover a line and click the blue **+**, or click or drag across line numbers, to write an inline comment.
 - Click **Review…** to send your review: **Comment**, **Approve** or **Request changes**, then **Submit review**.
 
 ## Merge

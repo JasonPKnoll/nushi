@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'package:nushi/back_swipe.dart';
 import 'package:nushi/diff_box_find.dart';
+import 'package:nushi/diff_comment_button.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/review.dart';
 import 'package:nushi/review_cards.dart';
@@ -72,12 +73,12 @@ typedef DiffNote = ({String id, bool old, int line});
 /// [oneSided], or narrower than [oneColumnBelow]; ADR 0107). With [fit] it
 /// is only as tall as the change (up to fifteen rows, then it scrolls),
 /// on code's surface, its corners rounded; else as tall as its box, on
-/// the theme's own diff background unless [sunk]. With
-/// [review], a click or a
-/// drag on line numbers opens a box for a comment on those lines, and the
-/// chat's comments made in that view show under their lines. Else [notes]
-/// show under their lines, as [note] builds each, and a click or a drag on
-/// line numbers goes to [onLines].
+/// the theme's own diff background unless [sunk]. With [review], a click
+/// or a drag on line numbers (or from the + at the start of the line under
+/// the pointer, [DiffCommentButton]) opens a box for a comment on those
+/// lines, and the chat's comments made in that view show under their
+/// lines. Else [notes] show under their lines, as [note] builds each, and
+/// a click or a drag on line numbers (or the +) goes to [onLines].
 class DiffBox extends StatefulWidget {
   const new(
     this.change, {
@@ -544,6 +545,13 @@ class _DiffBoxState extends State<DiffBox> {
     final inlays = widget.review == null && widget.note == null
         ? _noInlay
         : _inlay;
+    final Widget view = unified
+        ? UnifiedDiff(controller: c, theme: _theme, inlayBuilder: inlays)
+        : SideBySideDiff(controller: c, theme: _theme, inlayBuilder: inlays);
+    // A line that takes a comment shows a + under the pointer; the phone
+    // has none (no pointer hovers there).
+    final commentable =
+        !kIsWeb && (widget.review != null || widget.onLines != null);
     final diff = Listener(
       onPointerUp: _pointerUp,
       // diff_view's views have no scrollbar; one at the right edge, for
@@ -553,13 +561,14 @@ class _DiffBoxState extends State<DiffBox> {
         notificationPredicate: (n) =>
             n.context != null &&
             Scrollable.maybeOf(n.context!)?.widget.controller == scroll,
-        child: unified
-            ? UnifiedDiff(controller: c, theme: _theme, inlayBuilder: inlays)
-            : SideBySideDiff(
+        child: commentable
+            ? DiffCommentButton(
                 controller: c,
+                unified: unified,
                 theme: _theme,
-                inlayBuilder: inlays,
-              ),
+                child: view,
+              )
+            : view,
       ),
     );
     if (!widget.fit) return diff;

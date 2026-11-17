@@ -50,7 +50,6 @@ What isn't built yet and the decisions still open, each checked against the code
 
 ### Changes and review
 
-- **A comment button on the diff's lines** (owner, 2026-11-17, from the promo site's demo): a blue + that shows at the start of the line under the cursor, as GitHub has it, so it's plain that a line takes a comment; today only clicking or dragging across line numbers starts one, which nothing shows.
 - **Review comments by an agent** (from JetBrains AIR): a side chat reviews the changes and posts comments through a small MCP tool (`add_comment(file, line, text)`); they show in Changes, and those picked go to the main chat.
 - **Findings, picked** (after a finding opened the chat's Changes at its line, 2026-10-26): tick a review's findings in its card and send them back to the agent ("fix these"), or show them as comments in Changes. Each finding already has a stable id (`findingIds`: its file, line and summary).
 - **More git from Changes**: push, and staging by hunk ([ADR 0079](adr/0079-stage-and-commit-from-changes.md) has whole files; diff_view has no per-hunk controls yet).

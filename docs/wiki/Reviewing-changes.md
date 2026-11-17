@@ -31,7 +31,7 @@ You can also use **View › Show Diffs Unified**. Your choice applies to every d
 
 You can leave comments for the agent, like a code review.
 
-1. Click a line number in the diff, or drag across several.
+1. Hover a line and click the blue **+** at its start, or click a line number. To comment on several lines, drag across them from the **+** or the numbers.
 2. Type your comment and click **Comment**.
 3. Add as many comments as you like, across any files.
 
