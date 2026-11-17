@@ -23,12 +23,13 @@ const double markWedge = 7;
 /// The most of a mark's old lines its card lists.
 const markCardLines = 40;
 
-/// A mark's ink: the diff's own colours (`Tokens.diff`'s inserted and
-/// modified words', its gutter's changed text for a removal), solid.
+/// A mark's ink, solid: the diff's inserted and modified words' colours,
+/// and for a removal red (`crashed`), as an editor's gutter has it: a
+/// grey wedge that small was easy to miss.
 Color markColor(Tokens t, MarkKind kind) => switch (kind) {
   MarkKind.added => t.done,
   MarkKind.changed => t.accentInk,
-  MarkKind.removed => t.textSecondary,
+  MarkKind.removed => t.crashed,
 };
 
 /// One line's change mark, over its number cell: [cell]'s bar at [barX]
