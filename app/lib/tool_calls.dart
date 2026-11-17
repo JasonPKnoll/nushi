@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:diff_view/diff_view.dart';
 import 'package:flutter/material.dart';
 
@@ -237,8 +239,37 @@ class _Failed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
-    return Text(failed, style: theme.ui(theme.t.crashed, size: 12));
+    return Text(
+      failed,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      style: theme.ui(theme.t.crashed, size: 12),
+    );
   }
+}
+
+/// What a tool row's header holds after its title, [room] wide at most
+/// (the row less its icon and the title's least, [RowRoom.titleLeast]):
+/// its words, each in a [Flexible], end in an ellipsis rather than run
+/// past the row's end, in a pane squeezed narrow and in any font
+/// (ADR 0114); wide, it takes only what it needs, so the title has the
+/// rest.
+class _AfterTitle extends StatelessWidget {
+  const new({required this.room, required this.children});
+
+  final double room;
+  final List<Widget> children;
+
+  /// The header's room for it, [width] wide.
+  static double roomIn(double width) =>
+      max(0, width - _iconRoom - RowRoom.titleLeast);
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(maxWidth: room),
+    child: Row(mainAxisSize: MainAxisSize.min, children: children),
+  );
 }
 
 /// What a tool row's header holds beside its title, by the row's width:
@@ -262,7 +293,22 @@ abstract final class RowRoom {
 
   /// The narrowest run's row that has a Preview in its header.
   static const runPreview = 290.0;
+
+  /// The least a call's title keeps in its header: what's beside it
+  /// (its state, failed) ends in an ellipsis first.
+  static const titleLeast = 48.0;
 }
+
+/// A call's icon and the gap after it, in its header.
+const double _iconRoom = 23;
+
+/// A running call's spinner and the gap before it.
+const double _spinnerRoom = 24;
+
+/// A show call's Open and the gap before it: in a header with less room
+/// after its title (a row under about 160), it has none rather than run
+/// past the row's end.
+const double _openRoom = 88;
 
 /// A row's `+n −m`, in code type: the lines its diffs added and removed.
 class LineCounts extends StatelessWidget {
@@ -380,66 +426,89 @@ class ToolCallView extends StatelessWidget {
             ids: [it.id],
             nested: nested,
             folded: callFolded(it),
-            header: Row(
-              children: [
-                Icon(
-                  kindOf(it).icon,
-                  size: 15,
-                  color: failed ? t.crashed : t.toolAccent,
-                ),
-                const SizedBox(width: 8),
-                // The title types out as the call comes (the path after the
-                // verb), then shines while it runs, the band across the text
-                // alone.
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _tooltip(
-                      context,
-                      rawName,
-                      Typed(
-                        title,
-                        keep: pathed ? verb!.length + 1 : 0,
-                        shine: working,
+            // What's beside the title has the row less the icon and the
+            // title's least: its words end in an ellipsis rather than run
+            // past the row's end, in a pane squeezed narrow and in any
+            // font (ADR 0114).
+            header: LayoutBuilder(
+              builder: (context, row) {
+                final room = _AfterTitle.roomIn(row.maxWidth);
+                return Row(
+                  children: [
+                    Icon(
+                      kindOf(it).icon,
+                      size: 15,
+                      color: failed ? t.crashed : t.toolAccent,
+                    ),
+                    const SizedBox(width: _iconRoom - 15),
+                    // The title types out as the call comes (the path
+                    // after the verb), then shines while it runs, the band
+                    // across the text alone.
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _tooltip(
+                          context,
+                          rawName,
+                          Typed(
+                            title,
+                            keep: pathed ? verb!.length + 1 : 0,
+                            shine: working,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                if (it.diffs.isNotEmpty && counts) LineCounts(added, removed),
-                if (preview != null && previewAbove) ...[
-                  const SizedBox(width: 8),
-                  PreviewButton(preview),
-                ],
-                if (page != null) ...[
-                  const SizedBox(width: 8),
-                  OpenPageButton(page),
-                ],
-                // The call ends; the command runs on
-                // (background_commands.dart).
-                if (it.hasBackgroundCommand()) ...[
-                  const SizedBox(width: 8),
-                  Shine(
-                    on: it.backgroundCommand.state == 'running' && !still,
-                    child: Text(
-                      box.maxWidth >= RowRoom.note
-                          ? 'in the background: ${it.backgroundCommand.state}'
-                          : it.backgroundCommand.state,
-                      style: theme.ui(t.textSecondary, size: 12),
+                    _AfterTitle(
+                      room: room,
+                      children: [
+                        if (it.diffs.isNotEmpty && counts)
+                          Flexible(child: LineCounts(added, removed)),
+                        if (preview != null && previewAbove) ...[
+                          const SizedBox(width: 8),
+                          PreviewButton(preview),
+                        ],
+                        if (page != null && room >= _openRoom) ...[
+                          const SizedBox(width: 8),
+                          OpenPageButton(page),
+                        ],
+                        // The call ends; the command runs on
+                        // (background_commands.dart).
+                        if (it.hasBackgroundCommand()) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Shine(
+                              on:
+                                  it.backgroundCommand.state == 'running' &&
+                                  !still,
+                              child: Text(
+                                box.maxWidth >= RowRoom.note
+                                    ? 'in the background: '
+                                          '${it.backgroundCommand.state}'
+                                    : it.backgroundCommand.state,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.ui(t.textSecondary, size: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (failed) ...[
+                          const SizedBox(width: 8),
+                          const Flexible(child: _Failed('failed')),
+                        ],
+                        if (working && room >= _spinnerRoom) ...[
+                          const SizedBox(width: _spinnerRoom - 14),
+                          SizedBox.square(
+                            dimension: 14,
+                            child: Spinner(color: t.textSecondary),
+                          ),
+                        ],
+                      ],
                     ),
-                  ),
-                ],
-                if (failed) ...[
-                  const SizedBox(width: 8),
-                  const _Failed('failed'),
-                ],
-                if (working) ...[
-                  const SizedBox(width: 10),
-                  SizedBox.square(
-                    dimension: 14,
-                    child: Spinner(color: t.textSecondary),
-                  ),
-                ],
-              ],
+                  ],
+                );
+              },
             ),
             // A call with nothing to show only has its title.
             body: !body
@@ -527,23 +596,31 @@ class RunView extends StatelessWidget {
           ids: ['group ${calls.first.id}', calls.first.id],
           folded: runFolded(calls),
           sunk: false,
-          header: Row(
-            children: [
-              Icon(Icons.layers_outlined, size: 15, color: t.toolAccent),
-              const SizedBox(width: 8),
-              Expanded(child: _groupTitle(theme, calls, still: still)),
-              if (edits && box.maxWidth >= RowRoom.runCounts)
-                LineCounts(added, removed),
-              if (preview != null && box.maxWidth >= RowRoom.runPreview) ...[
-                const SizedBox(width: 8),
-                PreviewButton(preview),
+          header: LayoutBuilder(
+            builder: (context, row) => Row(
+              children: [
+                Icon(Icons.layers_outlined, size: 15, color: t.toolAccent),
+                const SizedBox(width: _iconRoom - 15),
+                Expanded(child: _groupTitle(theme, calls, still: still)),
+                _AfterTitle(
+                  room: _AfterTitle.roomIn(row.maxWidth),
+                  children: [
+                    if (edits && box.maxWidth >= RowRoom.runCounts)
+                      Flexible(child: LineCounts(added, removed)),
+                    if (preview != null &&
+                        box.maxWidth >= RowRoom.runPreview) ...[
+                      const SizedBox(width: 8),
+                      PreviewButton(preview),
+                    ],
+                    // Its failed calls stand out inside, and in the count.
+                    if (failed > 0) ...[
+                      const SizedBox(width: 8),
+                      Flexible(child: _Failed('$failed failed')),
+                    ],
+                  ],
+                ),
               ],
-              // Its failed calls stand out inside, and in the count.
-              if (failed > 0) ...[
-                const SizedBox(width: 8),
-                _Failed('$failed failed'),
-              ],
-            ],
+            ),
           ),
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
