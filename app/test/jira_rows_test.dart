@@ -315,6 +315,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.play_arrow_outlined), findsNWidgets(2));
     expect(find.byTooltip('Start work'), findsOneWidget);
+    // Its menu stays open as the pointer leaves the row for it: the button
+    // is the menu's anchor, and went with the hover.
+    await mouse.moveTo(tester.getCenter(find.byTooltip('Start work')));
+    await mouse.down(tester.getCenter(find.byTooltip('Start work')));
+    await mouse.up();
+    await tester.pumpAndSettle();
+    await mouse.moveTo(tester.getCenter(find.text('Choose folder…')));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose folder…'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Choose folder…'), findsNothing);
     await mouse.moveTo(Offset.zero);
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.play_arrow_outlined), findsOneWidget);

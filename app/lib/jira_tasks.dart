@@ -258,6 +258,10 @@ class TaskRow extends StatefulWidget {
 class _TaskRowState extends State<TaskRow> {
   bool _hover = false;
 
+  /// Whether Start work's menu is open: its button is the menu's anchor,
+  /// so it stays while it is, though the pointer has left the row for it.
+  bool _starting = false;
+
   List<MenuEntry> _folders(BuildContext context) => folderEntries(
     widget.daemon,
     onPick: (f) => startWork(
@@ -360,7 +364,7 @@ class _TaskRowState extends State<TaskRow> {
                 SizedBox(
                   width: 30,
                   height: 20,
-                  child: _hover || widget.selected
+                  child: _hover || _starting || widget.selected
                       ? Align(
                           alignment: Alignment.centerRight,
                           child: _start(context),
@@ -377,6 +381,10 @@ class _TaskRowState extends State<TaskRow> {
 
   Widget _start(BuildContext context) => Menu(
     digits: true,
+    onOpen: () => setState(() => _starting = true),
+    onClose: () {
+      if (mounted) setState(() => _starting = false);
+    },
     entries: _folders(context),
     builder: (context, open) {
       if (widget.selected) widget.startMenu(open);

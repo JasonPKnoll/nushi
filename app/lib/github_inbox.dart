@@ -229,6 +229,10 @@ class ItemRow extends StatefulWidget {
 class _ItemRowState extends State<ItemRow> {
   bool _hover = false;
 
+  /// Whether Start work's menu is open: its button is the menu's anchor,
+  /// so it stays while it is, though the pointer has left the row for it.
+  bool _starting = false;
+
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
@@ -325,7 +329,7 @@ class _ItemRowState extends State<ItemRow> {
                 ItemAge(it.updatedMs.toInt()),
                 SizedBox(
                   width: 30,
-                  child: _hover || widget.selected
+                  child: _hover || _starting || widget.selected
                       ? Align(
                           alignment: Alignment.centerRight,
                           child: _start(context),
@@ -342,6 +346,10 @@ class _ItemRowState extends State<ItemRow> {
 
   Widget _start(BuildContext context) => Menu(
     digits: true,
+    onOpen: () => setState(() => _starting = true),
+    onClose: () {
+      if (mounted) setState(() => _starting = false);
+    },
     entries: startEntries(context, widget.daemon, widget.item),
     builder: (context, open) {
       if (widget.selected) widget.startMenu(open);
