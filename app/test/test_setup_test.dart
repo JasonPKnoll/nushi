@@ -2,10 +2,13 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/collapsible.dart';
+import 'package:nushi/gen/nushi/v1/nushi.connect.spec.dart';
+import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/settings.dart';
 
+import 'fake_daemon.dart';
 import 'fake_desktop.dart';
 import 'flutter_test_config.dart';
 
@@ -39,6 +42,19 @@ void main() {
     expect(readSaved(), isNotEmpty);
     startAfresh();
     expect(readSaved(), isEmpty);
+  });
+
+  test('a chat the fake daemon changes isn’t the one its test built it '
+      'from, which the next test may share', () async {
+    final shared = [Chat(id: 'a', title: 'A')];
+    final fake = FakeDaemon(shared);
+    await fake.unary(NushiService.pinChats, PinChatsRequest(chatIds: ['a']));
+    await fake.unary(
+      NushiService.setChatColor,
+      SetChatColorRequest(chatId: 'a', color: 'teal'),
+    );
+    expect([fake.chats.single.pin, fake.chats.single.color], [1, 'teal']);
+    expect(shared.single, Chat(id: 'a', title: 'A'));
   });
 
   test('what lib keeps outside widgets is made through run_state.dart', () {
