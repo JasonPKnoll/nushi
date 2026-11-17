@@ -117,3 +117,43 @@ func (Harness) ReadBackgroundCommand(id, file string) (output, end string, err e
 	}
 	return out, out[m[2]:m[3]], nil
 }
+
+// taskSummary is the exit code in Claude's summary of a background
+// command's end: `Background command "<description>" completed (exit code
+// 0)` or `… failed with exit code 144` (docs/facts/claude.md).
+var taskSummary = regexp.MustCompile(`" (?:completed \(exit code (-?\d+)\)|failed with exit code (-?\d+))$`)
+
+// CommandTask reads Claude's own word on a background command's task, the
+// _meta.claudeCode.task that claude-acp-go (v0.5.0 on) sends as an update
+// of the Bash call that started it: running, then how it ended
+// (completed; failed, also when killed from outside; killed then stopped
+// for Claude's TaskStop). The end is in the words of the file's end line:
+// "exited with code N" from the summary, which comes with the second of
+// an end's two updates, or "killed" for a stop (docs/facts/claude.md).
+func (Harness) CommandTask(meta map[string]any) (id, state, end string, ok bool) {
+	cc, _ := meta["claudeCode"].(map[string]any)
+	task, _ := cc["task"].(map[string]any)
+	id, _ = task["id"].(string)
+	kind, _ := task["type"].(string)
+	status, _ := task["status"].(string)
+	summary, _ := task["summary"].(string)
+	if id == "" || kind != "local_bash" {
+		return "", "", "", false
+	}
+	switch status {
+	case "running":
+		return id, "running", "", true
+	case "completed":
+		state = "done"
+	case "failed":
+		state = "failed"
+	case "killed", "stopped":
+		return id, "stopped", "killed", true
+	default:
+		return "", "", "", false
+	}
+	if m := taskSummary.FindStringSubmatch(summary); m != nil {
+		end = "exited with code " + m[1] + m[2]
+	}
+	return id, state, end, true
+}

@@ -113,8 +113,16 @@ type BackgroundTasks interface {
 	BackgroundCommand(it model.Item) (id, file string, ok bool)
 	// ReadBackgroundCommand reads that file: the output so far, and how the
 	// command ended ("" while it runs), as the file says; only a sign
-	// until its shell is gone (followCommand).
+	// until its shell is gone, and only where the agent hasn't said
+	// (followCommand).
 	ReadBackgroundCommand(id, file string) (output, end string, err error)
+	// CommandTask reads the agent's own word on such a command, from an
+	// update of the call that started it (its _meta): the task's id, its
+	// state ("running", "done", "failed" or "stopped") and how it ended in
+	// the file's words ("exited with code 0", "killed"; "" unsaid). ok is
+	// false for an update that says nothing of one. Once heard, it is the
+	// source of truth for whether the command runs (ADR 0130).
+	CommandTask(meta map[string]any) (id, state, end string, ok bool)
 	// RunsBackgroundCommand says a process the agent runs (its command
 	// line) is the shell running the command of call, a tool call that left
 	// it running in the background: Nushi then stops the command itself, by

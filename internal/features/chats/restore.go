@@ -105,6 +105,10 @@ func (c *chat) restoreLocked(replayed []model.Item, times map[string]time.Time) 
 		it := &items[i]
 		c.noteID(it.ID)
 		date(it)
+		if it.BackgroundCommand != nil { // the copy's row takes the end the replay told (commandTaskLocked)
+			sh := c.heardLocked(*it.BackgroundCommand)
+			it.BackgroundCommand = &sh
+		}
 		if it.ID != "" {
 			continue
 		}

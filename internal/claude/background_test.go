@@ -100,3 +100,35 @@ func TestBackgroundCommands(t *testing.T) {
 		t.Error("refused a task's file in /tmp's real path")
 	}
 }
+
+// Claude's task, as claude-acp-go v0.5.0 sends it on the Bash call
+// (docs/facts/claude.md), in Nushi's words: the state, and how it ended
+// in the file's words, the exit code only from the summary.
+func TestCommandTask(t *testing.T) {
+	task := func(status, summary string) map[string]any {
+		return map[string]any{"claudeCode": map[string]any{"toolName": "Bash", "task": map[string]any{
+			"id": "b1", "type": "local_bash", "status": status, "summary": summary}}}
+	}
+	for _, tc := range []struct {
+		meta       map[string]any
+		state, end string
+		ok         bool
+	}{
+		{task("running", ""), "running", "", true},
+		{task("completed", ""), "done", "", true},
+		{task("completed", `Background command "Run it" completed (exit code 0)`), "done", "exited with code 0", true},
+		{task("failed", `Background command "Wait (exit code 3)" failed with exit code 144`), "failed", "exited with code 144", true},
+		{task("failed", "Background command \"x\" failed with exit code 144\nmore"), "failed", "", true},
+		{task("killed", ""), "stopped", "killed", true},
+		{task("stopped", "Wait long"), "stopped", "killed", true},
+		{task("pending", ""), "", "", false},
+		{map[string]any{"claudeCode": map[string]any{"task": map[string]any{"id": "b1", "type": "local_agent", "status": "completed"}}}, "", "", false},
+		{map[string]any{"claudeCode": map[string]any{"toolName": "Bash"}}, "", "", false},
+		{nil, "", "", false},
+	} {
+		id, state, end, ok := Harness{}.CommandTask(tc.meta)
+		if ok != tc.ok || state != tc.state || end != tc.end || ok && id != "b1" {
+			t.Errorf("%v: %q %q %q %v", tc.meta, id, state, end, ok)
+		}
+	}
+}

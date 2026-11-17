@@ -1,12 +1,100 @@
 package chats
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 	"time"
 
+	acp "github.com/afrase/acp-go/unstable"
+
 	"github.com/afrase/nushi/internal/model"
 )
+
+// A background command's end is the agent's to say, where it says
+// (ADR 0130): Claude, through claude-acp-go v0.5.0 on, sends its task's
+// status as updates of the call that started it (BackgroundTasks'
+// CommandTask). Its output file and the command's shell are the fallback,
+// used only for a command whose task the agent hasn't told of: an agent
+// that doesn't, a claude that went mid-command, a reopened chat whose
+// history had no end.
+
+// taskWord is what the agent last said of a background command's task:
+// its state and how it ended, as CommandTask reads them, and the agent
+// that said "running", which counts only while that agent runs.
+type taskWord struct {
+	state, end string
+	agent      Agent
+}
+
+// ended says the task is over, by the agent's word.
+func (t taskWord) ended() bool { return t.state != "" && t.state != "running" }
+
+// commandTaskLocked takes an update that is the agent's word on a
+// background command's task, and ends its row when the word is an end:
+// the first of an end's two updates ends it, the second (and a stop's
+// "stopped" after "killed") only adds how, so the row changes once and
+// its detail at most once more. It says whether the update said nothing
+// else, so it is no step of the agent's work (no turn of its own, no
+// change to the call).
+func (c *chat) commandTaskLocked(u acp.SessionUpdate) (only bool) {
+	t := u.ToolCallUpdate
+	if c.kind.background == nil || u.SessionUpdate != "tool_call_update" || t == nil {
+		return false
+	}
+	id, state, end, ok := c.kind.background.CommandTask(t.Meta)
+	if !ok {
+		return false
+	}
+	was := c.tasks[id]
+	switch {
+	case was.ended() && state == "running": // late, or replayed after its end
+	case was.ended():
+		was.end = cmp.Or(was.end, end)
+	case state == "running":
+		was = taskWord{state: state, agent: c.agent}
+	default:
+		was = taskWord{state: state, end: end}
+	}
+	if c.tasks == nil {
+		c.tasks = map[string]taskWord{}
+	}
+	c.tasks[id] = was
+	if it := c.itemLocked(string(t.ToolCallID)); it != nil && it.BackgroundCommand != nil && it.BackgroundCommand.ID == id {
+		if sh := c.heardLocked(*it.BackgroundCommand); sh != *it.BackgroundCommand {
+			it.BackgroundCommand = &sh
+			c.publishLocked(*it)
+		}
+	}
+	return t.Status == "" && t.Title == "" && t.Kind == "" && t.Content == nil && t.Locations == nil && t.RawInput == nil && t.RawOutput == nil
+}
+
+// heardLocked is sh as the agent's word on its task has it: ended, if
+// the agent said so, whatever the file or a TaskStop made of it before;
+// a command Nushi stopped itself reads "stopped" though Claude says it
+// failed (model.BackgroundCommand's Killed). How it ended keeps the words
+// it has (the file's end line), else takes the agent's.
+func (c *chat) heardLocked(sh model.BackgroundCommand) model.BackgroundCommand {
+	t := c.tasks[sh.ID]
+	if !t.ended() {
+		return sh
+	}
+	state := t.state
+	if state == "failed" && sh.Killed {
+		state = "stopped"
+	}
+	if sh.State != state {
+		if sh.State != "running" && sh.State != "started" {
+			sh.End = "" // the fallback's guess, overruled
+		}
+		sh.State = state
+		if !sh.Started.IsZero() && sh.Ended.IsZero() {
+			sh.Ended = time.Now()
+		}
+	}
+	sh.End = cmp.Or(sh.End, t.end)
+	return sh
+}
 
 // backgroundCommandLocked notices a tool call that left its command running in the
 // background (see model.BackgroundCommand) and follows it: through its output file
@@ -19,59 +107,31 @@ func (c *chat) backgroundCommandLocked(it *model.Item) {
 	if !ok {
 		return
 	}
-	it.BackgroundCommand = &model.BackgroundCommand{ID: id, State: "started"}
+	sh := model.BackgroundCommand{ID: id, State: "started"}
 	var agent Agent // none: the end is read once
 	if !c.reopeningLocked() {
-		it.BackgroundCommand.State, it.BackgroundCommand.Started, agent = "running", time.Now(), c.agent
+		sh.State, sh.Started, agent = "running", time.Now(), c.agent
 	}
+	sh = c.heardLocked(sh) // its end can come first
+	it.BackgroundCommand = &sh
 	go c.followCommand(it.ID, id, file, agent)
 }
 
-// Whether the command runs is its shell's to say: while the command's
-// agent runs, an end Claude's file gives (its line can be followed by what
-// the command left dying, and the command can print such a line itself:
-// docs/facts/claude.md) is taken only once the file has stopped growing
-// after it and the command's shell no longer runs, where Nushi can look
-// (commandShellRuns); the file gives how it ended. With its agent gone
-// there's nothing more to wait for. Claude's TaskStop of the task ends it
-// too (stoppedLocked).
+// followCommand reads the command's output file for its output until it
+// ends. While the agent that runs it lives and has said its task runs,
+// that word stands, whatever the file says; its end comes as an update
+// (commandTaskLocked), after which the file is read once more, for the
+// output and its end line's words. Else, the fallback: an end Claude's file
+// gives (its line can be followed by what the command left dying, and the
+// command can print such a line itself: docs/facts/claude.md) is taken
+// only once the file has stopped growing after it and the command's shell
+// no longer runs, where Nushi can look (commandShellRuns); the file gives
+// how it ended. With its agent gone there's nothing more to wait for: the
+// file's end, else "started" (its end unknown). Claude's TaskStop of the
+// task ends it too (stoppedLocked).
 func (c *chat) followCommand(callID, id, file string, agent Agent) {
-	var endAt *string // the output an end was first seen after
-	for {
-		out, end, err := c.kind.background.ReadBackgroundCommand(id, file)
-		if end != "" && agent != nil && endAt != nil && *endAt == out && c.commandShellRuns(callID, agent) {
-			endAt = nil // the shell runs: the line was the command's own
-		}
-		c.mu.Lock()
-		it := c.itemLocked(callID)
-		if it == nil || it.BackgroundCommand == nil {
-			c.mu.Unlock()
-			return // the chat went, or was rewound past the call
-		}
-		sh := *it.BackgroundCommand
-		if err == nil {
-			sh.Output = out
-		}
-		gone := agent == nil || c.agent != agent || err != nil
-		switch {
-		case end != "" && (gone || endAt != nil && *endAt == out):
-			sh.State, sh.End = commandState(end, sh.Killed), end
-			if !sh.Started.IsZero() && sh.Ended.IsZero() {
-				sh.Ended = time.Now()
-			}
-		case end != "":
-			endAt = &out
-		case gone:
-			sh.State = "started" // no word of its end, and nothing says it still runs
-		}
-		if sh != *it.BackgroundCommand {
-			it.BackgroundCommand = &sh
-			c.publishLocked(*it)
-		}
-		c.mu.Unlock()
-		if sh.State != "running" {
-			return
-		}
+	f := commandFollower{c: c, callID: callID, id: id, file: file, agent: agent}
+	for f.step() {
 		select {
 		case <-time.After(c.timing.commandPoll()):
 		case <-c.ctx.Done():
@@ -80,14 +140,91 @@ func (c *chat) followCommand(callID, id, file string, agent Agent) {
 	}
 }
 
+// commandFollower follows one background command (followCommand): its
+// call, its task's id and output file, and the agent that runs it (nil:
+// the end is read once).
+type commandFollower struct {
+	c                *chat
+	callID, id, file string
+	agent            Agent
+	endAt            *string // the output an end was first seen after
+}
+
+// step reads the file once and updates the row; false once there's no
+// more to follow.
+func (f *commandFollower) step() bool {
+	c := f.c
+	out, end, err := c.kind.background.ReadBackgroundCommand(f.id, f.file)
+	if end != "" && f.agent != nil && f.endAt != nil && *f.endAt == out && !c.toldRunning(f.id, f.agent) && c.commandShellRuns(f.callID, f.agent) {
+		f.endAt = nil // the shell runs: the line was the command's own
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	it := c.itemLocked(f.callID)
+	if it == nil || it.BackgroundCommand == nil {
+		return false // the chat went, or was rewound past the call
+	}
+	sh := *it.BackgroundCommand
+	if err == nil {
+		sh.Output = out
+	}
+	sh, over := f.nextLocked(sh, out, end, err == nil)
+	if sh != *it.BackgroundCommand {
+		it.BackgroundCommand = &sh
+		c.publishLocked(*it)
+	}
+	return !over && sh.State == "running"
+}
+
+// nextLocked is the row sh after a read of the file (read: it was read,
+// as out and end), and whether following it is over.
+func (f *commandFollower) nextLocked(sh model.BackgroundCommand, out, end string, read bool) (model.BackgroundCommand, bool) {
+	c := f.c
+	task := c.tasks[f.id]
+	live := f.agent != nil && c.agent == f.agent
+	gone := !live || !read
+	switch {
+	case task.ended(): // the agent's word: the file adds its end line's words
+		sh = c.heardLocked(sh)
+		if end != "" && read {
+			sh.End = end
+		}
+		return sh, true
+	case sh.State != "running" && sh.State != "started": // its TaskStop ended it
+		return sh, true
+	case task.state == "running" && task.agent == f.agent && live: // it runs, whatever the file says
+	case end != "" && (gone || f.endAt != nil && *f.endAt == out):
+		sh.State, sh.End = commandState(end, sh.Killed), end
+		if !sh.Started.IsZero() && sh.Ended.IsZero() {
+			sh.Ended = time.Now()
+		}
+	case end != "":
+		f.endAt = &out
+	case gone:
+		sh.State = "started" // no word of its end, and nothing says it still runs
+	}
+	return sh, false
+}
+
+// toldRunning says the agent, still running, has said task id runs: its
+// shell needn't be looked for.
+func (c *chat) toldRunning(id string, agent Agent) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	t := c.tasks[id]
+	return t.state == "running" && t.agent == agent && c.agent == agent
+}
+
 // commandStoppedLocked ends the background command of task id, if the chat
-// still shows it running: the agent's TaskStop stopped it (Claude writes
-// "[killed]" then), or found it no longer running, how it ended unsaid
-// (docs/facts/claude.md). Its follower then stops reading its file.
+// shows it running or its end unknown: the agent's TaskStop stopped it
+// (Claude writes "[killed]" then), or found it no longer running, how it
+// ended unsaid (docs/facts/claude.md). Its follower then only reads its
+// output once more. One step, under the lock: the row is never seen with
+// one of its state and end changed and not the other.
 func (c *chat) commandStoppedLocked(id string, stopped bool) {
 	for i := range c.items {
 		it := &c.items[i]
-		if it.BackgroundCommand == nil || it.BackgroundCommand.ID != id || it.BackgroundCommand.State != "running" {
+		if it.BackgroundCommand == nil || it.BackgroundCommand.ID != id || it.BackgroundCommand.State != "running" && it.BackgroundCommand.State != "started" {
 			continue
 		}
 		sh := *it.BackgroundCommand
