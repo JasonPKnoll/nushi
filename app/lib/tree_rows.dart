@@ -77,6 +77,7 @@ class TreeRowView extends StatelessWidget {
     required this.onTap,
     super.key,
     this.large = false,
+    this.onSecondaryTapUp,
   });
 
   final TreeRow row;
@@ -87,6 +88,9 @@ class TreeRowView extends StatelessWidget {
   final bool showing; // the file the preview shows
   final bool wrote;
   final VoidCallback? onTap;
+
+  /// A right-click on it (a written file's menu).
+  final GestureTapUpCallback? onSecondaryTapUp;
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +117,7 @@ class TreeRowView extends StatelessWidget {
     final dim = r.ignored || r.kind != TreeRowKind.folder && !r.opens;
     return Tap(
       onTap: onTap,
+      onSecondaryTapUp: onSecondaryTapUp,
       selected: selected,
       // The file the preview shows is the open row (ADR 0111), the keys'
       // place or not.
