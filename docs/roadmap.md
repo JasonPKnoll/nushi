@@ -50,6 +50,7 @@ What isn't built yet and the decisions still open, each checked against the code
 
 ### Changes and review
 
+- **Changed lines in a file's preview** (owner, 2026-11-17: "I see the green dot and want to know what changed"; compared against the last commit, as the Changes tab's Uncommitted is, by the owner's choice): a thin strip beside each line of the Files pane's source that differs from HEAD (added or changed; a small mark where lines went); hovering or clicking a strip shows what the lines were, in a popup, not a diff view; and a dotted file's right-click menu gets **Show changes**, which opens it in the Changes tab. The tree's green dot stays what it is (files this chat wrote, committed or not), so after a commit a file can have a dot and no strips.
 - **Review comments by an agent** (from JetBrains AIR): a side chat reviews the changes and posts comments through a small MCP tool (`add_comment(file, line, text)`); they show in Changes, and those picked go to the main chat.
 - **Findings, picked** (after a finding opened the chat's Changes at its line, 2026-10-26): tick a review's findings in its card and send them back to the agent ("fix these"), or show them as comments in Changes. Each finding already has a stable id (`findingIds`: its file, line and summary).
 - **More git from Changes**: push, and staging by hunk ([ADR 0079](adr/0079-stage-and-commit-from-changes.md) has whole files; diff_view has no per-hunk controls yet).
