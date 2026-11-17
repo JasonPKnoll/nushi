@@ -68,14 +68,22 @@ class ChatsScreen extends StatelessWidget {
               UpdateBar(phone),
               Expanded(
                 child: groups.isEmpty && needs.isEmpty && pinned.isEmpty
+                    // "No chats" only once the list has come: connected
+                    // comes first, and said then it showed for a moment
+                    // before the chats did. Until it comes, a spinner; the
+                    // link down, the bar above says so.
                     ? Center(
-                        child: Text(
-                          daemon.connected ? 'No chats' : '',
-                          style: phoneText(
-                            context,
-                            color: NushiTheme.of(context).t.textMuted,
-                          ),
-                        ),
+                        child: daemon.chatsListed
+                            ? Text(
+                                'No chats',
+                                style: phoneText(
+                                  context,
+                                  color: NushiTheme.of(context).t.textMuted,
+                                ),
+                              )
+                            : daemon.connected
+                            ? const PhoneSpinner()
+                            : null,
                       )
                     : ListView(
                         padding: const EdgeInsets.only(bottom: 24),

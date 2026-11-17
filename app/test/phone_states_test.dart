@@ -15,6 +15,7 @@ import 'package:nushi/phone/connection_bar.dart';
 import 'package:nushi/phone/phone.dart';
 import 'package:nushi/phone/phone_app.dart';
 import 'package:nushi/phone/platform.dart';
+import 'package:nushi/phone/ui.dart';
 import 'package:nushi/spinner.dart';
 import 'package:remote_transport/remote_transport.dart' show Unreachable;
 
@@ -230,6 +231,31 @@ void main() {
         );
         _inside(tester, find.byType(TextField).last, phone);
         await render(tester, find.byType(PhoneApp), 'phone_chat_loading_$name');
+        await _end(tester, p);
+      });
+
+      testWidgets('the chats on their way: a spinner, never "No chats" '
+          'until the list has come ($name)', (tester) async {
+        final list = Completer<ListChatsResponse>();
+        final fake = FakeDaemon(_chats)
+          ..answer = (input) => input is ListChatsRequest ? list.future : null;
+        final p = await _app(tester, fake, phone, b);
+        expect(p.daemon!.connected, isTrue);
+        expect(p.daemon!.chatsListed, isFalse);
+        expect(find.text('No chats'), findsNothing);
+        expect(find.byType(PhoneSpinner), findsOneWidget);
+        await render(
+          tester,
+          find.byType(PhoneApp),
+          'phone_chats_loading_$name',
+        );
+        // None after all: now it says so.
+        list.complete(ListChatsResponse());
+        for (var i = 0; i < 8; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        expect(find.text('No chats'), findsOneWidget);
+        expect(find.byType(PhoneSpinner), findsNothing);
         await _end(tester, p);
       });
 
