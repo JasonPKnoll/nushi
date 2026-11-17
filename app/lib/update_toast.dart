@@ -121,8 +121,8 @@ void openRelease(BuildContext context, Daemon d) =>
 bool isBeta(String version) => version.split('+').first.contains('-');
 
 /// Says a newer release is out, in the main area's bottom right corner,
-/// above a chat's composer (`TopNotices`, `Beside`, ADR 0128), out of the
-/// way: not modal, no sound.
+/// above a chat's composer and the bars at a tab's foot (`TopNotices`,
+/// `Beside`, `CardFloor`, ADR 0128), out of the way: not modal, no sound.
 /// When Homebrew installed the app and its cask has the release
 /// ([caskWith]), Update has the daemon run Homebrew's upgrade (ADR 0109;
 /// Release notes opens the release's page):

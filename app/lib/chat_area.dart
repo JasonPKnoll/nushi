@@ -66,9 +66,10 @@ class _ChatAreaState extends State<ChatArea> {
   /// another tab put it back.
   final _cover = ValueNotifier<String?>(null);
 
-  /// How tall the transcript's foot is (its composer): the update card
-  /// stands above it ([FootRoom], ADR 0128).
-  final _foot = ValueNotifier<double>(0);
+  /// The bars at the foot of the tab shown (the composer, the cards
+  /// waiting, the commit box): the update card stands above them
+  /// ([CardFloor], ADR 0128).
+  final _floor = CardFloor();
 
   /// Where ⌃` and the keys stay when what had the focus goes.
   final _keys = FocusNode(skipTraversal: true);
@@ -135,7 +136,7 @@ class _ChatAreaState extends State<ChatArea> {
     _pull.unfollow();
     if (widget.chat.covered == _cover.value) widget.chat.covered = null;
     _cover.dispose();
-    _foot.dispose();
+    _floor.dispose();
     _inFiles.dispose();
     typesThrough.remove(_keys);
     _keys.dispose();
@@ -320,25 +321,25 @@ class _ChatAreaState extends State<ChatArea> {
                       : null,
                 ),
               );
-              final main = switch (tab) {
-                ChatTab.changes => ChangesView(
-                  chat: chat,
-                  daemon: widget.daemon,
-                ),
-                ChatTab.pull => PullTab(
-                  chat: chat,
-                  daemon: widget.daemon,
-                  onChat: () => _tab.value = ChatTab.chat,
-                ),
-                ChatTab.chat => FootRoom(
-                  room: _foot,
-                  child: ChatView(
+              final main = CardFloors(
+                floor: _floor,
+                child: switch (tab) {
+                  ChatTab.changes => ChangesView(
+                    chat: chat,
+                    daemon: widget.daemon,
+                  ),
+                  ChatTab.pull => PullTab(
+                    chat: chat,
+                    daemon: widget.daemon,
+                    onChat: () => _tab.value = ChatTab.chat,
+                  ),
+                  ChatTab.chat => ChatView(
                     chat: chat,
                     daemon: widget.daemon,
                     onPull: () => _tab.value = ChatTab.pull,
                   ),
-                ),
-              };
+                },
+              );
               final foot = TerminalFoot(
                 chat: chat,
                 daemon: widget.daemon,
@@ -437,13 +438,10 @@ class _ChatAreaState extends State<ChatArea> {
       panes: panes,
       details: details,
       notices: switch (widget.notices) {
-        // The card over the transcript stands above its composer.
+        // The card over the tab stands above the bars at its foot.
         (:final bars, :final card) => (
           bars: bars,
-          card: CardLift(
-            by: onChat && cover == null ? _foot : null,
-            child: card,
-          ),
+          card: CardLift(floor: cover == null ? _floor : null, child: card),
         ),
         null => null,
       },

@@ -63,7 +63,7 @@ class BarsRow extends StatelessWidget {
 /// What floats over a view that isn't a chat (ADR 0128): the [card] (the
 /// newer release's) in its bottom right corner. The bars and the toasts
 /// are under its header ([BarsRow]); a chat places all three itself
-/// (`Beside`'s notices), the card above its composer ([CardLift]). It
+/// (`Beside`'s notices), the card above the bars at its foot ([CardLift]). It
 /// covers the main area and takes no pointer but the card's.
 class TopNotices extends StatelessWidget {
   const new({required this.card, super.key});
@@ -173,69 +173,153 @@ class _Place extends MultiChildLayoutDelegate with NoticesPlace {
   bool shouldRelayout(_Place old) => false;
 }
 
-/// Where the chat area's main view tells how tall the foot of its
-/// transcript is (its turn status and composer, `OverBottom`), as last
-/// laid out, for the update card to stand above it ([CardLift]). A side
-/// pane's transcript isn't under it.
-class FootRoom extends InheritedWidget {
-  const new({required this.room, required super.child, super.key});
+/// The bars at the foot of what a chat's tab shows (the transcript's turn
+/// status and composer, the Pull request tab's cards waiting, Changes'
+/// commit box), as laid out: the update card rises above any of them it
+/// would otherwise cover ([CardLift], ADR 0128). A side pane's bars aren't
+/// in it: the card is never over a pane.
+class CardFloor extends ChangeNotifier {
+  final _bars = <RenderBox>{};
 
-  /// The foot's height.
-  final ValueNotifier<double> room;
+  /// The bars, each where it was last laid out.
+  Iterable<RenderBox> get bars => _bars;
 
-  /// The [FootRoom] [context] is in, if any.
-  static ValueNotifier<double>? maybeOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<FootRoom>()?.room;
+  void _add(RenderBox bar) {
+    _bars.add(bar);
+    notifyListeners();
+  }
 
-  @override
-  bool updateShouldNotify(FootRoom old) => room != old.room;
+  void _remove(RenderBox bar) {
+    if (_bars.remove(bar)) notifyListeners();
+  }
+
+  void _moved() => notifyListeners();
 }
 
-/// [child] drawn and hit [by] higher than it's laid out, and only while
-/// [shown] says so: the update card over a chat's transcript, above its
-/// composer, which grows as it's typed in, and not at all while it's under
-/// the panes ([NoticesPlace]). Both are read as it paints, after the
-/// composer's and the panes' layout: the card is never a frame behind
+/// Where the chat area's main view finds its [CardFloor].
+class CardFloors extends InheritedWidget {
+  const new({required this.floor, required super.child, super.key});
+
+  /// The bars the card stands above.
+  final CardFloor floor;
+
+  /// The [CardFloor] [context] is in, if any.
+  static CardFloor? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<CardFloors>()?.floor;
+
+  @override
+  bool updateShouldNotify(CardFloors old) => floor != old.floor;
+}
+
+/// [child], a bar at the foot of a chat's tab with controls on it, which
+/// the update card never covers: it's in the [CardFloor] around it, if any.
+class UnderCard extends SingleChildRenderObjectWidget {
+  const new({super.child, super.key});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _Bar(CardFloors.maybeOf(context));
+
+  @override
+  void updateRenderObject(BuildContext context, RenderObject renderObject) =>
+      (renderObject as _Bar).follow(CardFloors.maybeOf(context));
+}
+
+class _Bar extends RenderProxyBox {
+  new(this._floor);
+
+  CardFloor? _floor;
+
+  void follow(CardFloor? floor) {
+    if (floor == _floor) return;
+    if (attached) _floor?._remove(this);
+    _floor = floor;
+    if (attached) _floor?._add(this);
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _floor?._add(this);
+  }
+
+  @override
+  void detach() {
+    _floor?._remove(this);
+    super.detach();
+  }
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    // Read as the card paints, after this layout.
+    _floor?._moved();
+  }
+}
+
+/// [child] drawn and hit higher than it's laid out, and only while [shown]
+/// says so: the update card over a chat's tab, above the bars of its
+/// [floor] that it would otherwise cover (the composer, which grows as
+/// it's typed in; the cards waiting; the commit box), and not at all while
+/// it's under the panes ([NoticesPlace]). Both are read as it paints,
+/// after the bars' and the panes' layout: the card is never a frame behind
 /// them, and nothing is laid out again.
 class CardLift extends SingleChildRenderObjectWidget {
-  const new({this.by, this.shown, super.child, super.key});
+  const new({this.floor, this.shown, super.child, super.key});
 
-  /// How high; not at all while null.
-  final ValueListenable<double>? by;
+  /// The bars it stands above; none while null.
+  final CardFloor? floor;
 
   /// Whether it shows; always while null.
   final ValueListenable<bool>? shown;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _Lifted(by, shown);
+  RenderObject createRenderObject(BuildContext context) =>
+      _Lifted(floor, shown);
 
   @override
   void updateRenderObject(BuildContext context, RenderObject renderObject) =>
-      (renderObject as _Lifted).follow(by, shown);
+      (renderObject as _Lifted).follow(floor, shown);
 }
 
 class _Lifted extends RenderProxyBox {
-  new(this._by, this._shown);
+  new(this._floor, this._shown);
 
-  ValueListenable<double>? _by;
+  CardFloor? _floor;
   ValueListenable<bool>? _shown;
 
-  void follow(ValueListenable<double>? by, ValueListenable<bool>? shown) {
-    if (by == _by && shown == _shown) return;
+  void follow(CardFloor? floor, ValueListenable<bool>? shown) {
+    if (floor == _floor && shown == _shown) return;
     if (attached) _listen(false);
-    _by = by;
+    _floor = floor;
     _shown = shown;
     if (attached) _listen(true);
     _moved();
   }
 
   void _listen(bool on) {
-    for (final l in <Listenable?>[_by, _shown]) {
+    for (final l in <Listenable?>[_floor, _shown]) {
       on ? l?.addListener(_moved) : l?.removeListener(_moved);
     }
   }
 
-  double get _lift => _by?.value ?? 0;
+  /// How far it rises: until it's [TopNotices.cardInset] above each bar
+  /// of its floor that it's across from and not wholly above.
+  double get _lift {
+    final floor = _floor;
+    if (floor == null || !attached || !hasSize) return 0;
+    final card = localToGlobal(Offset.zero) & size;
+    var lift = 0.0;
+    for (final bar in floor.bars) {
+      if (!bar.attached || !bar.hasSize) continue;
+      final r = bar.localToGlobal(Offset.zero) & bar.size;
+      final across = min(r.right, card.right) - max(r.left, card.left);
+      if (across <= 0.5 || r.bottom <= card.top) continue;
+      lift = max(lift, card.bottom + TopNotices.cardInset - r.top);
+    }
+    return lift;
+  }
+
   bool get _visible => _shown?.value ?? true;
 
   void _moved() {

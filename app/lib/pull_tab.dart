@@ -14,6 +14,7 @@ import 'package:nushi/pull_states.dart';
 import 'package:nushi/replies.dart';
 import 'package:nushi/send_to_agent.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/top_notices.dart';
 import 'package:nushi/widgets.dart';
 
 /// A chat's Pull request tab: the GitHub view's pull request (its
@@ -84,7 +85,10 @@ class PullTab extends StatelessWidget {
             valueListenable: chat.draft.replies,
             builder: (context, replies, _) => replies.isEmpty
                 ? const SizedBox.shrink()
-                : RepliesWaiting(replies.length, onChat: onChat),
+                // The update card stands above it (ADR 0128).
+                : UnderCard(
+                    child: RepliesWaiting(replies.length, onChat: onChat),
+                  ),
           ),
         ],
       ),

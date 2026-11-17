@@ -103,14 +103,18 @@ class _OverBottomState extends State<OverBottom> {
           scroll.hasClients &&
           n.context == scroll.position.context.notificationContext,
       child: CustomMultiChildLayout(
-        delegate: _OverBottomLayout(_below, FootRoom.maybeOf(context)),
+        delegate: _OverBottomLayout(_below),
         children: [
           LayoutId(id: _Part.list, child: widget.list),
           LayoutId(
             id: _Part.bottom,
-            child: ColoredBox(
-              color: NushiTheme.of(context).t.base,
-              child: widget.bottom,
+            // The update card stands above it, in the chat area's main
+            // view ([CardFloor]).
+            child: UnderCard(
+              child: ColoredBox(
+                color: NushiTheme.of(context).t.base,
+                child: widget.bottom,
+              ),
             ),
           ),
         ],
@@ -122,12 +126,9 @@ class _OverBottomState extends State<OverBottom> {
 enum _Part { list, bottom }
 
 class _OverBottomLayout extends MultiChildLayoutDelegate {
-  new(this.below, this.room);
+  new(this.below);
 
   final ValueNotifier<double> below;
-
-  /// The chat area's, told the same: the update card stands above it.
-  final ValueNotifier<double>? room;
 
   @override
   void performLayout(Size size) {
@@ -145,12 +146,10 @@ class _OverBottomLayout extends MultiChildLayoutDelegate {
     positionChild(_Part.list, Offset.zero);
     // Read as the scrollbar paints, after this layout.
     below.value = bottom.height;
-    room?.value = bottom.height;
   }
 
   @override
-  bool shouldRelayout(_OverBottomLayout old) =>
-      old.below != below || old.room != room;
+  bool shouldRelayout(_OverBottomLayout old) => old.below != below;
 }
 
 /// [list] without its own scrollbar (FullHeightScrollbar draws it); what's

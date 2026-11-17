@@ -19,6 +19,7 @@ import 'package:nushi/review.dart';
 import 'package:nushi/review_elsewhere.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/top_notices.dart';
 import 'package:nushi/transcript_find.dart';
 import 'package:nushi/widgets.dart';
 
@@ -521,12 +522,16 @@ class _ChangesViewState extends State<ChangesView> with FollowsChanges {
                             ),
                           ),
                           if (staging && _files.isNotEmpty)
-                            CommitBox(
-                              chat: chat,
-                              files: _files,
-                              onStage: _stage,
-                              onCommit: _commit,
-                              onWrite: _writeMessage,
+                            // The update card stands above it where it
+                            // would cover it, in a narrow window (ADR 0128).
+                            UnderCard(
+                              child: CommitBox(
+                                chat: chat,
+                                files: _files,
+                                onStage: _stage,
+                                onCommit: _commit,
+                                onWrite: _writeMessage,
+                              ),
                             ),
                         ],
                       ),
