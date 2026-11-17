@@ -17,6 +17,9 @@ const double markGap = 4;
 const double markBar = 3;
 const double markRoom = 7;
 
+/// How far a removed run's wedge reaches back from the bar's right edge.
+const double markWedge = 7;
+
 /// The most of a mark's old lines its card lists.
 const markCardLines = 40;
 
@@ -64,7 +67,7 @@ class ChangeMark extends StatelessWidget {
 
 /// Paints [cell]'s mark in [box], a line's number cell: its bar [x] in,
 /// the box's height, and a removed run's wedge on its top or bottom edge,
-/// pointing at the text.
+/// pointing at the text, its tip at the bar's right edge.
 void paintChangeMark(
   Canvas canvas,
   Rect box,
@@ -79,12 +82,15 @@ void paintChangeMark(
       Paint()..color = markColor(t, bar.kind),
     );
   }
+  // The wedge ends at the bar's right edge, reaching back into the gap
+  // after the number: the editor's column ends there, and clips past it.
   final wedge = Paint()..color = markColor(t, MarkKind.removed);
+  final tip = left + markBar;
   void at(double y) => canvas.drawPath(
     Path()
-      ..moveTo(left, y - 5)
-      ..lineTo(left + 7, y)
-      ..lineTo(left, y + 5)
+      ..moveTo(tip - markWedge, y - 5)
+      ..lineTo(tip, y)
+      ..lineTo(tip - markWedge, y + 5)
       ..close(),
     wedge,
   );

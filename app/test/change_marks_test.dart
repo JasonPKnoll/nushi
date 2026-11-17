@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' show PictureRecorder;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -227,6 +228,31 @@ void main() {
       await tester.tapAt(const Offset(400, 300));
       await tester.pump();
     }
+  });
+
+  testWidgets("a removal's wedge is whole in a column that ends at the bar", (
+    tester,
+  ) async {
+    // The editor's mark column ends at the bar's right edge and clips
+    // there: the wedge must fit, 7 wide, not a 3-point sliver.
+    const box = Rect.fromLTWH(0, 0, markGap + markBar, 20);
+    const cell = MarkCell(top: LineMark(MarkKind.removed, 1, 0, ['gone']));
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder)..clipRect(box);
+    paintChangeMark(canvas, box.translate(0, 5), cell, markGap, Tokens.light);
+    final image = await tester.runAsync(
+      () => recorder.endRecording().toImage(7, 30),
+    );
+    final bytes = (await tester.runAsync(image!.toByteData))!;
+    // Inked across the box (but its anti-aliased tip) on the edge's row.
+    for (var x = 0; x < 6; x++) {
+      expect(
+        bytes.getUint8((5 * 7 + x) * 4 + 3),
+        greaterThan(200),
+        reason: 'column $x',
+      );
+    }
+    image.dispose();
   });
 
   testWidgets('a card lists 40 old lines at most', (tester) async {
