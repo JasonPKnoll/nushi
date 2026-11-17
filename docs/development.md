@@ -18,6 +18,7 @@ make check       # lint, test and the desktop build: the one check before a push
 make test-timings RUN=<id>  # app/test/timings.tsv from that CI run's app shards
 make gen         # regenerate the API code after editing proto/
 make lines       # hand-written line counts
+make hooks       # this clone's git hooks (.githooks): a push that make lint fails is refused
 make package     # a release "Nushi.app" with nushid inside (signed: Install, below, says with what)
 make install     # package, then copy it to ~/Applications (Linux: package-linux, then its install.sh)
 make package-linux  # Linux's package, app/build/linux/nushi (tools/package-linux.sh)
@@ -50,6 +51,8 @@ tools/linux-smoke.sh dist/nushi-1.2.0-linux-amd64.tar.gz  # install and start it
 - `tools/test-shards -check` (next): every app test file in exactly one shard of its set for any shard count, no file that builds Go or tests Linux in the macOS set (the files with goldens), and `app/test/timings.tsv` well formed; it notes how many files the table lacks;
 - `buf lint` and `buf format`;
 - `flutter analyze` and `dart format`, for the app and each package.
+
+`make hooks` sets this clone's `core.hooksPath` to `.githooks`, whose `pre-push` runs `make lint` and refuses the push when it fails (quiet when it passes); `git push --no-verify` skips it deliberately.
 
 `make check` runs it, the tests and the desktop app's build (`tools/check`): the app's suite (`--concurrency 3`) and then the web's tests in one lane, the lints and the other tests in another beside it, then `flutter build macos` (`linux` on Linux). A failure stops nothing, so one run shows every failure; each step's log is in `bin/check-logs`. `make check-app` is the same, under its old name.
 
