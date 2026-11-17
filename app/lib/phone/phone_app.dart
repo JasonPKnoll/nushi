@@ -11,6 +11,7 @@ import 'package:nushi/phone/history.dart';
 import 'package:nushi/phone/keyboard.dart';
 import 'package:nushi/phone/pair_screen.dart';
 import 'package:nushi/phone/phone.dart';
+import 'package:nushi/phone/touch_outside.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/toast.dart';
 
@@ -120,14 +121,16 @@ class _PhoneAppState extends State<PhoneApp> with WidgetsBindingObserver {
     themeAnimationDuration: Duration.zero,
     // The Mac's transcript and controls are drawn for a desk: larger text,
     // and targets for a finger, on a phone. Every screen, dialog and sheet
-    // keeps clear of the on-screen keyboard.
+    // keeps clear of the on-screen keyboard, which a scroll leaves up.
     builder: (context, child) => KeyboardInset(
       widget.phone.platform.keyboard,
-      child: TouchTargets(
-        child: MediaQuery.withClampedTextScaling(
-          minScaleFactor: 1.15,
-          // The toasts at the bottom, near the thumb (ADR 0128).
-          child: ToastHost(atBottom: true, child: child!),
+      child: TouchOutside(
+        child: TouchTargets(
+          child: MediaQuery.withClampedTextScaling(
+            minScaleFactor: 1.15,
+            // The toasts at the bottom, near the thumb (ADR 0128).
+            child: ToastHost(atBottom: true, child: child!),
+          ),
         ),
       ),
     ),
