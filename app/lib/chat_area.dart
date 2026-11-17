@@ -17,6 +17,7 @@ import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_tab.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/terminal_panel.dart';
+import 'package:nushi/top_notices.dart';
 import 'package:nushi/type_to_box.dart';
 
 /// A chat in the main area (ADR 0111, 0123): one pane of its transcript, its
@@ -27,8 +28,9 @@ import 'package:nushi/type_to_box.dart';
 /// the details show and hide; the rail tucks itself away when the panes
 /// need its room. All of it is laid out by one [Beside], which keeps the
 /// header and the terminal as the tabs change. Over it, [notices]: the
-/// bars, the newer release's card and the toasts' place, the card and the
-/// toasts over the transcript (ADR 0128).
+/// bars, the newer release's card and the toasts' place, the toasts over
+/// the transcript and the card at its bottom right, above the composer
+/// (ADR 0128).
 class ChatArea extends StatefulWidget {
   const new(this.chat, this.daemon, {super.key, this.notices});
 
@@ -63,6 +65,10 @@ class _ChatAreaState extends State<ChatArea> {
   /// browser's place, a terminal opening, another chat (another area) or
   /// another tab put it back.
   final _cover = ValueNotifier<String?>(null);
+
+  /// How tall the transcript's foot is (its composer): the update card
+  /// stands above it ([FootRoom], ADR 0128).
+  final _foot = ValueNotifier<double>(0);
 
   /// Where ⌃` and the keys stay when what had the focus goes.
   final _keys = FocusNode(skipTraversal: true);
@@ -129,6 +135,7 @@ class _ChatAreaState extends State<ChatArea> {
     _pull.unfollow();
     if (widget.chat.covered == _cover.value) widget.chat.covered = null;
     _cover.dispose();
+    _foot.dispose();
     _inFiles.dispose();
     typesThrough.remove(_keys);
     _keys.dispose();
@@ -323,10 +330,13 @@ class _ChatAreaState extends State<ChatArea> {
                   daemon: widget.daemon,
                   onChat: () => _tab.value = ChatTab.chat,
                 ),
-                ChatTab.chat => ChatView(
-                  chat: chat,
-                  daemon: widget.daemon,
-                  onPull: () => _tab.value = ChatTab.pull,
+                ChatTab.chat => FootRoom(
+                  room: _foot,
+                  child: ChatView(
+                    chat: chat,
+                    daemon: widget.daemon,
+                    onPull: () => _tab.value = ChatTab.pull,
+                  ),
                 ),
               };
               final foot = TerminalFoot(
@@ -409,6 +419,7 @@ class _ChatAreaState extends State<ChatArea> {
         : const <SidePane>[];
     // One is dragged as wide as it's wanted (PaneSpec.wide).
     final wide = panes.any((p) => p.wide);
+    final cover = _coverable(_cover.value) ? _cover.value : null;
     return Beside(
       scene: tab,
       head: head,
@@ -422,10 +433,20 @@ class _ChatAreaState extends State<ChatArea> {
       // narrower than that the panes lie over it ([chatFit]).
       least: wide ? ChatView.leastBesideWide : ChatView.minWidth,
       railLeast: wide ? ChatView.leastBesideWide : ChatView.leastBesideDetails,
-      cover: _coverable(_cover.value) ? _cover.value : null,
+      cover: cover,
       panes: panes,
       details: details,
-      notices: widget.notices,
+      notices: switch (widget.notices) {
+        // The card over the transcript stands above its composer.
+        (:final bars, :final card) => (
+          bars: bars,
+          card: CardLift(
+            by: onChat && cover == null ? _foot : null,
+            child: card,
+          ),
+        ),
+        null => null,
+      },
     );
   }
 }

@@ -120,8 +120,9 @@ void openRelease(BuildContext context, Daemon d) =>
 /// ADR 0108).
 bool isBeta(String version) => version.split('+').first.contains('-');
 
-/// Says a newer release is out, at the main area's top right under its
-/// header (`TopNotices`, ADR 0128), out of the way: not modal, no sound.
+/// Says a newer release is out, in the main area's bottom right corner,
+/// above a chat's composer (`TopNotices`, `Beside`, ADR 0128), out of the
+/// way: not modal, no sound.
 /// When Homebrew installed the app and its cask has the release
 /// ([caskWith]), Update has the daemon run Homebrew's upgrade (ADR 0109;
 /// Release notes opens the release's page):
@@ -133,8 +134,8 @@ bool isBeta(String version) => version.split('+').first.contains('-');
 class UpdateToast extends StatefulWidget {
   const new(this.daemon, {super.key});
 
-  /// As wide as the details panel's text, over whose top it sits in a
-  /// wide window: the panel's width inside its side margins.
+  /// As wide as the details panel's text: the panel's width inside its
+  /// side margins.
   static const width = 288.0;
 
   final Daemon daemon;
@@ -171,7 +172,7 @@ class _UpdateToastState extends State<UpdateToast> {
     builder: (context, _) {
       final version = updateToShow(widget.daemon);
       return Presence(
-        // It comes down 8 px as it fades in, and only fades as it goes.
+        // It rises 8 px as it fades in, and only fades as it goes.
         builder: (context, run, child) => AnimatedBuilder(
           animation: run,
           builder: (context, child) => Faded(
@@ -179,9 +180,7 @@ class _UpdateToastState extends State<UpdateToast> {
             child: Transform.translate(
               offset: Offset(
                 0,
-                run.status == AnimationStatus.reverse
-                    ? 0
-                    : -8 * (1 - run.value),
+                run.status == AnimationStatus.reverse ? 0 : 8 * (1 - run.value),
               ),
               child: child,
             ),

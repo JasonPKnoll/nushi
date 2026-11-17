@@ -146,6 +146,10 @@ class _BesideState extends State<Beside> {
   /// Holds the focus while it's in the rail.
   final _railFocus = FocusNode(skipTraversal: true, canRequestFocus: false);
 
+  /// Whether the newer release's card shows: not while it's under the
+  /// panes ([NoticesPlace]).
+  final ValueNotifier<bool> _cardShown = ValueNotifier(true);
+
   @override
   void didUpdateWidget(Beside old) {
     super.didUpdateWidget(old);
@@ -163,6 +167,7 @@ class _BesideState extends State<Beside> {
   @override
   void dispose() {
     _railFocus.dispose();
+    _cardShown.dispose();
     super.dispose();
   }
 
@@ -303,11 +308,15 @@ class _BesideState extends State<Beside> {
         final railName = details?.name ?? _BesideState._railName;
         final notices = [
           if (widget.notices case (:final bars, :final card))
-            ...TopNotices.slots(bars: bars, card: card),
+            ...TopNotices.slots(
+              bars: bars,
+              card: CardLift(shown: _cardShown, child: card),
+            ),
         ];
         // Over the view, the card is its transcript's and lies under the
-        // panes, as the rest of the view does, so it never covers a pane's
-        // rows; the bars and the toasts stay over all.
+        // panes, as the rest of the view does, hidden where it doesn't fit
+        // left of them, so it never covers a pane's rows; the bars and the
+        // toasts stay over all.
         final cardUnder = over && cover == null
             ? notices
                   .where((w) => w.key == const ValueKey(NoticeSlot.card))
@@ -448,6 +457,7 @@ class _BesideState extends State<Beside> {
               at: _at,
               widths: _widths,
               cover: cover,
+              cardShown: _cardShown,
             ),
             children: children,
           ),

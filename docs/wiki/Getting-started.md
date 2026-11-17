@@ -38,7 +38,7 @@ Without Homebrew, or on Linux, download a beta from the [Releases page](https://
 
 ## Update Nushi
 
-When a newer version is out, a small card appears at the top right of the window, under the header.
+When a newer version is out, a small card appears at the bottom right of the window, above the message box in a chat.
 
 1. Click **Update**. The card says "Updating to Nushi…" while Homebrew downloads and installs it.
 2. Nushi closes and opens again as the new version. Your chats keep running.

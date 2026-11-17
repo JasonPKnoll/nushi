@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat_view.dart';
+import 'package:nushi/composer.dart';
 import 'package:nushi/daemon.dart';
-import 'package:nushi/files_bar.dart';
+import 'package:nushi/files_pane.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/settings_rows.dart';
-import 'package:nushi/slides.dart';
 import 'package:nushi/status_bar.dart';
 import 'package:nushi/toast.dart';
 import 'package:nushi/top_notices.dart';
@@ -92,7 +92,7 @@ void main() {
     ]) {
       for (final width in [1700.0, 720.0]) {
         testWidgets('the toast ($kind), ${width.toInt()} wide ($name): at '
-            'the top right, under the header', (tester) async {
+            'the bottom right, above the composer', (tester) async {
           final (found, buttons) =
               toastStates[kind] ?? (newerUpdate('0.1.17'), ['Download']);
           brewCask = kind == 'zip' ? null : 'nushi';
@@ -104,11 +104,12 @@ void main() {
           );
           expect(toastButtons(tester), buttons);
           final box = tester.getRect(updateToast);
-          // At the transcript's top right, under the header and so clear
-          // of its buttons, left of the details rail (ADR 0128).
+          // At the transcript's bottom right, left of the details rail,
+          // above the composer and so clear of its buttons (ADR 0128).
           final transcript = tester.getRect(find.byType(ChatView));
           expect(box.right, transcript.right - TopNotices.cardInset);
-          expect(box.top, transcript.top + FloatBar.inset);
+          expect(box.bottom, composerFoot(tester).top - TopNotices.cardInset);
+          expect(box.top, greaterThan(transcript.center.dy)); // not the top
           expect(
             tester.getRect(find.byType(StatusBar)).right,
             lessThan(box.left),
@@ -198,9 +199,8 @@ void main() {
 
   for (final width in [720.0, 900.0]) {
     testWidgets('Files lying over the transcript, ${width.toInt()} wide: the '
-        "card is the transcript's, under the pane, which keeps its toolbar", (
-      tester,
-    ) async {
+        "card is the transcript's, hidden under the pane, which keeps its "
+        'rows', (tester) async {
       final d = await openWithUpdate(
         tester,
         updateDaemon(() => newerUpdate('0.1.17')),
@@ -208,25 +208,57 @@ void main() {
       );
       filesChats.value = {'c'};
       await tester.pumpAndSettle();
+      // No room left of the pane: the card is wholly under it, and what's
+      // drawn and clicked there is the pane, not the card.
       final card = tester.getRect(updateToast);
-      final bar = tester.getRect(find.byType(FilesBar));
-      final both = card.intersect(bar);
-      expect(both.isEmpty, isFalse, reason: 'the card is where it was');
-      // What's drawn and clicked there is the pane's toolbar, not the card.
-      final hit = tester.hitTestOnBinding(both.center);
+      final pane = tester.getRect(find.byType(FilesPane));
+      expect(pane.intersect(card), card);
+      final hit = tester.hitTestOnBinding(card.center);
       bool reached(Finder f) => hit.path.any(
         (e) => f.evaluate().any((el) => el.renderObject == e.target),
       );
-      expect(reached(find.byType(FilesBar)), isTrue);
+      expect(reached(find.byType(FilesPane)), isTrue);
       expect(reached(updateToast), isFalse);
+      expect(find.text('Download').hitTestable(), findsNothing);
       await render(
         tester,
         find.byType(MaterialApp),
         'update_toast_files_${width.toInt()}',
       );
+      // Closed, the card shows again where it was.
+      filesChats.value = {};
+      await tester.pumpAndSettle();
+      expect(find.text('Download').hitTestable(), findsOneWidget);
       d.dispose();
     }, variant: macOSOnly);
   }
+
+  testWidgets('the card stands above the composer as it grows, and stays '
+      'put as a toast shows', (tester) async {
+    final d = await openWithUpdate(
+      tester,
+      updateDaemon(() => newerUpdate('0.1.17')),
+      width: 720,
+    );
+    final before = tester.getRect(updateToast);
+    showToast(
+      Toasts.maybeOf(tester.element(find.byType(Scaffold))),
+      'Committed 3f2a9c1',
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getRect(updateToast), before);
+    await tester.enterText(
+      find.byType(TextField).first,
+      'one\ntwo\nthree\nfour\nfive',
+    );
+    await tester.pumpAndSettle();
+    final grown = tester.getRect(updateToast);
+    expect(grown.bottom, composerFoot(tester).top - TopNotices.cardInset);
+    expect(grown.bottom, lessThan(before.bottom));
+    // Its buttons are where it's drawn.
+    expect(find.text('Download').hitTestable(), findsOneWidget);
+    d.dispose();
+  }, variant: macOSOnly);
 
   testWidgets('a release arrives as an event; nothing found, no toast', (
     tester,
@@ -240,12 +272,12 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(updateToast, findsOneWidget);
-    // It comes down up to 8 px as it fades in.
+    // It rises up to 8 px as it fades in.
     await tester.pump(Motion.enter ~/ 4);
-    final coming = tester.getRect(updateToast).top;
+    final rising = tester.getRect(updateToast).bottom;
     await tester.pumpAndSettle();
-    final rest = tester.getRect(updateToast).top;
-    expect(rest - coming, inExclusiveRange(0, 8));
+    final rest = tester.getRect(updateToast).bottom;
+    expect(rising - rest, inExclusiveRange(0, 8));
     d.dispose();
   }, variant: macOSOnly);
 
@@ -349,3 +381,8 @@ void main() {
     d.dispose();
   }, variant: macOSOnly);
 }
+
+/// The foot of the chat's transcript: its turn status and composer.
+Rect composerFoot(WidgetTester tester) => tester.getRect(
+  find.ancestor(of: find.byType(Composer), matching: find.byType(Column)).first,
+);

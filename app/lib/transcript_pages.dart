@@ -5,6 +5,7 @@ import 'package:nushi/chat.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/spinner.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/top_notices.dart';
 
 /// At the top of a chat's transcript while more of it comes before what it
 /// has (ADR 0026): a small spinner while the page before comes (asked for
@@ -102,7 +103,7 @@ class _OverBottomState extends State<OverBottom> {
           scroll.hasClients &&
           n.context == scroll.position.context.notificationContext,
       child: CustomMultiChildLayout(
-        delegate: _OverBottomLayout(_below),
+        delegate: _OverBottomLayout(_below, FootRoom.maybeOf(context)),
         children: [
           LayoutId(id: _Part.list, child: widget.list),
           LayoutId(
@@ -121,9 +122,12 @@ class _OverBottomState extends State<OverBottom> {
 enum _Part { list, bottom }
 
 class _OverBottomLayout extends MultiChildLayoutDelegate {
-  new(this.below);
+  new(this.below, this.room);
 
   final ValueNotifier<double> below;
+
+  /// The chat area's, told the same: the update card stands above it.
+  final ValueNotifier<double>? room;
 
   @override
   void performLayout(Size size) {
@@ -141,10 +145,12 @@ class _OverBottomLayout extends MultiChildLayoutDelegate {
     positionChild(_Part.list, Offset.zero);
     // Read as the scrollbar paints, after this layout.
     below.value = bottom.height;
+    room?.value = bottom.height;
   }
 
   @override
-  bool shouldRelayout(_OverBottomLayout old) => old.below != below;
+  bool shouldRelayout(_OverBottomLayout old) =>
+      old.below != below || old.room != room;
 }
 
 /// [list] without its own scrollbar (FullHeightScrollbar draws it); what's

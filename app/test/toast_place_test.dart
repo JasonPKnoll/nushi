@@ -134,21 +134,22 @@ void main() {
           await tester.pump();
           await checking;
           await shot('e_card');
-          // At the top right, under the header's buttons.
+          // The transcript's bottom right, left of the details rail and
+          // above the composer, not up with the toasts (ADR 0128).
           final card = tester.getRect(updateToast);
-          expect(card.top, headerBottom + 8);
-          // The transcript's top right: left of the details rail.
           expect(card.right, transcript.right - TopNotices.cardInset);
+          expect(card.top, greaterThan(transcript.center.dy));
           say(
             context,
             'Archived side chat',
             action: (label: 'Undo', onPressed: () {}),
           );
           await shot('f_card_toast');
+          // Each where it was alone: neither moves for the other.
           final both = toast(tester);
           expect(both.overlaps(card), isFalse);
-          // A narrow window has the toast under the card; a wide one beside.
-          expect(both.top, both.right < card.left ? card.top : card.bottom + 8);
+          under(both);
+          expect(tester.getRect(updateToast), card);
           // Over Settings, where it was, and pressable.
           d.openSettings();
           await shot('h_settings');
