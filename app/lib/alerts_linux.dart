@@ -240,9 +240,12 @@ class LinuxAlertCenter implements AlertCenter {
         final id = _names[number];
         final chat = _chats[id];
         final token = _tokens.remove(number);
-        if (chat == null) return;
+        // A click while nothing listens (the alerts gone; a post follows
+        // the service again for its closes) is dropped, as the Mac's is.
+        final open = _open;
+        if (chat == null || open == null) return;
         _window.present(token: token).ignore();
-        _open?.call(chat);
+        open(chat);
       case ('NotificationClosed', _):
         final id = _names.remove(number);
         _tokens.remove(number);

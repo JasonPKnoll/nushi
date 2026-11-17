@@ -251,6 +251,30 @@ void main() {
     expect(window.presented, hasLength(2));
   });
 
+  test('after the alerts go, a post follows the service again, but a click '
+      'on an earlier notification neither opens nor brings the window up, '
+      'nor reaches a listener set later', () async {
+    final service = _Notifications();
+    final (center, window, _) = await _center(service);
+    final opened = <String>[];
+    center.onOpen(opened.add);
+    await _post(center, 'a/ended');
+    center.onOpen(null);
+    await _post(center, 'b/ended', chat: 'b');
+    await service.click(1, token: 'gnome-shell/Nushi/1-0-host_TIME1');
+    // The bus has routed the click once it answers the service's ping, and
+    // the center has read it once the bus answers the center's own call.
+    await service.client!.ping();
+    expect(await center.allowed(), NotifyPermission.allowed);
+    expect(window.presented, isEmpty);
+
+    center.onOpen(opened.add);
+    await service.click(2);
+    await _until(() => opened.isNotEmpty);
+    expect(opened, ['b']);
+    expect(window.presented, [null]);
+  });
+
   test("the badge is the launcher entry's count of the app's .desktop "
       'file', () async {
     final address = await _bus(DBusServer());
