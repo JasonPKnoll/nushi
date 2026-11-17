@@ -157,30 +157,32 @@ class _PresenceState extends State<Presence>
   }
 }
 
-/// A notice that floats over the main pane, under its header (ADR 0111): a
-/// rounded card with a shadow, [tint] over its fill for one that says a
-/// state, as wide as [child] asks. Under it, the room before the next.
-class FloatBar extends StatelessWidget {
+/// One of the bars (ADR 0128, amended 2026-11-17): a notice that stays
+/// until it's done with (the daemon's lost or back, its update waiting for
+/// idle chats, removed chats, a start walked away from), in a row of its
+/// own under the header, which pushes what's under it down rather than
+/// lying over it. A card on the pane (`raised`, corners `control`, no
+/// shadow: it doesn't float), [tint] over its fill for one that says a
+/// state, as wide as its row, its text at the header's gutter.
+class TopBar extends StatelessWidget {
   const new({required this.child, super.key, this.tint});
 
   final Widget child;
   final Color? tint;
 
-  /// The room under each.
-  static const gap = 6.0;
-
-  /// Their room under the pane's header, and the widest one gets.
-  static const inset = 8.0;
-  static const width = 640.0;
+  /// The room around each: in from the row's sides, and over it (the
+  /// header's hairline or the bar before).
+  static const side = 12.0;
+  static const gap = 8.0;
 
   @override
   Widget build(BuildContext context) {
     final t = NushiTheme.of(context).t;
     final radius = BorderRadius.circular(NushiTheme.control);
     return Padding(
-      padding: const EdgeInsets.only(bottom: gap),
+      padding: const EdgeInsets.fromLTRB(side, gap, side, 0),
       child: DecoratedBox(
-        decoration: floatBox(t, radius: NushiTheme.control),
+        decoration: cardBox(t, radius: NushiTheme.control),
         child: DecoratedBox(
           decoration: BoxDecoration(color: tint, borderRadius: radius),
           child: Padding(

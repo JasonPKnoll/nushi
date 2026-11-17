@@ -35,7 +35,7 @@ A chat was laid out transcript | side panes | details rail, the chat's header ac
 - A header 360 wide happens now. Past the Jira key and the GitHub chips, which fold into ⋯, the agent's mark folds (the state's dot's tooltip names the agent), then the tabs' field, into ⋯ as the tabs, so the title keeps its 80 even with the sidebar hidden on a Mac, where the traffic lights take the row's start.
 - A header with no pane open changed too, as the owner accepted: it gives its title the room the row leaves and measures the agent's name (f8650d40), where it had capped both from worst-case widths, so the header's row in the `spacing_turn_720`, `header_menu`, `reopen` and `reopen_gone` goldens moved.
 - Over the transcript the chat's header and its box are covered at their right, the header's ⋯ and the box's send button with them, until the window widens or a pane closes.
-- The notices still float centred on the whole pane, so they can lie over a pane's address row; centring them on the chat is a follow-up.
+- The notices still float centred on the whole pane, so they can lie over a pane's address row; centring them on the chat is a follow-up. (Done otherwise on 2026-11-17, [0128](0128-toasts-come-from-the-top.md): they take a row under the chat's header, as wide as it, and never lie over a pane.)
 - The Changes and Pull request tabs have no panes, as before; the header and the terminal stay the same widgets from tab to tab.
 
 ## Alternatives considered

@@ -537,11 +537,13 @@ void main() {
     await closeView(tester, d);
   }, variant: _mac);
 
-  testWidgets('a notice floats centred on the whole chat pane, under the '
-      "header's row, a pane open beside the chat (ADR 0123's known "
-      'overlap with its address row)', (tester) async {
+  testWidgets('a notice takes a row under the chat header, as wide as it, '
+      'a pane open beside the chat: the pane and its address row stay '
+      'where they were, clear of it (ADR 0128)', (tester) async {
     browserFakes();
     final (d, _) = await panesApp(tester, width: 1700, open: _open(browser: 1));
+    final pane = _rect(tester, find.byType(BrowserPane));
+    final view = _rect(tester, find.byType(ChatView));
     d
       ..notice = 'Didn’t start Claude in site'
       ..listChanged();
@@ -551,13 +553,22 @@ void main() {
       find
           .ancestor(
             of: find.textContaining('start Claude in site'),
-            matching: find.byType(FloatBar),
+            matching: find.byType(TopBar),
           )
           .first,
     );
-    final area = _rect(tester, find.byType(Pane));
-    expect(bar.center.dx, closeTo(area.center.dx, 1));
-    expect(bar.top, greaterThan(_rect(tester, find.byType(ChatHeader)).bottom));
+    final header = _rect(tester, find.byType(ChatHeader));
+    expect(bar.top, header.bottom);
+    expect(bar.left, header.left);
+    expect(bar.right, header.right);
+    expect(_rect(tester, find.byType(BrowserPane)), pane);
+    expect(bar.right, lessThanOrEqualTo(pane.left));
+    // The transcript goes down by the row.
+    expect(_rect(tester, find.byType(ChatView)).top, greaterThan(view.top));
+    expect(
+      _rect(tester, find.byType(ChatView)).top,
+      greaterThanOrEqualTo(bar.bottom),
+    );
     await closeView(tester, d);
   }, variant: _both);
 

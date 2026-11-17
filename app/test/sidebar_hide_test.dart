@@ -444,17 +444,17 @@ void main() {
   });
 
   group('the bars, hidden', () {
-    /// [bar] floats under the pane's header, clear of the lights, in the
-    /// pane's middle and no wider than a notice gets.
-    void floats(WidgetTester tester, Finder bar, double width) {
+    /// [bar] is a row under the pane's header (ADR 0128), clear of the
+    /// lights, across the pane less its sides.
+    void row(WidgetTester tester, Finder bar) {
       final r = tester.getRect(bar);
       expect(
         r.top,
         greaterThanOrEqualTo(NushiTheme.windowPad + PaneHeader.height),
       );
-      expect(r.width, lessThanOrEqualTo(FloatBar.width));
-      expect(r.left, greaterThanOrEqualTo(NushiTheme.windowPad + 16));
-      expect(r.center.dx, moreOrLessEquals(width / 2, epsilon: 1));
+      final pane = tester.getRect(find.byType(Pane));
+      expect(r.left, pane.left);
+      expect(r.right, pane.right);
     }
 
     for (final (width, b) in [
@@ -463,78 +463,72 @@ void main() {
       (720.0, Brightness.dark),
       (720.0, Brightness.light),
     ]) {
-      testWidgets(
-        'the update’s, removed chats’ and a notice’s cards float under '
-        'the header, $width wide, ${b.name}',
-        (tester) async {
-          viewport(tester, Size(width, 700), brightness: b);
-          paneWidths.value = {};
-          sidebarHidden.value = true;
-          final fake = FakeDaemon(_chats())
-            ..answer = ((input) => switch (input) {
-              PingRequest() => PingResponse(
-                apiVersion: apiVersion,
-                build: '7-1000',
-              ),
-              _ => null,
-            });
-          final d = Daemon(transport: fake)..bundled = '7-2000';
-          await tester.pumpWidget(NushiApp(daemon: d));
-          await tester.pumpAndSettle();
-          d.select('a');
-          fake.emit(
-            EventsResponse(
-              removedChats: RemovedChats(
-                chats: [
-                  RemovedChat(
-                    id: 'k',
-                    agent: 'claude',
-                    title: 'Old',
-                    folder: '/x',
-                  ),
-                ],
-              ),
+      testWidgets('the update’s, removed chats’ and a notice’s bars take a row '
+          'under the header, $width wide, ${b.name}', (tester) async {
+        viewport(tester, Size(width, 700), brightness: b);
+        paneWidths.value = {};
+        sidebarHidden.value = true;
+        final fake = FakeDaemon(_chats())
+          ..answer = ((input) => switch (input) {
+            PingRequest() => PingResponse(
+              apiVersion: apiVersion,
+              build: '7-1000',
             ),
-          );
-          await tester.pumpAndSettle();
-          d
-            ..notice = 'Didn’t start Claude in site'
-            ..listChanged();
-          await tester.pumpAndSettle();
-
-          final update = find.textContaining('Nushi will update its daemon');
-          final removed = find.textContaining('Removed “Old”');
-          final notice = find.text('Didn’t start Claude in site');
-          Finder bar(Finder text) =>
-              find.ancestor(of: text, matching: find.byType(FloatBar));
-          // The header keeps the pane's top: nothing is over or under the
-          // lights, and nothing in the pane moved.
-          expect(
-            tester.getRect(find.byType(ChatHeader)).top,
-            NushiTheme.windowPad,
-          );
-          for (final text in [update, removed, notice]) {
-            floats(tester, bar(text), width);
-          }
-          await render(
-            tester,
-            find.byType(NushiApp),
-            'sidebar_hidden_bars_${width.toInt()}_${b.name}',
-          );
-
-          // Beside the sidebar they are over the pane, not the sidebar.
-          sidebarHidden.value = false;
-          await tester.pumpAndSettle();
-          expect(
-            tester.getRect(bar(update)).left,
-            greaterThanOrEqualTo(
-              tester.getRect(find.byType(Sidebar)).right + 16,
+            _ => null,
+          });
+        final d = Daemon(transport: fake)..bundled = '7-2000';
+        await tester.pumpWidget(NushiApp(daemon: d));
+        await tester.pumpAndSettle();
+        d.select('a');
+        fake.emit(
+          EventsResponse(
+            removedChats: RemovedChats(
+              chats: [
+                RemovedChat(
+                  id: 'k',
+                  agent: 'claude',
+                  title: 'Old',
+                  folder: '/x',
+                ),
+              ],
             ),
-          );
-          d.dispose();
-        },
-        variant: _mac,
-      );
+          ),
+        );
+        await tester.pumpAndSettle();
+        d
+          ..notice = 'Didn’t start Claude in site'
+          ..listChanged();
+        await tester.pumpAndSettle();
+
+        final update = find.textContaining('Nushi will update its daemon');
+        final removed = find.textContaining('Removed “Old”');
+        final notice = find.text('Didn’t start Claude in site');
+        Finder bar(Finder text) =>
+            find.ancestor(of: text, matching: find.byType(TopBar));
+        // The header keeps the pane's top: nothing is over or under the
+        // lights.
+        expect(
+          tester.getRect(find.byType(ChatHeader)).top,
+          NushiTheme.windowPad,
+        );
+        for (final text in [update, removed, notice]) {
+          row(tester, bar(text));
+        }
+        await render(
+          tester,
+          find.byType(NushiApp),
+          'sidebar_hidden_bars_${width.toInt()}_${b.name}',
+        );
+
+        // Beside the sidebar they are in the pane, not over the sidebar.
+        sidebarHidden.value = false;
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(bar(update)).left,
+          greaterThanOrEqualTo(tester.getRect(find.byType(Sidebar)).right),
+        );
+        d.dispose();
+      }, variant: _mac);
     }
 
     testWidgets('the daemon’s banner too', (tester) async {
@@ -550,11 +544,7 @@ void main() {
       final text = find.text(
         'Lost the connection to the daemon; reconnecting…',
       );
-      floats(
-        tester,
-        find.ancestor(of: text, matching: find.byType(FloatBar)),
-        tester.getSize(find.byType(NushiApp)).width,
-      );
+      row(tester, find.ancestor(of: text, matching: find.byType(TopBar)));
       fake.answer = null;
       await d.ping();
       await tester.pump(DaemonBanner.backFor);

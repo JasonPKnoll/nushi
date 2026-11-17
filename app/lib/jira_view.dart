@@ -17,6 +17,7 @@ import 'package:nushi/motion.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/token_notices.dart';
+import 'package:nushi/top_notices.dart';
 import 'package:nushi/widgets.dart';
 
 /// ⌘J shows Jira in place of the chat, and back.
@@ -494,6 +495,7 @@ class _JiraViewState extends State<JiraView> {
               onRefresh: _load,
               onClose: widget.daemon.back,
             ),
+            const BarsRow(),
             Expanded(
               child: sites == null
                   ? const SizedBox()

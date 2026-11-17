@@ -154,7 +154,7 @@ class _DaemonBannerState extends State<DaemonBanner> {
     final back = _reconnected;
     final color = back ? t.done : t.needs;
     return BarSlide(
-      child: FloatBar(
+      child: TopBar(
         tint: back ? t.doneSoft : t.needsSoft,
         child: Shine(
           on: !back,

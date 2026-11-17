@@ -17,7 +17,7 @@ class DaemonUpdateBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FloatBar(
+    return TopBar(
       child: Row(
         spacing: 12,
         children: [
@@ -70,9 +70,11 @@ class _Waiting extends StatelessWidget {
           style: style,
         ),
         if (holds.isNotEmpty) Text('Waiting for:', style: style),
+        // Each its own wrap: in a narrow bar, a chat's link and what it
+        // runs go to the next line rather than past the bar's edge.
         for (final (i, (h, c)) in holds.indexed)
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               if (h.terminal) Text('a terminal ${h.why} in ', style: style),
               LinkText(

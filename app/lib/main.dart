@@ -474,9 +474,9 @@ class _Shell extends StatelessWidget {
 
   final Daemon daemon;
 
-  /// The bars over the main view: one element wherever they're put (in a
-  /// chat's pane or another view's), so a bar keeps its state, and its
-  /// slide, as the view under it changes.
+  /// The bars in their row under the main view's header: one element
+  /// wherever they're put (in a chat's pane or under another view's
+  /// header), so a bar keeps its state, and its slide, as the view changes.
   static final GlobalKey _bars = GlobalKey();
 
   @override
@@ -513,12 +513,14 @@ class _Shell extends StatelessWidget {
     }
     final chat = daemon.selected;
     final shut = sidebarShut;
-    // The notices float over the pane, under its header (ADR 0111):
-    // nothing in the pane moves as one comes or goes. Always a column of
-    // the same children: one coming and going keeps the others' state.
+    // The bars take a row of their own under the header (ADR 0128,
+    // amended 2026-11-17): they stay for minutes, so they push the view
+    // down rather than lie over its first lines. Always a column of the
+    // same children: one coming and going keeps the others' state.
     final bars = Column(
       key: _bars,
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DaemonBanner(daemon),
         // Each slides down as it comes and up as it goes,
@@ -542,7 +544,10 @@ class _Shell extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (header) const PaneHeader(plain: true, child: SizedBox.shrink()),
+          if (header) ...[
+            const PaneHeader(plain: true, child: SizedBox.shrink()),
+            const BarsRow(),
+          ],
           Expanded(child: view),
         ],
       ),
@@ -593,30 +598,31 @@ class _Shell extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: daemon.trustAsk != null
-                          ? pane(TrustCard(daemon.trustAsk!), header: true)
-                          : switch (daemon.place) {
-                              JiraPlace() => pane(JiraView(daemon)),
-                              GitHubPlace() => pane(GitHubView(daemon)),
-                              ChatPlace() when chat == null => pane(
-                                NothingOpen(daemon),
-                                header: true,
-                              ),
-                              ChatPlace() => ChatArea(
-                                key: ValueKey(chat!.id),
-                                chat,
-                                daemon,
-                                notices: (bars: bars, card: card),
-                              ),
-                            },
-                    ),
-                    // The bars, the newer release's card and where the
-                    // toasts show; a chat places them itself, the card
-                    // and the toasts over its transcript (ADR 0128).
-                    if (!inChat)
-                      Positioned.fill(
-                        child: TopNotices(bars: bars, card: card),
+                      // A view but a chat puts the bars under its header.
+                      child: TopBars(
+                        bars: inChat ? null : bars,
+                        child: daemon.trustAsk != null
+                            ? pane(TrustCard(daemon.trustAsk!), header: true)
+                            : switch (daemon.place) {
+                                JiraPlace() => pane(JiraView(daemon)),
+                                GitHubPlace() => pane(GitHubView(daemon)),
+                                ChatPlace() when chat == null => pane(
+                                  NothingOpen(daemon),
+                                  header: true,
+                                ),
+                                ChatPlace() => ChatArea(
+                                  key: ValueKey(chat!.id),
+                                  chat,
+                                  daemon,
+                                  notices: (bars: bars, card: card),
+                                ),
+                              },
                       ),
+                    ),
+                    // The newer release's card; the bars and the toasts are
+                    // under the view's header ([BarsRow]). A chat places
+                    // all three itself (ADR 0128).
+                    if (!inChat) Positioned.fill(child: TopNotices(card: card)),
                   ],
                 ),
               ),

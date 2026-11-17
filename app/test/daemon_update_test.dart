@@ -7,7 +7,6 @@ import 'package:nushi/daemon_update.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/main.dart';
 import 'package:nushi/panes.dart';
-import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
 
 import 'fake_app_install.dart';
@@ -116,10 +115,9 @@ void main() {
         final d = await _open(tester, fake, width: width);
         final bar = tester.getRect(find.byType(DaemonUpdateBar));
         final button = tester.getRect(find.text('Restart now'));
-        // A card over the main pane, under its header.
+        // A row under the main pane's header, across it (ADR 0128).
         expect(bar.top, greaterThan(PaneHeader.height));
-        expect(bar.width, lessThanOrEqualTo(FloatBar.width));
-        expect(bar.right, lessThanOrEqualTo(width - NushiTheme.windowPad - 16));
+        expect(bar.right, width - NushiTheme.windowPad);
         expect(button.right, lessThan(bar.right)); // inside it, at its end
         await render(
           tester,

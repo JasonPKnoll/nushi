@@ -79,6 +79,7 @@ class _Beside extends MultiChildLayoutDelegate with NoticesPlace {
     this.block,
     this.cover,
     this.cardShown,
+    this.barsStart = 0,
   });
 
   final List<String> panes; // left to right
@@ -92,12 +93,31 @@ class _Beside extends MultiChildLayoutDelegate with NoticesPlace {
   final Map<String, double> widths; // each pane's, as last laid out beside
   final String? cover; // the pane over all, the whole of it
   final ValueNotifier<bool>? cardShown; // the newer release's card's
+  final double barsStart; // the bars' left, across the top: past the lights
 
   @override
   void performLayout(Size size) {
     final width = size.width;
-    final height = size.height;
     final head = hasChild(_Slot.head) ? PaneHeader.height : 0.0;
+    final bars = hasChild(NoticeSlot.bars);
+    double layBars(double across) => layoutChild(
+      NoticeSlot.bars,
+      BoxConstraints.tightFor(width: max(0, across)),
+    ).height;
+    // The bars take a row of their own (ADR 0128, amended 2026-11-17),
+    // under the header: as wide as it while the panes are beside the view,
+    // their own headers level with it; across it all while they lie over
+    // the view, and they go down under it, a drawer over the view under
+    // the bars. Over a pane that covers it all, across the top, which goes
+    // down by their height.
+    final atTop = bars && cover != null;
+    final lift = atTop ? layBars(width - barsStart) : 0.0;
+    if (atTop) positionChild(NoticeSlot.bars, Offset(barsStart, 0));
+    final across0 = bars && cover == null && block != null;
+    final overRow = across0 ? layBars(width) : 0.0;
+    final drop = lift + (overRow > 0 ? head + overRow : 0);
+    final height = size.height - lift;
+    final paneHeight = size.height - drop;
     double foot(double across) {
       if (!hasChild(_Slot.foot)) return 0;
       final h = layoutChild(
@@ -108,7 +128,7 @@ class _Beside extends MultiChildLayoutDelegate with NoticesPlace {
           maxHeight: max(0, height - head),
         ),
       ).height;
-      positionChild(_Slot.foot, Offset(0, height - h));
+      positionChild(_Slot.foot, Offset(0, size.height - h));
       return h;
     }
 
@@ -123,7 +143,7 @@ class _Beside extends MultiChildLayoutDelegate with NoticesPlace {
       if (p == cover) {
         // It fills it all; the rest keep the room they had beside it, so
         // nothing under it is laid out anew.
-        place(p, Offset.zero & size);
+        place(p, Rect.fromLTWH(0, lift, width, height));
         x -= widths[p] ?? 0;
         continue;
       }
@@ -131,51 +151,63 @@ class _Beside extends MultiChildLayoutDelegate with NoticesPlace {
         p,
         BoxConstraints(
           maxWidth: squeezed[p] ?? width,
-          minHeight: height,
-          maxHeight: height,
+          minHeight: paneHeight,
+          maxHeight: paneHeight,
         ),
       ).width;
       widths[p] = w;
       x -= w;
-      positionChild(p, Offset(x, 0));
-      at[p] = Rect.fromLTWH(x, 0, w, height);
+      positionChild(p, Offset(x, drop));
+      at[p] = Rect.fromLTWH(x, drop, w, paneHeight);
     }
     // The view's header, terminal and rail: beside the panes, the room
     // they leave; over the view, its least, under them.
     final across = block ?? max(0.0, x);
-    final bottom = height - foot(across);
+    final bottom = size.height - foot(across);
     if (head > 0) {
-      layoutChild(_Slot.head, BoxConstraints.tight(Size(across, head)));
-      positionChild(_Slot.head, Offset.zero);
+      // Over the bars' row across it all, the panes gone down under it,
+      // the header is all there: as wide as the row, its line unbroken.
+      final wide = overRow > 0 ? width : across;
+      layoutChild(_Slot.head, BoxConstraints.tight(Size(wide, head)));
+      positionChild(_Slot.head, Offset(0, lift));
     }
-    final band = max(0.0, bottom - head);
+    // Under the header: beside the panes as wide as it, so only the view
+    // and the rail go down; over the view, across it all (laid out above).
+    final row = !bars || atTop
+        ? 0.0
+        : across0
+        ? overRow
+        : layBars(across);
+    if (bars && !atTop) positionChild(NoticeSlot.bars, Offset(0, head));
+    final top = lift + head + row;
+    final band = max(0.0, bottom - top);
     var main = across;
     if (rail case final r?) {
       if (railShown) {
         main = max(0, across - railWidth);
-        place(r, at[r] = Rect.fromLTWH(main, head, railWidth, band));
+        place(r, at[r] = Rect.fromLTWH(main, top, railWidth, band));
       } else {
         // Going, or tucked away: where it was, as it was.
         place(
           r,
           at[r] ??
-              Rect.fromLTWH(max(0, across - railWidth), head, railWidth, band),
+              Rect.fromLTWH(max(0, across - railWidth), top, railWidth, band),
         );
       }
     }
     for (final g in going) {
-      place(g, at[g] ?? Rect.fromLTWH(width, 0, 0, height));
+      place(g, at[g] ?? Rect.fromLTWH(width, drop, 0, paneHeight));
     }
     layoutChild(_Slot.main, BoxConstraints.tight(Size(main, band)));
-    positionChild(_Slot.main, Offset(0, head));
-    // The notices over it all; the toasts over the transcript, what the
-    // rail and the panes leave of it, and the card at its bottom right,
-    // above the terminal (ADR 0128).
+    positionChild(_Slot.main, Offset(0, top));
+    // The toasts over the transcript, under the bars, what the rail and
+    // the panes leave of it, and the card at its bottom right, above the
+    // terminal (ADR 0128).
     if (hasChild(NoticeSlot.card)) {
       placeNotices(
         width: width,
-        top: head + FloatBar.inset,
-        bottom: cover != null ? height : bottom,
+        top: top + ToastHost.margin,
+        bottom: cover != null ? size.height : bottom,
         left: 0,
         right: cover != null ? width : min(main, x),
         under: block != null && cover == null ? x : null,

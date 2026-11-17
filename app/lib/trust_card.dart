@@ -174,7 +174,7 @@ class NoticeBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
     final t = theme.t;
-    return FloatBar(
+    return TopBar(
       child: Row(
         spacing: 10,
         children: [

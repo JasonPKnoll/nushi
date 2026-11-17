@@ -70,7 +70,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
     await tester.pump(const Duration(milliseconds: 60));
     expect(find.text(_lost), findsOneWidget);
-    final full = tester.getSize(find.text(_lost)).height + 12 + FloatBar.gap;
+    final full = tester.getSize(find.text(_lost)).height + 12 + TopBar.gap;
     expect(height(tester), inExclusiveRange(0, full));
     await tester.pump(const Duration(milliseconds: 200));
     expect(height(tester), full);

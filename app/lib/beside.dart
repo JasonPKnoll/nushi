@@ -8,6 +8,7 @@ import 'package:nushi/settings.dart';
 import 'package:nushi/sidebar_button.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
+import 'package:nushi/toast.dart';
 import 'package:nushi/top_notices.dart';
 
 part 'beside_layout.dart';
@@ -49,10 +50,15 @@ part 'beside_layout.dart';
 /// focus, so the pane is the same widget throughout and its page doesn't
 /// load again.
 ///
-/// Over it all, [notices]: the bars across it, the newer release's card
-/// and the toasts over [main], what the rail and the panes leave of it
-/// ([NoticesPlace], ADR 0128); with the panes over [main], the card under
-/// them, as [main] is.
+/// With it, [notices]: the bars in a row of their own (ADR 0128, amended
+/// 2026-11-17) under [head], as wide as it while the panes are beside
+/// [main], pushing [main] and the rail down; across it all while the panes
+/// lie over [main], which go down under them; and across the top while a
+/// pane covers it all, which goes down by their height; the
+/// toasts over [main], under the bars, what the rail and the panes leave
+/// of it, and the newer release's card at its bottom right
+/// ([NoticesPlace]); with the panes over [main], the card under them, as
+/// [main] is.
 class Beside extends StatefulWidget {
   const new({
     required this.main,
@@ -315,8 +321,8 @@ class _BesideState extends State<Beside> {
         ];
         // Over the view, the card is its transcript's and lies under the
         // panes, as the rest of the view does, hidden where it doesn't fit
-        // left of them, so it never covers a pane's rows; the bars and the
-        // toasts stay over all.
+        // left of them, so it never covers a pane's rows; the toasts stay
+        // over all.
         final cardUnder = over && cover == null
             ? notices
                   .where((w) => w.key == const ValueKey(NoticeSlot.card))
@@ -458,6 +464,11 @@ class _BesideState extends State<Beside> {
               widths: _widths,
               cover: cover,
               cardShown: _cardShown,
+              // Across the top with the sidebar hidden, past the lights
+              // and the title buttons, which stay at the window's top.
+              barsStart: sidebarShut
+                  ? max(0, hiddenHeaderStart - TopBar.side)
+                  : 0,
             ),
             children: children,
           ),

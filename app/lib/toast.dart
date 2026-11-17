@@ -268,7 +268,7 @@ class Toasts extends State<ToastHost> with SingleTickerProviderStateMixin {
         return Stack(
           children: [
             Positioned(
-              top: PaneHeader.height + FloatBar.inset,
+              top: PaneHeader.height + ToastHost.margin,
               left: (box.maxWidth - wide) / 2,
               width: wide,
               child: CompositedTransformFollower(

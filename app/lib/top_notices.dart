@@ -5,58 +5,114 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:nushi/panes.dart';
-import 'package:nushi/slides.dart';
 import 'package:nushi/toast.dart';
 
-/// What floats over a view that isn't a chat (ADR 0111, 0128): at the
-/// top, under its header, the [bars], centred and at most
-/// [FloatBar.width] wide, and where the toasts show ([ToastAnchor]),
-/// centred under them; the [card] (the newer release's) in its bottom
-/// right corner. A chat places the same over its transcript (`Beside`'s
-/// notices), the card above its composer ([CardLift]). It covers the main
-/// area and takes no pointer but theirs.
-class TopNotices extends StatelessWidget {
-  const new({required this.bars, required this.card, super.key});
+/// The bars of the window (ADR 0128, amended 2026-11-17), for the view
+/// in the main pane to put in a row of their own under its header
+/// ([BarsRow]): one element wherever they're put, so a bar keeps its state
+/// and its slide as the view changes. A chat's `Beside` lays them out
+/// itself.
+class TopBars extends InheritedWidget {
+  const new({required this.bars, required super.child, super.key});
 
-  final Widget bars;
+  /// None in a chat, which lays them out itself.
+  final Widget? bars;
+
+  @override
+  bool updateShouldNotify(TopBars old) => bars != old.bars;
+}
+
+/// Under a view's header (Jira's, GitHub's, an empty window's), the bars
+/// ([TopBars]) across it, pushing the view down as one slides in and giving
+/// the room back as it goes; under them, where the toasts show
+/// ([ToastAnchor]), centred, never less than [ToastHost.margin] inside it.
+/// Nothing outside a [TopBars].
+class BarsRow extends StatelessWidget {
+  const new({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final bars = context.dependOnInheritedWidgetOfExactType<TopBars>()?.bars;
+    if (bars == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        bars,
+        // No height: a toast lies over what's under it for its seconds,
+        // [ToastHost.margin] under the bars.
+        LayoutBuilder(
+          builder: (context, box) => Center(
+            child: Transform.translate(
+              offset: const Offset(0, ToastHost.margin),
+              child: SizedBox(
+                width: min(
+                  ToastHost.width,
+                  max(0, box.maxWidth - 2 * ToastHost.margin),
+                ),
+                height: 0,
+                child: const ToastAnchor(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// What floats over a view that isn't a chat (ADR 0128): the [card] (the
+/// newer release's) in its bottom right corner. The bars and the toasts
+/// are under its header ([BarsRow]); a chat places all three itself
+/// (`Beside`'s notices), the card above its composer ([CardLift]). It
+/// covers the main area and takes no pointer but the card's.
+class TopNotices extends StatelessWidget {
+  const new({required this.card, super.key});
+
   final Widget card;
 
   /// The card's room from its column's right and bottom edges: the
   /// details panel's side margin, so it lines up with its cards' text.
   static const cardInset = 16.0;
 
-  /// [bars], [card] and the toasts' anchor as the children of a layout
-  /// whose delegate has [NoticesPlace].
-  static List<Widget> slots({required Widget bars, required Widget card}) => [
+  /// [card], [bars] and the toasts' anchor (with [toasts]) as the children
+  /// of a layout whose delegate has [NoticesPlace], which places the card
+  /// and the anchor; the bars are the layout's own to place.
+  static List<Widget> slots({
+    required Widget card,
+    Widget? bars,
+    bool toasts = true,
+  }) => [
     LayoutId(
       key: const ValueKey(NoticeSlot.card),
       id: NoticeSlot.card,
       child: card,
     ),
-    LayoutId(
-      key: const ValueKey(NoticeSlot.bars),
-      id: NoticeSlot.bars,
-      child: bars,
-    ),
-    LayoutId(
-      key: const ValueKey(NoticeSlot.toasts),
-      id: NoticeSlot.toasts,
-      child: const ToastAnchor(),
-    ),
+    if (bars != null)
+      LayoutId(
+        key: const ValueKey(NoticeSlot.bars),
+        id: NoticeSlot.bars,
+        child: bars,
+      ),
+    if (toasts)
+      LayoutId(
+        key: const ValueKey(NoticeSlot.toasts),
+        id: NoticeSlot.toasts,
+        child: const ToastAnchor(),
+      ),
   ];
 
   @override
   Widget build(BuildContext context) => CustomMultiChildLayout(
     delegate: _Place(),
-    children: slots(bars: bars, card: card),
+    children: slots(card: card, toasts: false),
   );
 }
 
 /// The ids of [TopNotices.slots].
 enum NoticeSlot { card, bars, toasts }
 
-/// Places [TopNotices.slots] (ADR 0128): the bars centred across the
-/// width at `top`; the toasts' anchor under them, centred over the column
+/// Places [TopNotices.slots] but the bars (ADR 0128): the toasts' anchor
+/// at `top` (under the header and the bars' row), centred over the column
 /// from `left` to `right` (the chat's transcript, or the whole width), or
 /// over the whole width where a toast doesn't fit the column; the card in
 /// the column's bottom right corner, above `bottom`. A toast and the card
@@ -88,10 +144,7 @@ mixin NoticesPlace on MultiChildLayoutDelegate {
     cardShown?.value = !hidden;
     final cardTop = max(top, bottom - TopNotices.cardInset - card.height);
     positionChild(NoticeSlot.card, Offset(cardLeft, cardTop));
-
-    final most = max(0.0, min(FloatBar.width, width - 32));
-    final bars = layoutChild(NoticeSlot.bars, BoxConstraints(maxWidth: most));
-    positionChild(NoticeSlot.bars, Offset((width - bars.width) / 2, top));
+    if (!hasChild(NoticeSlot.toasts)) return;
 
     // A toast is at most the main area less its margins: over the column
     // where it fits, else over the whole area, and never out of it.
@@ -102,10 +155,7 @@ mixin NoticesPlace on MultiChildLayoutDelegate {
     final centre = (fits ? (left + right) / 2 : width / 2)
         .clamp(least, max(least, width - least))
         .toDouble();
-    positionChild(
-      NoticeSlot.toasts,
-      Offset(centre - across / 2, top + bars.height),
-    );
+    positionChild(NoticeSlot.toasts, Offset(centre - across / 2, top));
   }
 }
 
@@ -113,7 +163,7 @@ class _Place extends MultiChildLayoutDelegate with NoticesPlace {
   @override
   void performLayout(Size size) => placeNotices(
     width: size.width,
-    top: PaneHeader.height + FloatBar.inset,
+    top: PaneHeader.height + ToastHost.margin,
     bottom: size.height,
     left: 0,
     right: size.width,

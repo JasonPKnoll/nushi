@@ -48,7 +48,7 @@ class RemovedChatsBar extends StatelessWidget {
     final theme = NushiTheme.of(context);
     final t = theme.t;
     final removed = daemon.removedChats;
-    return FloatBar(
+    return TopBar(
       child: Row(
         spacing: 12,
         children: [

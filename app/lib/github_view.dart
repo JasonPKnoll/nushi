@@ -19,6 +19,7 @@ import 'package:nushi/run_state.dart';
 import 'package:nushi/send_to_agent.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/token_notices.dart';
+import 'package:nushi/top_notices.dart';
 import 'package:nushi/widgets.dart';
 
 /// ⌘G shows GitHub in place of the chat, and back.
@@ -438,6 +439,7 @@ class _GitHubViewState extends State<GitHubView> {
               onRefresh: _load,
               onClose: widget.daemon.back,
             ),
+            const BarsRow(),
             Expanded(
               child: hosts == null
                   ? const SizedBox()
