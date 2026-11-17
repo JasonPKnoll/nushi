@@ -77,9 +77,16 @@ class _ChipFadeState extends State<ChipFade>
 /// The chip over a transcript scrolled up, back to the latest: "Jump to
 /// latest", or, while the agent waits on a permission prompt or question
 /// ([needs]), amber and "Needs you ↓", hopping once as it turns so (still
-/// with Reduce Motion).
+/// with Reduce Motion). On the phone ([TouchTargets]) it's the arrow
+/// alone, on a round button of the same fill, its words its tooltip.
 class JumpChip extends StatefulWidget {
   const new({required this.needs, required this.onTap, super.key});
+
+  /// The phone's round face, [round] points across, in a finger's target.
+  static const roundKey = Key('jump-round');
+
+  /// The phone's round face's width.
+  static const round = 38.0;
 
   final bool needs;
   final VoidCallback onTap;
@@ -113,39 +120,66 @@ class _JumpChipState extends State<JumpChip> with ClockRun {
     final t = theme.t;
     final needs = widget.needs;
     final color = needs ? t.needs : t.text;
-    final icon = Icon(Icons.arrow_downward, size: 14, color: color);
-    final chip = DecoratedBox(
-      // A pill on a card's fill, lifted off the text under it by a soft
-      // shadow, not an outline (ADR 0111).
-      decoration: BoxDecoration(
-        color: needs ? t.needsSoft : t.lifted,
-        borderRadius: BorderRadius.circular(NushiTheme.pill),
-        boxShadow: [
-          BoxShadow(
-            color: t.shadow,
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Tap(
-        onTap: widget.onTap,
-        radius: NushiTheme.pill,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 6,
-          children: [
-            if (!needs) icon,
-            Text(
-              needs ? 'Needs you' : 'Jump to latest',
-              style: theme.ui(color, size: 12, weight: FontWeight.w500),
+    final fill = needs ? t.needsSoft : t.lifted;
+    // On a card's fill, lifted off the text under it by a soft shadow, not
+    // an outline (ADR 0111).
+    final shadow = [
+      BoxShadow(color: t.shadow, blurRadius: 12, offset: const Offset(0, 3)),
+    ];
+    final Widget chip;
+    if (TouchTargets.of(context)) {
+      // The phone's: the arrow says it; a pill of words is too much there.
+      // A button to VoiceOver, named by its tooltip, as RoundButton is.
+      chip = Semantics(
+        button: true,
+        child: Pressable(
+          onTap: widget.onTap,
+          tooltip: needs ? 'Needs you: jump to latest' : 'Jump to latest',
+          builder: (context, look) => Container(
+            key: JumpChip.roundKey,
+            width: JumpChip.round,
+            height: JumpChip.round,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: look.pressed
+                  ? Color.alphaBlend(t.pressed, fill)
+                  : look.hover
+                  ? Color.alphaBlend(t.hover, fill)
+                  : fill,
+              shape: BoxShape.circle,
+              boxShadow: shadow,
             ),
-            if (needs) icon,
-          ],
+            child: Icon(Icons.arrow_downward, size: 18, color: color),
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      final icon = Icon(Icons.arrow_downward, size: 14, color: color);
+      chip = DecoratedBox(
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(NushiTheme.pill),
+          boxShadow: shadow,
+        ),
+        child: Tap(
+          onTap: widget.onTap,
+          radius: NushiTheme.pill,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 6,
+            children: [
+              if (!needs) icon,
+              Text(
+                needs ? 'Needs you' : 'Jump to latest',
+                style: theme.ui(color, size: 12, weight: FontWeight.w500),
+              ),
+              if (needs) icon,
+            ],
+          ),
+        ),
+      );
+    }
     if (!running) return chip;
     return Transform.translate(
       offset: Offset(0, -hopHeight(ranMs / hopFor.inMilliseconds)),
