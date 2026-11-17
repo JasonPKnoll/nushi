@@ -256,6 +256,9 @@ class _Section extends StatefulWidget {
 }
 
 class _SectionState extends State<_Section> {
+  /// The card's text sits this far in from its sides.
+  static const double _side = PanelType.side - PanelType.inset;
+
   bool _hovered = false;
 
   /// A menu of the action's is open: the pointer on it has left the widget,
@@ -307,9 +310,9 @@ class _SectionState extends State<_Section> {
         onExit: (_) => setState(() => _hovered = false),
         child: Container(
           decoration: cardBox(t),
-          padding: const EdgeInsets.symmetric(
-            horizontal: PanelType.side - PanelType.inset,
-          ),
+          // The title's pressed fill runs to the card's edges and takes
+          // its corners, so the card clips it.
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -321,7 +324,15 @@ class _SectionState extends State<_Section> {
                       ? SystemMouseCursors.grabbing
                       : SystemMouseCursors.grab,
                   tint: false,
-                  padding: const EdgeInsets.only(top: 12, bottom: 6),
+                  radius: 0,
+                  // Folded, the title is the whole card, and so is its
+                  // pressed fill: the foot's gap is the title's then.
+                  padding: EdgeInsets.fromLTRB(
+                    _side,
+                    12,
+                    _side,
+                    w.open ? 6 : 12,
+                  ),
                   child: Row(
                     children: [
                       w.title,
@@ -349,11 +360,11 @@ class _SectionState extends State<_Section> {
               Disclosure(
                 open: w.open,
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.fromLTRB(_side, 0, _side, 4),
                   child: w.body,
                 ),
               ),
-              const SizedBox(height: 6),
+              if (w.open) const SizedBox(height: 6),
             ],
           ),
         ),

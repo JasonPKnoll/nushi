@@ -52,6 +52,40 @@ void main() {
     expect(find.text('57%'), findsOneWidget);
   });
 
+  testWidgets("a pressed title's fill is the card's: edge to edge, the "
+      'whole card while folded', (tester) async {
+    collapsedWidgets.value = {'Context'};
+    await tester.pumpWidget(_widgets(Tokens.dark));
+    for (final (title, folded) in [
+      ('Background tasks', false),
+      ('Context', true),
+    ]) {
+      final tap = find.ancestor(
+        of: find.text(title),
+        matching: find.byType(Tap),
+      );
+      final card = find.ancestor(
+        of: tap,
+        matching: find.byWidgetPredicate(
+          (w) => w is Container && w.clipBehavior == Clip.antiAlias,
+        ),
+      );
+      final fill = tester.getRect(tap.first);
+      final box = tester.getRect(card.first);
+      expect(fill.left, box.left, reason: title);
+      expect(fill.right, box.right, reason: title);
+      expect(fill.top, box.top, reason: title);
+      if (folded) expect(fill.bottom, box.bottom, reason: title);
+    }
+    final press = await tester.startGesture(
+      tester.getCenter(find.text('Background tasks')),
+    );
+    await tester.pump();
+    await render(tester, find.byType(PanelWidgets), 'panel_widget_pressed');
+    await press.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('a title folds its widget, remembered', (tester) async {
     collapsedWidgets.value = {};
     await tester.pumpWidget(_widgets(Tokens.light));
