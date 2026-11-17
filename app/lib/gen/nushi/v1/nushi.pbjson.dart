@@ -3121,6 +3121,7 @@ const GetDiffRequest$json = {
     {'1': 'commit', '3': 3, '4': 1, '5': 9, '10': 'commit'},
     {'1': 'since', '3': 4, '4': 1, '5': 9, '10': 'since'},
     {'1': 'after', '3': 5, '4': 1, '5': 9, '10': 'after'},
+    {'1': 'path', '3': 6, '4': 1, '5': 9, '10': 'path'},
   ],
 };
 
@@ -3128,7 +3129,7 @@ const GetDiffRequest$json = {
 final $typed_data.Uint8List getDiffRequestDescriptor = $convert.base64Decode(
     'Cg5HZXREaWZmUmVxdWVzdBIWCgZmb2xkZXIYASABKAlSBmZvbGRlchISCgRiYXNlGAIgASgJUg'
     'RiYXNlEhYKBmNvbW1pdBgDIAEoCVIGY29tbWl0EhQKBXNpbmNlGAQgASgJUgVzaW5jZRIUCgVh'
-    'ZnRlchgFIAEoCVIFYWZ0ZXI=');
+    'ZnRlchgFIAEoCVIFYWZ0ZXISEgoEcGF0aBgGIAEoCVIEcGF0aA==');
 
 @$core.Deprecated('Use stageFilesRequestDescriptor instead')
 const StageFilesRequest$json = {

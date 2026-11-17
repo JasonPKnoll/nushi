@@ -27,14 +27,20 @@ const (
 // from HEAD or, with Base, from where HEAD's branch left Base (their merge
 // base), so the branch's commits too; or with Commit what that commit
 // changed, with Since as well what the commits from Since to Commit changed,
-// and with After instead what changed after After, up to Commit.
-type Span struct{ Base, Commit, Since, After string }
+// and with After instead what changed after After, up to Commit. With Path,
+// only that file's change (its path relative to the folder; a rename's new
+// path), and of the work tree's, a link or a file git doesn't track is
+// skipped, so no answer means tracked and unchanged.
+type Span struct{ Base, Commit, Since, After, Path string }
 
 // Changes returns the folder's changes in span, untracked files included
 // when they are uncommitted ones, with paths relative to the folder and
 // each file's lines added and removed, and uncommitted ones say how much is
 // staged. The folder may be anywhere inside a repository.
 func Changes(ctx context.Context, folder string, span Span) ([]model.FileChange, error) { //nolint:gocognit,gocyclo // each span's git commands, then one pass over their output
+	if span.Path != "" && !filepath.IsLocal(span.Path) {
+		return nil, fmt.Errorf("%q is not a path inside the folder", span.Path)
+	}
 	from, to, err := ends(ctx, folder, span)
 	if err != nil {
 		return nil, err
@@ -99,6 +105,14 @@ func Changes(ctx context.Context, folder string, span Span) ([]model.FileChange,
 		}
 		changes = append(changes, c)
 	}
+	if span.Path != "" {
+		changes = slices.DeleteFunc(changes, func(c model.FileChange) bool { return c.Path != span.Path })
+		if to == "" {
+			if changes, err = onePath(ctx, folder, span.Path, changes); err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	slices.SortFunc(changes, func(a, b model.FileChange) int { return strings.Compare(a.Path, b.Path) })
 	files := openBlobs(folder)
@@ -145,6 +159,32 @@ func Changes(ctx context.Context, folder string, span Span) ([]model.FileChange,
 		}
 	}
 	return changes, nil
+}
+
+// onePath finishes Changes' answer for the work tree's file rel, changes
+// being its entry or none: a symlink is skipped (worktree reads its target's
+// path, not what it points at), and a file git doesn't track (an ignored
+// one, or one outside this repository) is untracked and skipped, so that
+// no entry at all means tracked and unchanged.
+func onePath(ctx context.Context, folder, rel string, changes []model.FileChange) ([]model.FileChange, error) {
+	if fi, err := os.Lstat(filepath.Join(folder, rel)); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		if len(changes) == 0 {
+			return []model.FileChange{{Path: rel, Status: "modified", Skipped: "a link"}}, nil
+		}
+		changes[0].Skipped = "a link"
+		return changes, nil
+	}
+	if len(changes) > 0 {
+		return changes, nil
+	}
+	out, err := run(ctx, folder, "ls-files", "-z", "--", ":(literal)"+rel)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return []model.FileChange{{Path: rel, Status: "untracked", Skipped: "not tracked"}}, nil
+	}
+	return nil, nil
 }
 
 // numstat returns the lines added and removed per file (by its new path)

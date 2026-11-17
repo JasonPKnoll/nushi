@@ -42,7 +42,10 @@ func (s *server) GetDiff(ctx context.Context, req *connect.Request[nushiv1.GetDi
 	if err := absolute(req.Msg.Folder); err != nil {
 		return nil, err
 	}
-	span := git.Span{Base: req.Msg.Base, Commit: req.Msg.Commit, Since: req.Msg.Since, After: req.Msg.After}
+	if p := req.Msg.Path; p != "" && !filepath.IsLocal(p) {
+		return nil, invalid(fmt.Errorf("%q is not a path inside the folder", p))
+	}
+	span := git.Span{Base: req.Msg.Base, Commit: req.Msg.Commit, Since: req.Msg.Since, After: req.Msg.After, Path: req.Msg.Path}
 	resp := &nushiv1.GetDiffResponse{}
 	if span == (git.Span{}) {
 		// Read before the files: a file staged between the two then moves

@@ -64,6 +64,12 @@ class FakeDaemon implements Transport {
   Object? Function(Object input)? answer;
   final calls = <Object>[];
 
+  /// What GetDiff with a path (a file preview's question, API 121) answers,
+  /// by the file's absolute path (folder and path joined): its one change,
+  /// or an exception to throw. A file not in it answers no change, as a
+  /// tracked, unchanged one does. [answer] goes first.
+  final fileDiffs = <String, Object>{};
+
   /// The chats' images GetChatImage answers, by hash (ADR 0099); another
   /// hash is NotFound.
   final chatImages = <String, ImageData>{};
@@ -179,6 +185,12 @@ class FakeDaemon implements Transport {
                   : null,
             ),
           GetSettingsRequest() => GetSettingsResponse(settings: settings),
+          GetDiffRequest(:final folder, :final path) when path.isNotEmpty =>
+            switch (fileDiffs['$folder/$path']) {
+              final FileChange f => GetDiffResponse(files: [f]),
+              final Exception e => throw e,
+              _ => GetDiffResponse(),
+            },
           // A chat it has, so the app can show it.
           StartChatRequest() => StartChatResponse(chatId: chats.first.id),
           ListAgentSessionsRequest() =>

@@ -51,3 +51,35 @@ func TestStageAndCommitThroughTheAPI(t *testing.T) {
 		t.Errorf("a device committed: %v", err)
 	}
 }
+
+// TestGetDiffOfOnePath: a file preview's GetDiff (path) answers that file
+// alone, without the index's state, and refuses a path outside its folder.
+func TestGetDiffOfOnePath(t *testing.T) {
+	repo := t.TempDir()
+	c := client(t, New(Services{}))
+	ctx := t.Context()
+	if _, err := c.GetDiff(ctx, connect.NewRequest(&nushiv1.GetDiffRequest{Folder: repo, Path: "a.txt"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("not a repository: %v", err)
+	}
+	testcheck.Git(t, repo, "init", "-q", "-b", "main")
+	testcheck.Write(t, filepath.Join(repo, "a.txt"), "one\n")
+	testcheck.Write(t, filepath.Join(repo, "b.txt"), "b\n")
+	testcheck.Git(t, repo, "add", ".")
+	testcheck.Git(t, repo, "commit", "-q", "-m", "init")
+	testcheck.Write(t, filepath.Join(repo, "a.txt"), "one\ntwo\n")
+	testcheck.Write(t, filepath.Join(repo, "b.txt"), "b2\n")
+	testcheck.Git(t, repo, "add", "a.txt")
+
+	diff, err := c.GetDiff(ctx, connect.NewRequest(&nushiv1.GetDiffRequest{Folder: repo, Path: "a.txt"}))
+	if err != nil || diff.Msg.Index != "" || len(diff.Msg.Files) != 1 {
+		t.Fatalf("one path: %v %v", diff, err)
+	}
+	if f := diff.Msg.Files[0]; f.Path != "a.txt" || f.OldText != "one\n" || f.Staged != "" {
+		t.Errorf("its change: %v", f)
+	}
+	for _, p := range []string{"../a.txt", "/etc/hosts"} {
+		if _, err := c.GetDiff(ctx, connect.NewRequest(&nushiv1.GetDiffRequest{Folder: repo, Path: p})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+}
