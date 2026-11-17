@@ -225,10 +225,13 @@ class _FilesPaneState extends State<FilesPane> with FileTabsFocus {
                   Expanded(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
+                      // Squeezed out, the tree isn't built: laid out at
+                      // no width, its search field and rows would still
+                      // sit past the pane's edge, and Tab could reach them.
                       children: [
-                        if (tree && !right) files,
+                        if (named && !right) files,
                         viewer,
-                        if (tree && right) files,
+                        if (named && right) files,
                       ],
                     ),
                   ),

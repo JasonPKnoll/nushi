@@ -62,17 +62,59 @@ void Function(FlutterErrorDetails)? _settledRowsOnly() {
   return was;
 }
 
-/// The width the Files pane gives its tree (its edge's box).
-double _treeRoom(WidgetTester tester) => tester
-    .getSize(
-      find.ancestor(
-        of: find.byType(FilesTree),
-        matching: find.byKey(const ValueKey('tree')),
-      ),
-    )
-    .width;
+/// The width the Files pane gives its tree (its edge's box), 0 when it's
+/// squeezed out and so not there.
+double _treeRoom(WidgetTester tester) {
+  final tree = find.ancestor(
+    of: find.byType(FilesTree),
+    matching: find.byKey(const ValueKey('tree')),
+  );
+  return tree.evaluate().isEmpty ? 0 : tester.getSize(tree).width;
+}
+
+/// Each laid-out box in the Files pane that runs past its right edge, by
+/// what made it.
+List<String> _pastFiles(WidgetTester tester) {
+  final pane = tester.getRect(find.byType(FilesPane));
+  return [
+    for (final e
+        in find
+            .descendant(
+              of: find.byType(FilesPane),
+              matching: find.byWidgetPredicate((_) => true),
+            )
+            .evaluate())
+      if (e.renderObject case final RenderBox r when r.hasSize)
+        if (r.localToGlobal(Offset(r.size.width, 0)).dx case final right
+            when right > pane.right + 0.5)
+          '${e.widget.runtimeType} to $right',
+  ];
+}
 
 void main() {
+  for (final width in [400.0, 480.0]) {
+    testWidgets('Files alone in a ${width.round()} window: the tree squeezed '
+        'out, its search field runs nowhere past the pane', (tester) async {
+      _settledRowsOnly();
+      final (d, _) = await panesApp(
+        tester,
+        width: width,
+        open: (
+          side: false,
+          files: true,
+          subagent: false,
+          command: false,
+          previews: 0,
+          browser: 0,
+        ),
+      );
+      expect(_treeRoom(tester), 0);
+      expect(_pastFiles(tester), isEmpty);
+      expectTextInside(tester, width);
+      await closeView(tester, d);
+    }, variant: _mac);
+  }
+
   for (final (name, open) in [
     ('side + Files + browser', _with(browser: true)),
     ('side + Files + subagent', _with(subagent: true)),
