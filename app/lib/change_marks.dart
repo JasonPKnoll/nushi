@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:nushi/hover_card.dart';
 import 'package:nushi/line_changes.dart';
+import 'package:nushi/run_state.dart';
 import 'package:nushi/theme/theme.dart';
 
 // The change marks in a file's source gutter (ADR 0131), as an editor
@@ -58,7 +59,7 @@ class ChangeMark extends StatefulWidget {
 class _ChangeMarkState extends State<ChangeMark> {
   /// The marks on screen, to find a run's other lines by: a run's lines
   /// share its one [LineMark] (`markCells`), each view its own.
-  static final _shown = <_ChangeMarkState>{};
+  static final _shown = runSet<_ChangeMarkState>();
 
   @override
   void initState() {
