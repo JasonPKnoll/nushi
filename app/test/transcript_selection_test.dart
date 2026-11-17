@@ -14,14 +14,23 @@ import 'harness.dart';
 import 'long_chat.dart';
 
 /// The app on [items] (each chat's, by id), the first chat shown.
-Future<Daemon> _app(WidgetTester tester, Map<String, List<Item>> items) async {
+Future<Daemon> _app(
+  WidgetTester tester,
+  Map<String, List<Item>> items, {
+  List<String> files = const [],
+}) async {
   viewport(tester, const Size(1400, 900));
   showDetails.value = false;
   final chats = {for (final id in items.keys) id: chat(id, 'claude', id)};
   final fake = FakeDaemon(chats.values.toList())
-    ..answer = (input) => input is GetChatRequest
-        ? GetChatResponse(chat: chats[input.chatId], items: items[input.chatId])
-        : null;
+    ..answer = (input) => switch (input) {
+      GetChatRequest() => GetChatResponse(
+        chat: chats[input.chatId],
+        items: items[input.chatId],
+      ),
+      FindChatFilesRequest() => FindChatFilesResponse(found: files),
+      _ => null,
+    };
   final d = await fake.connect(tester);
   d.select(items.keys.first);
   await tester.pumpWidget(NushiApp(daemon: d));
@@ -214,5 +223,120 @@ void main() {
     expect(quote, contains('the code'));
     expect(quote, contains('after'));
     await closeView(tester, d);
+  }, variant: mac);
+
+  testWidgets('a file named in a line is quoted and copied in its place', (
+    tester,
+  ) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    // Long enough to wrap: a link is cut after its slashes.
+    final long = '${'folder/' * 40}deep.toml';
+    // Each line, and the words a drag starts and ends on.
+    final lines = [
+      ('pin it in `mise.toml` like golangci-lint.', 'pin it', 'golangci'),
+      ('`start.toml` pins the tools first.', 'start.toml', 'first.'),
+      ('The tools are pinned in `last.toml`', 'The tools', 'last.toml'),
+      ('Both `one.toml` and `two.toml` pin tools.', 'Both', 'pin tools.'),
+      ('See `$long` for the deep one.', 'See', 'deep one.'),
+    ];
+    final d = await _app(
+      tester,
+      {
+        'a': [
+          for (final (i, (text, _, _)) in lines.indexed) _agent('m$i', text),
+        ],
+      },
+      files: [
+        'mise.toml',
+        'start.toml',
+        'last.toml',
+        'one.toml',
+        'two.toml',
+        long,
+      ],
+    );
+    // Each name is a link here (a widget span), and the long one wraps.
+    expect(find.text('mise.toml'), findsOneWidget);
+    final pieces = find.text('folder/');
+    expect(
+      tester.getTopLeft(pieces.first).dy,
+      lessThan(tester.getTopLeft(pieces.last).dy),
+    );
+    for (final (text, from, to) in lines) {
+      final plain = text.replaceAll('`', '');
+      await _drag(tester, _ends(tester, from).$1, _ends(tester, to).$2);
+      expect(
+        await _quoted(tester),
+        plain.substring(0, plain.indexOf(to) + to.length),
+        reason: text,
+      );
+    }
+
+    // ⌘C copies the same.
+    await _drag(
+      tester,
+      _ends(tester, 'pin it').$1,
+      _ends(tester, 'golangci').$2,
+    );
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(copied, 'pin it in mise.toml like golangci');
+    await closeView(tester, d);
+  }, variant: mac);
+
+  testWidgets('a reply to a line with a file link is sent in its order', (
+    tester,
+  ) async {
+    viewport(tester, const Size(1400, 900), brightness: Brightness.dark);
+    const line = 'pin it in `mise.toml` like golangci-lint.';
+    final d = await _app(
+      tester,
+      {
+        'a': [_agent('o', line)],
+      },
+      files: ['mise.toml'],
+    );
+    await _drag(
+      tester,
+      _ends(tester, 'pin').$1,
+      _ends(tester, 'golangci-lint.').$2,
+    );
+    await tester.tap(find.text('Reply').last);
+    await tester.pump();
+    await render(tester, find.byType(NushiApp), 'reply-file-link');
+    final quote = tester.widget<ReplyBox>(find.byType(ReplyBox)).quote;
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    await closeView(tester, d);
+
+    // The message sent with it, as the owner saw it.
+    final sent = await _app(
+      tester,
+      {
+        'b': [
+          _agent('o', line),
+          Item(
+            id: 'u',
+            kind: ItemKind.ITEM_KIND_USER_MESSAGE,
+            text: withReplies([(quote: quote, text: '', from: '')], ''),
+          ),
+        ],
+      },
+      files: ['mise.toml'],
+    );
+    await render(tester, find.byType(NushiApp), 'sent-reply-file-link');
+    await closeView(tester, sent);
+    expect(quote, 'pin it in mise.toml like golangci-lint.');
   }, variant: mac);
 }
