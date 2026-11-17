@@ -59,7 +59,7 @@ class ChangeMark extends StatefulWidget {
 class _ChangeMarkState extends State<ChangeMark> {
   /// The marks on screen, to find a run's other lines by: a run's lines
   /// share its one [LineMark] (`markCells`), each view its own.
-  static final _shown = runSet<_ChangeMarkState>();
+  static final Set<_ChangeMarkState> _shown = runSet();
 
   @override
   void initState() {
