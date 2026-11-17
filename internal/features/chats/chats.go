@@ -156,6 +156,7 @@ type chat struct {
 	viewers  Viewers         // the service's
 	ctx      context.Context //nolint:containedctx // the service's life, which ends what the chat follows on its own
 	timing   Timing          // the service's
+	procs    Processes       // the service's, for whether a background command's shell runs (followCommand)
 	// serverCommand and serverAnswered are the service's, for a
 	// preview_start ask's card.
 	serverCommand  func(chatID, name string) (command, askID string)
@@ -336,7 +337,7 @@ func checkFolder(folder string) error {
 }
 
 func (s *Service) newChat(k *kind) *chat {
-	return &chat{kind: k, remembered: s.remembered, publish: s.publish, sessions: s.sessions, worktrees: s.worktrees, owned: s.ownedWorktrees, copies: s.copies, copiesOn: s.copiesOn, viewers: s.viewers, ctx: s.ctx, timing: s.timing, serverCommand: s.serverCommand, serverAnswered: s.serverAnswered, gitHubHost: s.gitHubHost, waiting: map[string]chan<- string{},
+	return &chat{kind: k, remembered: s.remembered, publish: s.publish, sessions: s.sessions, worktrees: s.worktrees, owned: s.ownedWorktrees, copies: s.copies, copiesOn: s.copiesOn, viewers: s.viewers, ctx: s.ctx, timing: s.timing, procs: s.procs, serverCommand: s.serverCommand, serverAnswered: s.serverAnswered, gitHubHost: s.gitHubHost, waiting: map[string]chan<- string{},
 		questions: map[string]chan<- []model.Field{}, sides: map[string]*chat{}, children: map[string]*child{}, probes: map[string]*silentRun{}, unsaved: map[string]bool{},
 		mirrored: true} // a new chat's copy is as empty as its transcript
 }

@@ -50,6 +50,10 @@ func TestBackgroundCommands(t *testing.T) {
 			t.Errorf("followed %+v", it)
 		}
 	}
+	// The owner's server (2026-11-17), stopped by TaskStop, logged its
+	// shutdown after Claude's "[killed]".
+	const served = "SIGTERM exit code: 0\ntime=12:51:34 level=INFO msg=\"serving http\" addr=:9030\n"
+	const shutdown = "time=12:54:20 level=INFO msg=\"shutting down server\"\ntime=12:54:20 level=INFO msg=\"server stopped\"\n"
 	for text, want := range map[string][2]string{
 		"":                               {"", ""},
 		"half\n":                         {"half\n", ""},
@@ -58,7 +62,13 @@ func TestBackgroundCommands(t *testing.T) {
 		"\n[killed]\n":                   {"", "killed"},
 		"[killed]\n":                     {"[killed]\n", ""},
 		"x [exited with code 0]\n":       {"x [exited with code 0]\n", ""},
-		"\n[killed]\nmore\n":             {"\n[killed]\nmore\n", ""},
+		// Output after the end line: the whole file shows.
+		"\n[killed]\nmore\n":                   {"\n[killed]\nmore\n", "killed"},
+		served + "\n[killed]\n" + shutdown:     {served + "\n[killed]\n" + shutdown, "killed"},
+		"a\n\n[exited with code 144]\nstray\n": {"a\n\n[exited with code 144]\nstray\n", "exited with code 144"},
+		// The last such line is taken: one the command printed comes before Claude's.
+		"[killed]\nb\n\n[killed] not alone\n\n[exited with code 0]\n": {"[killed]\nb\n\n[killed] not alone", "exited with code 0"},
+		"\n[exited with code 0]\nmid\n\n[killed]\n":                   {"\n[exited with code 0]\nmid", "killed"},
 	} {
 		testcheck.NoErr(t, os.WriteFile(file, []byte(text), 0o600))
 		if out, end, err := harness.ReadBackgroundCommand("b1", file); err != nil || out != want[0] || end != want[1] {

@@ -23,11 +23,13 @@ type fakeProcesses struct {
 	below   map[int][]model.Process
 	stopped []model.Process // with the root asked under, in Pgid's place
 	err     error           // StopGroup's
+	looked  int             // Under's calls
 }
 
 func (f *fakeProcesses) Under(root int) ([]model.Process, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.looked++
 	return f.below[root], nil
 }
 
@@ -42,6 +44,56 @@ func (f *fakeProcesses) StopGroup(root int, p model.Process) error {
 	}
 	f.stopped = append(f.stopped, p)
 	return nil
+}
+
+// set puts procs below root in place of what was there.
+func (f *fakeProcesses) set(root int, procs ...model.Process) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.below[root] = procs
+}
+
+// lookedSince says whether Under was called more than n times.
+func (f *fakeProcesses) lookedSince(n int) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.looked > n
+}
+
+// Output can follow Claude's end line: the owner's server (2026-11-17),
+// stopped by TaskStop, logged its shutdown after "[killed]". That ends the
+// command once the file stops growing and its shell no longer runs; while
+// the shell runs, the line is taken for the command's own, and the
+// restart waits for it.
+func TestOutputAfterTheEndLineEndsTheCommand(t *testing.T) {
+	shell := model.Process{Pid: 4100, Pgid: 4100, Args: zshRunning(waitLoop)}
+	for text, want := range map[string]model.BackgroundCommand{
+		"waiting\n\n[killed]\nshutting down\nserver stopped\n": {State: "stopped", End: "killed", Output: "waiting\n\n[killed]\nshutting down\nserver stopped\n"},
+		"waiting\n\n[exited with code 1]\nshutting down\n":     {State: "failed", End: "exited with code 1", Output: "waiting\n\n[exited with code 1]\nshutting down\n"},
+		"waiting\n\n[exited with code 0]\n":                    {State: "done", End: "exited with code 0", Output: "waiting"}, // the file's last line, as the command could print it too
+	} {
+		t.Run(want.End, func(t *testing.T) {
+			f := commandChat(t, true, shell)
+			testcheck.NoErr(t, os.WriteFile(f.file, []byte(text), 0o600))
+			if !testcheck.Eventually(func() bool { return f.procs.lookedSince(1) }) {
+				t.Fatal("never looked for the command's shell")
+			}
+			if sh := commandOf(f.c); sh.State != "running" {
+				t.Fatalf("ended while its shell runs: %+v", sh)
+			}
+			if holds := f.svc.Holding(); len(holds) != 1 || holds[0].Why != "in background" {
+				t.Errorf("the restart waits for %+v", holds)
+			}
+			f.procs.set(agentPid)
+			eventually(t, f.c, func() bool { return f.c.itemLocked(waitCall).BackgroundCommand.State != "running" })
+			if sh := commandOf(f.c); sh.State != want.State || sh.End != want.End || sh.Output != want.Output || sh.Ended.IsZero() {
+				t.Errorf("ended as %+v", sh)
+			}
+			if holds := f.svc.Holding(); len(holds) != 0 {
+				t.Errorf("the restart still waits for %+v", holds)
+			}
+		})
+	}
 }
 
 // zshRunning is Claude Code's shell's command line for a command, as
@@ -141,6 +193,7 @@ func TestABackgroundCommandIsStoppedByItsProcessGroup(t *testing.T) {
 	if prompts, _ := agent.texts(); len(prompts) != 0 || len(procs.stopped) != 1 {
 		t.Errorf("a second Stop asked %q, stopped %+v", prompts, procs.stopped)
 	}
+	procs.set(agentPid) // the group ended
 	testcheck.NoErr(t, os.WriteFile(file, []byte("waiting\n\n[exited with code 144]\n"), 0o600))
 	eventually(t, c, func() bool { return c.itemLocked(waitCall).BackgroundCommand.State == "stopped" })
 	if sh := commandOf(c); sh.End != "exited with code 144" || sh.Ended.IsZero() {

@@ -1,6 +1,7 @@
 package chats
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -26,13 +27,21 @@ func (c *chat) backgroundCommandLocked(it *model.Item) {
 	go c.followCommand(it.ID, id, file, agent)
 }
 
-// A command can print a line that reads as Claude's end line, so an end is
-// taken only once the file stops growing after it (while the command's
-// agent runs: else there's nothing more to wait for).
+// Whether the command runs is its shell's to say: while the command's
+// agent runs, an end Claude's file gives (its line can be followed by what
+// the command left dying, and the command can print such a line itself:
+// docs/facts/claude.md) is taken only once the file has stopped growing
+// after it and the command's shell no longer runs, where Nushi can look
+// (commandShellRuns); the file gives how it ended. With its agent gone
+// there's nothing more to wait for. Claude's TaskStop of the task ends it
+// too (stoppedLocked).
 func (c *chat) followCommand(callID, id, file string, agent Agent) {
 	var endAt *string // the output an end was first seen after
 	for {
 		out, end, err := c.kind.background.ReadBackgroundCommand(id, file)
+		if end != "" && agent != nil && endAt != nil && *endAt == out && c.commandShellRuns(callID, agent) {
+			endAt = nil // the shell runs: the line was the command's own
+		}
 		c.mu.Lock()
 		it := c.itemLocked(callID)
 		if it == nil || it.BackgroundCommand == nil {
@@ -69,6 +78,26 @@ func (c *chat) followCommand(callID, id, file string, agent Agent) {
 			return // the service closed: its agents end, and nobody is left to tell
 		}
 	}
+}
+
+// commandShellRuns says whether the shell running the command callID left
+// in the background is still among agent's processes (a group's leader:
+// BackgroundTasks.RunsBackgroundCommand). False when Nushi can't look (no
+// process tree, the agent's pid unknown, the tree unreadable): the file
+// alone then says.
+func (c *chat) commandShellRuns(callID string, agent Agent) bool {
+	c.mu.Lock()
+	call := c.itemLocked(callID)
+	if c.procs == nil || c.kind.background == nil || call == nil || agent.Pid() <= 0 {
+		c.mu.Unlock()
+		return false
+	}
+	cp, tasks := *call, c.kind.background
+	c.mu.Unlock()
+	procs, err := c.procs.Under(agent.Pid())
+	return err == nil && slices.ContainsFunc(procs, func(p model.Process) bool {
+		return p.Pid == p.Pgid && tasks.RunsBackgroundCommand(cp, p.Args)
+	})
 }
 
 // commandState is a background command's state from how the agent says it

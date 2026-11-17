@@ -74,13 +74,20 @@ func tempRoots() []string {
 // outputTail is how much of a background command's output is read.
 const outputTail = 64 << 10
 
-var endLine = regexp.MustCompile(`\n+\[(exited with code -?\d+|killed)\]\n$`)
+// endLine is Claude's line for a background command's end, "[exited with
+// code N]" or "[killed]", alone on its line after the output.
+var endLine = regexp.MustCompile(`\n+\[(exited with code -?\d+|killed)\]\n`)
 
 // ReadBackgroundCommand reads what a background command wrote so far (the end of it),
-// and how it ended once it has: Claude ends the file with a line of its
-// own, "\n[exited with code N]\n" or "\n[killed]\n" (the command could
-// print such a line too: see chats' followCommand). Only a regular file named
-// for the task, in Claude's folder for them (taskFile), is read.
+// and how the file says it ended: Claude writes a line of its own as the
+// task ends, "\n[exited with code N]\n" or "\n[killed]\n", the last such
+// line being taken. It is mostly the file's last (the output is then what
+// comes before it), but what the command left behind can write after it
+// (a server logging its shutdown after "[killed]": docs/facts/claude.md;
+// the output is then the whole file), and the command can print such a
+// line itself: chats' followCommand takes the end only once the command's
+// shell is gone. Only a regular file named for the task, in Claude's
+// folder for them (taskFile), is read.
 func (Harness) ReadBackgroundCommand(id, file string) (output, end string, err error) {
 	if !taskFile(id, file) {
 		return "", "", errors.New("not the task's output file")
@@ -100,8 +107,13 @@ func (Harness) ReadBackgroundCommand(id, file string) (output, end string, err e
 		return "", "", err
 	}
 	out := strings.ToValidUTF8(string(b), "�")
-	if m := endLine.FindStringSubmatchIndex(out); m != nil {
+	all := endLine.FindAllStringSubmatchIndex(out, -1)
+	if all == nil {
+		return out, "", nil
+	}
+	m := all[len(all)-1]
+	if m[1] == len(out) {
 		return out[:m[0]], out[m[2]:m[3]], nil
 	}
-	return out, "", nil
+	return out, out[m[2]:m[3]], nil
 }
