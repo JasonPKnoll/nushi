@@ -87,13 +87,16 @@ void main() {
       await mouse.moveTo(_row(tester, 2));
       await tester.pump();
       expect(_button, findsOne);
-      // At the start of the hovered row, over its numbers.
+      // On the hovered row, centred on the change marker's column, right
+      // of the numbers.
       final at = tester.getRect(_button);
       expect((at.center.dy - _row(tester, 2).dy).abs(), lessThan(1));
       final pane = unified
           ? tester.getTopLeft(find.byType(UnifiedDiff)).dx
           : tester.getTopLeft(find.byType(DiffPane).last).dx;
-      expect(at.left, pane + 2);
+      final res = _controller(tester).resources;
+      final m = unified ? res.unifiedGutter : res.gutter;
+      expect(at.center.dx, closeTo(pane + m.markerX + res.advance / 2, 0.01));
       expect(layout(), before);
       await mouse.moveTo(_row(tester, 6));
       await tester.pump();
@@ -142,7 +145,7 @@ void main() {
     final mouse = await _mouse(tester);
     await mouse.moveTo(_row(tester, 4, side: PaneSide.old));
     await tester.pump();
-    expect(tester.getRect(_button).left, lessThan(10));
+    expect(tester.getRect(_button).right, lessThan(100));
     await mouse.down(tester.getCenter(_button));
     await tester.pump();
     await mouse.up();

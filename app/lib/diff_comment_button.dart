@@ -9,14 +9,17 @@ import 'package:nushi/controls.dart';
 import 'package:nushi/theme/theme.dart';
 
 /// A diff that takes comments ([child], a `UnifiedDiff` or a
-/// `SideBySideDiff` of [controller]) with a small accent "+" at the start
+/// `SideBySideDiff` of [controller]) with a small accent "+" in the gutter
 /// of the line under the pointer, as GitHub's diff has: it shows that a
-/// line takes a comment. It sits over the left edge of the line's
-/// numbers and moves nothing; a press on it goes through to the numbers
-/// below, so a click opens the comment box a click on the number opens and
-/// a drag from it selects lines as one over the numbers does. In the side
-/// by side view it is on the pane under the pointer, the side a click on
-/// a number there comments on. Only with a mouse: nothing hovers on touch.
+/// line takes a comment. It sits in the change marker's column, right of
+/// the numbers (where the package draws its own +), so it covers no digit
+/// at any width and stays put from line to line; on a changed line it
+/// stands in for the marker, whose tint still shows. It moves nothing; a
+/// press on it goes through to the gutter below, so a click opens the
+/// comment box a click on the number opens and a drag from it selects
+/// lines as one over the numbers does. In the side by side view it is on
+/// the pane under the pointer, the side a click on a number there
+/// comments on. Only with a mouse: nothing hovers on touch.
 class DiffCommentButton extends StatefulWidget {
   const new({
     required this.controller,
@@ -112,8 +115,8 @@ class _DiffCommentButtonState extends State<DiffCommentButton> {
     return (PaneSide.neu, double.nan); // the divider
   }
 
-  /// Where the button goes for the pointer at [at]: the top left of the
-  /// row under it, or null off a line (an inlay, a fold, the divider).
+  /// Where the row under the pointer at [at] starts: its pane's left
+  /// edge and its top, or null off a line (an inlay, a fold, the divider).
   Offset? _place(Offset at, double width) {
     final c = widget.controller;
     final (side, left) = _pane(at, width);
@@ -152,10 +155,18 @@ class _DiffCommentButtonState extends State<DiffCommentButton> {
                 final at = _pointer.value;
                 final place = at == null ? null : _place(at, box.maxWidth);
                 if (place == null) return const SizedBox.shrink();
-                final line = c.resources.lineHeight;
+                final res = c.resources;
+                final line = res.lineHeight;
                 final size = min(DiffCommentButton.size, line);
+                // Centred on the marker's column, inside the gutter: a
+                // press anywhere on it is one on the gutter.
+                final m = widget.unified ? res.unifiedGutter : res.gutter;
+                final x = min(
+                  m.markerX + (res.advance - size) / 2,
+                  m.gutterWidth - size,
+                );
                 return Positioned(
-                  left: place.dx + 2,
+                  left: place.dx + x,
                   top: place.dy + (line - size) / 2,
                   child: _SeeThrough(
                     child: tooltip(
