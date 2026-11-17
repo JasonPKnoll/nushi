@@ -8,6 +8,7 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/github_card.dart';
 import 'package:nushi/github_items.dart';
+import 'package:nushi/hover_card.dart';
 import 'package:nushi/menu.dart';
 import 'package:nushi/theme/theme.dart';
 
