@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/app_actions.dart';
+import 'package:nushi/change_marks.dart' show markBar, markGap;
 import 'package:nushi/main.dart';
 import 'package:nushi/place.dart';
 import 'package:nushi/settings.dart';
@@ -184,7 +185,10 @@ void main() {
         .first;
     final space = line.getRangeRects(const TextRange(start: 1, end: 2)).single;
     final left =
-        tester.getTopRight(gutter).dx -
+        // The text area starts after the change marks' column.
+        tester.getTopRight(gutter).dx +
+        markGap +
+        markBar -
         tester.getTopLeft(find.byType(WhitespaceOverlay)).dx;
     expect(
       c.dots.single.dx,
@@ -238,7 +242,10 @@ void main() {
         .getRangeRects(const TextRange(start: 40, end: 41))
         .single;
     final left =
-        tester.getTopRight(gutter).dx -
+        // The text area starts after the change marks' column.
+        tester.getTopRight(gutter).dx +
+        markGap +
+        markBar -
         tester.getTopLeft(find.byType(WhitespaceOverlay)).dx;
     // re_editor draws the line 200 to the left of where it laid it out.
     expect(

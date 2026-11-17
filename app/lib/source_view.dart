@@ -5,7 +5,9 @@ import 'dart:ui' show BoxHeightStyle;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import 'package:nushi/change_marks.dart';
 import 'package:nushi/indent_guides.dart';
+import 'package:nushi/line_changes.dart';
 import 'package:nushi/preview_text.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_spans.dart';
@@ -26,7 +28,10 @@ const _blank = '\u200B';
 /// until then and past 200,000 characters), its lines numbered and built as
 /// they scroll into view. JSON is pretty-printed. With [wrap] off a long
 /// line runs on and the view scrolls sideways, the line numbers staying
-/// put; a switch keeps the top line.
+/// put; a switch keeps the top line. With a [base], the last commit's
+/// text, the lines that differ from it have change marks in the gutter
+/// (ADR 0131); pretty-printed JSON's lines aren't the file's, so it has
+/// none.
 class SourceView extends StatefulWidget {
   const new(
     this.text, {
@@ -37,6 +42,7 @@ class SourceView extends StatefulWidget {
     this.tabSize = defaultTabSize,
     this.guides = false,
     this.pastEnd = false,
+    this.base,
   });
 
   final String text;
@@ -55,6 +61,9 @@ class SourceView extends StatefulWidget {
   /// pane's Scroll past end).
   final bool pastEnd;
 
+  /// The last commit's text, its lines marked against; null marks none.
+  final String? base;
+
   @override
   State<SourceView> createState() => _SourceViewState();
 }
@@ -66,6 +75,8 @@ class _SourceViewState extends State<SourceView> {
   int _reads = 0; // a highlight lands only for the latest read
   int? _columns; // the widest line's, worked out when first unwrapped
   Indents? _indents; // each line's indent, worked out when guides show
+  List<MarkCell?> _cells = const []; // each line's change mark
+  int _markings = 0; // marks land only for the latest base and text
 
   /// Each wrapping's list, to find the line at its top (a key of their
   /// own: one shared would carry the scroll offset across); and its
@@ -89,7 +100,11 @@ class _SourceViewState extends State<SourceView> {
   void didUpdateWidget(SourceView old) {
     super.didUpdateWidget(old);
     // The file changed: read again where it scrolled to.
-    if (old.text != widget.text || old.path != widget.path) _read();
+    if (old.text != widget.text || old.path != widget.path) {
+      _read();
+    } else if (old.base != widget.base) {
+      _mark();
+    }
     if (old.wrap != widget.wrap) _keepTopLine();
     if (old.tabSize != widget.tabSize) _columns = _indents = null;
   }
@@ -114,12 +129,40 @@ class _SourceViewState extends State<SourceView> {
     _spans = null;
     _columns = null;
     _indents = null;
+    _mark();
     if (sourceLanguage(widget.path, _text) case final language?) {
       highlightSides(language, '', _text).then((s) {
         if (mounted && read == _reads && s[1] != null) {
           setState(() => _spans = s[1]);
         }
       }).ignore();
+    }
+  }
+
+  /// Its lines' change marks against [SourceView.base]: none without one,
+  /// or when the lines shown aren't the file's own (JSON pretty-printed;
+  /// already formatted, it shows as it is, but for its last line break).
+  void _mark() {
+    final marked = ++_markings;
+    final base = widget.base;
+    final own = _text.trimRight() == widget.text.trimRight();
+    if (base == null || !own) {
+      _cells = const [];
+      return;
+    }
+    List<MarkCell?> cells(List<LineMark> marks) =>
+        marks.isEmpty ? const [] : markCells(marks, _lines.length);
+    // At once while the view builds anyway; a long file's when it's done,
+    // the last ones showing meanwhile.
+    switch (lineMarksSoon(base, _text)) {
+      case final List<LineMark> marks:
+        _cells = cells(marks);
+      case final Future<List<LineMark>> later:
+        later.then((marks) {
+          if (mounted && marked == _markings) {
+            setState(() => _cells = cells(marks));
+          }
+        }).ignore();
     }
   }
 
@@ -213,6 +256,30 @@ class _SourceViewState extends State<SourceView> {
     return max(widest, w + note);
   });
 
+  /// Line [i]'s [child] with its change mark over its first [cell]
+  /// points, its bar [bar] in, when it has one.
+  Widget _marked(
+    int i, {
+    required double cell,
+    required double bar,
+    required Widget child,
+  }) {
+    final mark = _cells.elementAtOrNull(i);
+    if (mark == null) return child;
+    return Stack(
+      children: [
+        child,
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: cell,
+          child: ChangeMark(cell: mark, barX: bar),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = NushiTheme.of(context);
@@ -294,29 +361,36 @@ class _SourceViewState extends State<SourceView> {
               controller: _down,
               padding: padded(box.maxHeight),
               itemCount: _lines.length,
-              itemBuilder: (context, i) => Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SelectionContainer.disabled(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 14),
-                      child: Text(number(i), style: gutter),
-                    ),
-                  ),
-                  Expanded(
-                    child: _Line(
-                      Text.rich(
-                        text(i),
-                        strutStyle: strut,
-                        selectionColor: Colors.transparent,
+              itemBuilder: (context, i) => _marked(
+                i,
+                cell: digits * char + markGap + markBar + markRoom,
+                bar: digits * char + markGap,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SelectionContainer.disabled(
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: markGap + markBar + markRoom,
+                        ),
+                        child: Text(number(i), style: gutter),
                       ),
-                      whole: _lines[i],
-                      column: char,
-                      level: level(i),
-                      step: step,
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: _Line(
+                        Text.rich(
+                          text(i),
+                          strutStyle: strut,
+                          selectionColor: Colors.transparent,
+                        ),
+                        whole: _lines[i],
+                        column: char,
+                        level: level(i),
+                        step: step,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -326,7 +400,7 @@ class _SourceViewState extends State<SourceView> {
     final pad = widget.padding ?? EdgeInsets.zero;
     // The numbers' column, the view's inset with them: it stays as the
     // lines scroll under it, over them in the view's color.
-    final numbers = pad.left + digits * char + 14 + 1;
+    final numbers = pad.left + digits * char + markGap + markBar + markRoom + 1;
     final width = numbers + _widest * char + pad.right;
     return LayoutBuilder(
       builder: (context, box) => MacScrollbar(
@@ -391,12 +465,17 @@ class _SourceViewState extends State<SourceView> {
                                     ),
                                 child: ColoredBox(
                                   color: t.base,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(left: pad.left),
-                                    child: Text(
-                                      number(i),
-                                      style: gutter,
-                                      softWrap: false,
+                                  child: _marked(
+                                    i,
+                                    cell: numbers,
+                                    bar: pad.left + digits * char + markGap,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(left: pad.left),
+                                      child: Text(
+                                        number(i),
+                                        style: gutter,
+                                        softWrap: false,
+                                      ),
                                     ),
                                   ),
                                 ),

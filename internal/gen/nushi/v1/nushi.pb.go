@@ -10537,7 +10537,12 @@ type GetDiffRequest struct {
 	Since string `protobuf:"bytes,4,opt,name=since,proto3" json:"since,omitempty"`
 	// With commit, instead of since, an older commit: what changed after it,
 	// its own change left out (API 100).
-	After         string `protobuf:"bytes,5,opt,name=after,proto3" json:"after,omitempty"`
+	After string `protobuf:"bytes,5,opt,name=after,proto3" json:"after,omitempty"`
+	// Only this file's change, by its path relative to folder (a rename's new
+	// path); its index state and what's staged are left out. Of the work
+	// tree's, a file that is ignored or a symlink comes back skipped, so no
+	// file at all means it is tracked and unchanged (API 121).
+	Path          string `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10603,6 +10608,13 @@ func (x *GetDiffRequest) GetSince() string {
 func (x *GetDiffRequest) GetAfter() string {
 	if x != nil {
 		return x.After
+	}
+	return ""
+}
+
+func (x *GetDiffRequest) GetPath() string {
+	if x != nil {
+		return x.Path
 	}
 	return ""
 }
@@ -26740,13 +26752,14 @@ const file_nushi_v1_nushi_proto_rawDesc = "" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x12\n" +
 	"\x04main\x18\x03 \x01(\bR\x04main\x12\x16\n" +
 	"\x06locked\x18\x04 \x01(\bR\x06locked\x12\x18\n" +
-	"\acurrent\x18\x05 \x01(\bR\acurrent\"\x80\x01\n" +
+	"\acurrent\x18\x05 \x01(\bR\acurrent\"\x94\x01\n" +
 	"\x0eGetDiffRequest\x12\x16\n" +
 	"\x06folder\x18\x01 \x01(\tR\x06folder\x12\x12\n" +
 	"\x04base\x18\x02 \x01(\tR\x04base\x12\x16\n" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit\x12\x14\n" +
 	"\x05since\x18\x04 \x01(\tR\x05since\x12\x14\n" +
-	"\x05after\x18\x05 \x01(\tR\x05after\"Y\n" +
+	"\x05after\x18\x05 \x01(\tR\x05after\x12\x12\n" +
+	"\x04path\x18\x06 \x01(\tR\x04path\"Y\n" +
 	"\x11StageFilesRequest\x12\x16\n" +
 	"\x06folder\x18\x01 \x01(\tR\x06folder\x12\x14\n" +
 	"\x05paths\x18\x02 \x03(\tR\x05paths\x12\x16\n" +

@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:nushi/app_actions.dart' show findKey;
+import 'package:nushi/change_marks.dart';
 import 'package:nushi/conventions.dart';
 import 'package:nushi/editor_find.dart';
 import 'package:nushi/file_edit.dart';
 import 'package:nushi/indent_guides.dart';
 import 'package:nushi/keys.dart';
+import 'package:nushi/line_changes.dart';
 import 'package:nushi/menu.dart' show Menu;
+import 'package:nushi/motion.dart' show Waits;
 import 'package:nushi/settings.dart';
 import 'package:nushi/source_spans.dart';
 import 'package:nushi/tab_indent.dart';
@@ -26,17 +30,24 @@ import 'package:re_editor/re_editor.dart';
 /// chat); not for a menu, the palette, a dialog, find, or a selection in
 /// the transcript or a preview, which wait for where the focus goes next.
 /// ⌘F with the focus in it finds in the file ([EditorFind]), not the chat.
+/// With a [base], the last commit's text, the lines that differ from it
+/// have change marks beside their numbers (ADR 0131), unsaved edits too,
+/// a pause in typing after each.
 class SourceEditor extends StatefulWidget {
   const new({
     required this.edit,
     required this.wrap,
     super.key,
     this.padding = EdgeInsets.zero,
+    this.base,
   });
 
   final FileEdit edit;
   final bool wrap;
   final EdgeInsets padding;
+
+  /// The last commit's text, its lines marked against (null marks none).
+  final ValueListenable<String?>? base;
 
   @override
   State<SourceEditor> createState() => _SourceEditorState();
@@ -61,11 +72,61 @@ class _SourceEditorState extends State<SourceEditor> {
   ModalRoute<Object?>? _route;
   bool _following = false;
 
+  /// Each line's change mark, against [SourceEditor.base]; the lines they
+  /// were worked out for, and the next working out, while typing pauses.
+  final _cells = ValueNotifier<List<MarkCell?>>(const []);
+  CodeLines? _marked;
+  Timer? _typing;
+  int _markings = 0;
+
   @override
   void initState() {
     super.initState();
     _focus.addListener(_focusChanged);
     tabSize.addListener(_tabSizeChanged);
+    widget.base?.addListener(_mark);
+    widget.edit.controller.addListener(_edited);
+    _mark();
+  }
+
+  @override
+  void didUpdateWidget(SourceEditor old) {
+    super.didUpdateWidget(old);
+    if (old.base != widget.base) {
+      old.base?.removeListener(_mark);
+      widget.base?.addListener(_mark);
+      _mark();
+    }
+  }
+
+  /// The text changed (not only the caret): marked again once typing
+  /// pauses.
+  void _edited() {
+    if (identical(widget.edit.controller.codeLines, _marked)) return;
+    _typing?.cancel();
+    _typing = Timer(Waits.typing, _mark);
+  }
+
+  void _mark() {
+    _typing?.cancel();
+    final marked = ++_markings;
+    final lines = widget.edit.controller.codeLines;
+    _marked = lines;
+    final base = widget.base?.value;
+    if (base == null) {
+      _cells.value = const [];
+      return;
+    }
+    List<MarkCell?> cells(List<LineMark> marks) =>
+        marks.isEmpty ? const [] : markCells(marks, lines.length);
+    switch (lineMarksSoon(base, widget.edit.text)) {
+      case final List<LineMark> marks:
+        _cells.value = cells(marks);
+      case final Future<List<LineMark>> later:
+        later.then((marks) {
+          if (mounted && marked == _markings) _cells.value = cells(marks);
+        }).ignore();
+    }
   }
 
   /// Tab size set: the lines' runs are made again, to the new stops
@@ -80,6 +141,10 @@ class _SourceEditorState extends State<SourceEditor> {
 
   @override
   void dispose() {
+    _typing?.cancel();
+    widget.base?.removeListener(_mark);
+    widget.edit.controller.removeListener(_edited);
+    _cells.dispose();
     tabSize.removeListener(_tabSizeChanged);
     _unfollow();
     _find.dispose();
@@ -180,8 +245,10 @@ class _SourceEditorState extends State<SourceEditor> {
             chunkAnalyzer: const NonCodeChunkAnalyzer(),
             shortcutsActivatorsBuilder: const _EditorKeys(),
             shortcutOverrideActions: widget.edit.tabs ? _tabActions : null,
+            // The numbers' own room is the change marks' (markRoom), so
+            // the text starts where a read-only source's does.
             padding: EdgeInsets.only(
-              left: 14,
+              left: 14 - markGap - markBar,
               top: top,
               right: widget.padding.right,
               bottom: scrollPastEnd.value
@@ -213,12 +280,27 @@ class _SourceEditorState extends State<SourceEditor> {
               return Padding(
                 key: _gutter,
                 padding: EdgeInsets.only(left: widget.padding.left),
-                child: DefaultCodeLineNumber(
-                  controller: controller,
-                  notifier: notifier,
-                  minNumberCount: 1,
-                  textStyle: gutter,
-                  focusedTextStyle: gutter.copyWith(color: t.textSecondary),
+                child: Stack(
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DefaultCodeLineNumber(
+                          controller: controller,
+                          notifier: notifier,
+                          minNumberCount: 1,
+                          textStyle: gutter,
+                          focusedTextStyle: gutter.copyWith(
+                            color: t.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: markGap + markBar),
+                      ],
+                    ),
+                    Positioned.fill(
+                      child: _EditorMarks(lines: notifier, cells: _cells),
+                    ),
+                  ],
                 ),
               );
             },
@@ -276,6 +358,113 @@ class _SourceEditorState extends State<SourceEditor> {
       ),
     );
   }
+}
+
+/// The editor's change marks over its line numbers' cells, where
+/// re_editor laid the lines out ([lines], the numbers' own), each bar at
+/// its cell's right edge: painted as the lines are laid out, so they
+/// scroll with them; and where the pointer finds them, set a frame later
+/// (re_editor tells of its lines while it lays them out, when nothing
+/// may build).
+class _EditorMarks extends StatefulWidget {
+  const new({required this.lines, required this.cells});
+
+  final CodeIndicatorValueNotifier lines;
+  final ValueListenable<List<MarkCell?>> cells;
+
+  @override
+  State<_EditorMarks> createState() => _EditorMarksState();
+}
+
+class _EditorMarksState extends State<_EditorMarks> {
+  bool _waiting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.lines.addListener(_laidOut);
+    widget.cells.addListener(_laidOut);
+  }
+
+  @override
+  void dispose() {
+    widget.lines.removeListener(_laidOut);
+    widget.cells.removeListener(_laidOut);
+    super.dispose();
+  }
+
+  void _laidOut() {
+    if (_waiting) return;
+    _waiting = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _waiting = false;
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = NushiTheme.of(context).t;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final marks = widget.cells.value;
+        final x = box.maxWidth - markBar;
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _EditorMarkPainter(widget.lines, widget.cells, x, t),
+              ),
+            ),
+            for (final p
+                in widget.lines.value?.paragraphs ??
+                    const <CodeLineRenderParagraph>[])
+              if (marks.elementAtOrNull(p.index) case final cell?)
+                Positioned(
+                  left: 0,
+                  width: box.maxWidth,
+                  top: p.top,
+                  height: p.height,
+                  child: ChangeMark(cell: cell, barX: x, painted: false),
+                ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _EditorMarkPainter extends CustomPainter {
+  new(this.lines, this.cells, this.x, this.t)
+    : super(repaint: Listenable.merge([lines, cells]));
+
+  final CodeIndicatorValueNotifier lines;
+  final ValueListenable<List<MarkCell?>> cells;
+  final double x;
+  final Tokens t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final marks = cells.value;
+    canvas
+      ..save()
+      ..clipRect(Offset.zero & size);
+    for (final p
+        in lines.value?.paragraphs ?? const <CodeLineRenderParagraph>[]) {
+      if (marks.elementAtOrNull(p.index) case final cell?) {
+        final box = Rect.fromLTWH(0, p.top, size.width, p.height);
+        paintChangeMark(canvas, box, cell, x, t);
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_EditorMarkPainter old) =>
+      old.x != x ||
+      old.t != t ||
+      !identical(old.lines, lines) ||
+      !identical(old.cells, cells);
 }
 
 /// Whether the focus at [focus] only passes on its way somewhere (an

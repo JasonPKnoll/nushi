@@ -342,6 +342,7 @@ class PreviewBody extends StatelessWidget {
     this.tabSize = defaultTabSize,
     this.guides = false,
     this.pastEnd = false,
+    this.base,
   });
 
   final FileWatch watch;
@@ -370,6 +371,10 @@ class PreviewBody extends StatelessWidget {
 
   /// Whether a source scrolls on past its last line: the Mac's setting.
   final bool pastEnd;
+
+  /// The last commit's text, a source's lines marked against (the Mac's
+  /// Files pane, ADR 0131); a rendered file's own view has none.
+  final String? base;
 
   @override
   Widget build(BuildContext context) {
@@ -452,6 +457,7 @@ class PreviewBody extends StatelessWidget {
                 tabSize: tabSize,
                 guides: guides,
                 pastEnd: pastEnd,
+                base: base,
               );
               final why = readOnly?.call();
               if (why == null || why.isEmpty) return view;

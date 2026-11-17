@@ -57,7 +57,8 @@ String sumOf(List<int> b) => sha256.convert(b).toString();
 
 /// The Mac app on that chat ([more] chats beside it), [files] on its
 /// fake disk, [open] in the preview; the tree lists [folder] at the
-/// chat's folder (empty without it).
+/// chat's folder (empty without it); GetDiff answers [fileDiffs] for one
+/// file (`FakeDaemon.fileDiffs`); the chat's transcript is [items].
 Future<(Daemon, FakeDaemon)> openEditor(
   WidgetTester tester,
   Map<String, List<int>?> files, {
@@ -66,6 +67,8 @@ Future<(Daemon, FakeDaemon)> openEditor(
   Brightness brightness = Brightness.light,
   List<Chat> more = const [],
   List<FolderEntry> folder = const [],
+  Map<String, Object> fileDiffs = const {},
+  List<Item>? items,
 }) async {
   viewport(tester, Size(width, 900), brightness: brightness);
   showDetails.value = false;
@@ -74,7 +77,7 @@ Future<(Daemon, FakeDaemon)> openEditor(
     ..answer = ((input) => switch (input) {
       GetChatRequest(chatId: 'c') => GetChatResponse(
         chat: editChat,
-        items: editItems,
+        items: items ?? editItems,
       ),
       GetChatRequest(:final chatId) => GetChatResponse(
         chat: more.firstWhere((c) => c.id == chatId),
@@ -95,6 +98,7 @@ Future<(Daemon, FakeDaemon)> openEditor(
     };
   }
   fake.files.addAll(files);
+  fake.fileDiffs.addAll(fileDiffs);
   final d = await fake.connect(tester);
   d.select('c');
   await tester.pumpWidget(NushiApp(daemon: d));

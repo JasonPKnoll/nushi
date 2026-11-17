@@ -13399,6 +13399,7 @@ class GetDiffRequest extends $pb.GeneratedMessage {
     $core.String? commit,
     $core.String? since,
     $core.String? after,
+    $core.String? path,
   }) {
     final result = GetDiffRequest._();
     if (folder != null) result.folder = folder;
@@ -13406,6 +13407,7 @@ class GetDiffRequest extends $pb.GeneratedMessage {
     if (commit != null) result.commit = commit;
     if (since != null) result.since = since;
     if (after != null) result.after = after;
+    if (path != null) result.path = path;
     return result;
   }
 
@@ -13427,6 +13429,7 @@ class GetDiffRequest extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'commit')
     ..aOS(4, _omitFieldNames ? '' : 'since')
     ..aOS(5, _omitFieldNames ? '' : 'after')
+    ..aOS(6, _omitFieldNames ? '' : 'path')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -13505,6 +13508,19 @@ class GetDiffRequest extends $pb.GeneratedMessage {
   $core.bool hasAfter() => $_has(4);
   @$pb.TagNumber(5)
   void clearAfter() => $_clearField(5);
+
+  /// Only this file's change, by its path relative to folder (a rename's new
+  /// path); its index state and what's staged are left out. Of the work
+  /// tree's, a file that is ignored or a symlink comes back skipped, so no
+  /// file at all means it is tracked and unchanged (API 121).
+  @$pb.TagNumber(6)
+  $core.String get path => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set path($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPath() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPath() => $_clearField(6);
 }
 
 class StageFilesRequest extends $pb.GeneratedMessage {

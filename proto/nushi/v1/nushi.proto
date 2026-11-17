@@ -1920,6 +1920,11 @@ message GetDiffRequest {
   // With commit, instead of since, an older commit: what changed after it,
   // its own change left out (API 100).
   string after = 5;
+  // Only this file's change, by its path relative to folder (a rename's new
+  // path); its index state and what's staged are left out. Of the work
+  // tree's, a file that is ignored or a symlink comes back skipped, so no
+  // file at all means it is tracked and unchanged (API 121).
+  string path = 6;
 }
 
 message StageFilesRequest {

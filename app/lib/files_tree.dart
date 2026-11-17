@@ -7,6 +7,7 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/double_clicks.dart';
 import 'package:nushi/file_filter.dart';
 import 'package:nushi/folder_tree.dart';
+import 'package:nushi/menu.dart';
 import 'package:nushi/settings.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/tree_rows.dart';
@@ -219,6 +220,28 @@ class _FilesTreeState extends State<FilesTree> {
     );
   }
 
+  /// A row the chat [wrote] (a file with the dot) has a right-click menu:
+  /// Show changes opens it in the chat's Changes tab (ADR 0131). Others
+  /// have none.
+  Widget _written(
+    TreeRow r, {
+    required bool wrote,
+    required Widget Function(GestureTapUpCallback? menu) builder,
+  }) {
+    if (!wrote) return builder(null);
+    return Menu(
+      filter: false,
+      entries: [
+        MenuEntry(
+          'Show changes',
+          icon: Icons.difference_outlined,
+          onPick: () => widget.chat.showFile(r.path),
+        ),
+      ],
+      builder: (context, open) => builder((d) => open(d.localPosition)),
+    );
+  }
+
   Widget _body(NushiTheme theme) {
     final t = theme.t;
     final marks = writtenMarks(widget.chat);
@@ -257,6 +280,9 @@ class _FilesTreeState extends State<FilesTree> {
               itemCount: _rows.length,
               itemBuilder: (context, i) {
                 final r = _rows[i];
+                final wrote = r.kind == TreeRowKind.folder
+                    ? marks.folders.contains(r.path)
+                    : marks.files.contains(r.path);
                 // A second click on a file keeps its tab: its first opened
                 // it, and the second's tap shows it again.
                 return Listener(
@@ -265,19 +291,22 @@ class _FilesTreeState extends State<FilesTree> {
                       widget.chat.openInFiles(r.path);
                     }
                   },
-                  child: TreeRowView(
+                  child: _written(
                     r,
-                    selected: r.entry && r.path == _at,
-                    showing: r.kind == TreeRowKind.file && r.path == open,
-                    wrote: r.kind == TreeRowKind.folder
-                        ? marks.folders.contains(r.path)
-                        : marks.files.contains(r.path),
-                    onTap: r.entry
-                        ? () {
-                            _list.requestFocus();
-                            _activate(r, keep: false);
-                          }
-                        : null,
+                    wrote: wrote && r.kind != TreeRowKind.folder,
+                    builder: (menu) => TreeRowView(
+                      r,
+                      selected: r.entry && r.path == _at,
+                      showing: r.kind == TreeRowKind.file && r.path == open,
+                      wrote: wrote,
+                      onSecondaryTapUp: menu,
+                      onTap: r.entry
+                          ? () {
+                              _list.requestFocus();
+                              _activate(r, keep: false);
+                            }
+                          : null,
+                    ),
                   ),
                 );
               },

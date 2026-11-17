@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nushi/change_marks.dart' show markBar, markGap;
 import 'package:nushi/file_edit.dart';
 import 'package:nushi/file_text.dart';
 import 'package:nushi/settings.dart';
@@ -422,7 +423,11 @@ void main() {
       (8.8, 3),
     ]) {
       await tester.tapAt(
-        Offset(tester.getTopRight(gutter).dx, tester.getTopLeft(gutter).dy) +
+        // The text area starts after the change marks' column.
+        Offset(
+              tester.getTopRight(gutter).dx + markGap + markBar,
+              tester.getTopLeft(gutter).dy,
+            ) +
             line.offset +
             Offset(columns * column, line.preferredLineHeight / 2),
       );

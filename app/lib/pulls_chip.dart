@@ -5,6 +5,7 @@ import 'package:nushi/daemon.dart';
 import 'package:nushi/github_card.dart';
 import 'package:nushi/github_items.dart';
 import 'package:nushi/github_parts.dart' show ItemBadges;
+import 'package:nushi/hover_card.dart';
 import 'package:nushi/pull_link.dart';
 import 'package:nushi/pull_rows.dart';
 import 'package:nushi/theme/theme.dart';
