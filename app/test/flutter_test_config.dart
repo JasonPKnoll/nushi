@@ -38,13 +38,14 @@ import 'harness.dart';
 /// a streaming reply's caret), so goldens are one frame and pumpAndSettle
 /// settles while a call runs; the app's clock stands at [fixtureNow], so an
 /// age a golden shows never moves. No test sees what another left: the
-/// app's prefs as at launch, nothing the app holds in memory while it runs
-/// (`run_state.dart`'s: agents, caches, drafts, groups opened…), no pull
-/// request read, review comments, clones or theme files known, no tile's
-/// image kept, no image decoded, the shared clock of what loops at its
-/// start; the Mac's native edge (on every host), no speller, a fake
-/// install, so nothing starts or stops a daemon, a fake file manager, so
-/// nothing opens on the desktop, and a phone paired with a Mac.
+/// app's prefs as at launch (`app.json` too), nothing the app holds in
+/// memory while it runs (`run_state.dart`'s: agents, caches, drafts,
+/// groups opened…), no pull request read, review comments, clones or
+/// theme files known, no tile's image kept, no image decoded, the shared
+/// clock of what loops at its start; the Mac's native edge (on every
+/// host), no speller, a fake install, so nothing starts or stops a
+/// daemon, a fake file manager, so nothing opens on the desktop, and a
+/// phone paired with a Mac.
 /// The test process's data folder goes when its tests end; on Linux it
 /// holds the process's `XDG_CONFIG_HOME` too, where enchant makes its
 /// folder, so no test writes in the user's.
@@ -98,6 +99,7 @@ void startAfresh() {
     ..install = FakeAppInstall()
     ..desktop = FakeDesktop();
   phoneHost = macConventions;
+  // The prefs as at launch, and `app.json` on disk as it was then.
   resetAppSettings();
   // What the app holds while it runs (caches, half-written comments,
   // groups opened…), each made through run_state.dart.

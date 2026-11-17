@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/collapsible.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/palette.dart';
+import 'package:nushi/settings.dart';
 
 import 'fake_desktop.dart';
 import 'flutter_test_config.dart';
@@ -30,6 +31,14 @@ void main() {
     startAfresh();
     expect(Collapsible.opened, isEmpty);
     expect(recentRows, isEmpty);
+  });
+
+  test('what one test saves to app.json the next doesn’t read', () async {
+    showDetails.value = !showDetails.value;
+    await pumpEventQueue();
+    expect(readSaved(), isNotEmpty);
+    startAfresh();
+    expect(readSaved(), isEmpty);
   });
 
   test('what lib keeps outside widgets is made through run_state.dart', () {

@@ -645,17 +645,30 @@ Map<String, List<String>> _byPlace(Object? saved) => _entries(saved, _strings);
 
 File get _settings => File('$dataDir/app.json');
 
-/// `app.json` as it was at launch.
-final Map<String, Object?> _saved = readSaved();
+/// `app.json`'s text as it was at launch; null when there was none.
+final String? _launchText = _readText();
 
-/// `app.json` as it is on disk now; empty when it can't be read.
-Map<String, Object?> readSaved() {
+/// `app.json` as it was at launch.
+final Map<String, Object?> _saved = _decode(_launchText);
+
+String? _readText() {
   try {
-    return jsonDecode(_settings.readAsStringSync()) as Map<String, Object?>;
+    return _settings.readAsStringSync();
+  } on Object {
+    return null;
+  }
+}
+
+Map<String, Object?> _decode(String? text) {
+  try {
+    return jsonDecode(text!) as Map<String, Object?>;
   } on Object {
     return <String, Object?>{};
   }
 }
+
+/// `app.json` as it is on disk now; empty when it can't be read.
+Map<String, Object?> readSaved() => _decode(_readText());
 
 /// Keys an older app saved that mean nothing now, dropped by the next
 /// save: `worktrees` (new chats no longer remember one), `subagentWide`
@@ -697,12 +710,21 @@ void _save() {
 }
 
 /// Every pref as it was at launch (a test process's: as its data folder's
-/// `app.json` had it, none unless a test wrote one before reading), so
-/// no test sees another's.
+/// `app.json` had it, none unless a test wrote one before reading), and
+/// the file on disk too, so no test sees another's, in memory or saved.
 @visibleForTesting
 void resetAppSettings() {
   _saveDue = false; // a test's pending save may never have run
   for (final p in _made) {
     p._reset();
+  }
+  try {
+    if (_launchText case final text?) {
+      writeWhole(_settings, utf8.encode(text));
+    } else if (_settings.existsSync()) {
+      _settings.deleteSync();
+    }
+  } on Object {
+    // A test that reads the file would fail on what's left.
   }
 }
