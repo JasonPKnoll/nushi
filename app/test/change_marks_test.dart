@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/change_marks.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
+import 'package:nushi/hover_card.dart';
 import 'package:nushi/line_changes.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/source_editor.dart';
@@ -253,6 +254,88 @@ void main() {
       );
     }
     image.dispose();
+  });
+
+  for (final wrap in [true, false]) {
+    testWidgets("a run's card leaves its lines in sight, wrapped $wrap", (
+      tester,
+    ) async {
+      await tester.pumpWidget(_source(wrap: wrap));
+      // Lines 5–7 changed: the first one's card opens under the last.
+      final run = find.byType(ChangeMark);
+      await tester.tap(run.first);
+      await tester.pump();
+      final card = tester.getRect(find.byType(ChangeCard));
+      expect(card.top, greaterThanOrEqualTo(tester.getRect(run.at(2)).bottom));
+      expect(card.top, lessThan(tester.getRect(_line('func main()')).bottom));
+      await tester.tapAt(const Offset(400, 300));
+      await tester.pump();
+    });
+  }
+
+  testWidgets("near the window's foot, a run's card opens over its first "
+      'line', (tester) async {
+    await tester.pumpWidget(_source());
+    final run = find.byType(ChangeMark);
+    final first = tester.getRect(run.first);
+    // The window ends just under the run.
+    viewport(tester, Size(800, tester.getRect(run.at(2)).bottom + 40));
+    await tester.pump();
+    await tester.tap(run.at(2));
+    await tester.pump();
+    expect(tester.getRect(find.byType(ChangeCard)).bottom, lessThan(first.top));
+  });
+
+  testWidgets('a card stays in a narrow window and wraps a long line', (
+    tester,
+  ) async {
+    viewport(tester, const Size(720, 600));
+    final long = 'x' * 140;
+    final cell = MarkCell(bar: LineMark(MarkKind.changed, 0, 1, [long]));
+    await tester.pumpWidget(
+      themed(
+        Padding(
+          padding: const EdgeInsets.only(left: 263, top: 40),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 30,
+              height: 17,
+              child: ChangeMark(cell: cell, barX: 26),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(ChangeMark));
+    await tester.pump();
+    final card = tester.getRect(find.byType(ChangeCard));
+    expect(card.right, lessThanOrEqualTo(720 - HoverCard.margin));
+    expect(card.left, 263);
+    // All 140 columns are there, on more than one row.
+    final line = tester.getRect(find.text(long));
+    expect(line.height, greaterThan(30));
+    expect(line.right, lessThanOrEqualTo(card.right));
+    // At the window's right edge, it moves left, no narrower than its
+    // least.
+    await tester.tapAt(const Offset(10, 500));
+    await tester.pumpWidget(
+      themed(
+        Align(
+          alignment: Alignment.topRight,
+          child: SizedBox(
+            width: 30,
+            height: 17,
+            child: ChangeMark(cell: cell, barX: 26),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(ChangeMark));
+    await tester.pump();
+    final moved = tester.getRect(find.byType(ChangeCard));
+    expect(moved.right, lessThanOrEqualTo(720 - HoverCard.margin));
+    expect(moved.width, greaterThanOrEqualTo(240));
   });
 
   testWidgets('a card lists 40 old lines at most', (tester) async {

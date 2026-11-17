@@ -35,8 +35,10 @@ Color markColor(Tokens t, MarkKind kind) => switch (kind) {
 /// from its left, the whole line high, its removed run's wedge on its top
 /// or bottom edge; hovered (after a moment) or clicked, its card. Not
 /// [painted], it's only where the pointer finds it (the editor paints its
-/// marks as it lays its lines out: [paintChangeMark]).
-class ChangeMark extends StatelessWidget {
+/// marks as it lays its lines out: [paintChangeMark]). The card keeps
+/// clear of its whole run's lines on screen, so what they say now stays
+/// in sight beside what they were.
+class ChangeMark extends StatefulWidget {
   const new({
     required this.cell,
     required this.barX,
@@ -49,15 +51,57 @@ class ChangeMark extends StatelessWidget {
   final bool painted;
 
   @override
+  State<ChangeMark> createState() => _ChangeMarkState();
+}
+
+class _ChangeMarkState extends State<ChangeMark> {
+  /// The marks on screen, to find a run's other lines by: a run's lines
+  /// share its one [LineMark] (`markCells`), each view its own.
+  static final _shown = <_ChangeMarkState>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _shown.add(this);
+  }
+
+  @override
+  void dispose() {
+    _shown.remove(this);
+    super.dispose();
+  }
+
+  Rect? _box() {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  /// This line's box and its run's other lines' on screen (a removal's
+  /// wedge is its line's alone).
+  Rect _around() {
+    final own = _box() ?? Rect.zero;
+    final run = widget.cell.bar;
+    if (run == null) return own;
+    var all = own;
+    for (final other in _shown) {
+      if (!identical(other.widget.cell.bar, run)) continue;
+      if (other._box() case final box?) all = all.expandToInclude(box);
+    }
+    return all;
+  }
+
+  @override
   Widget build(BuildContext context) => HoverCard(
     showOnTap: true,
     above: 300,
-    card: (_) => ChangeCard(marks: cell.marks),
+    around: _around,
+    card: (_) => ChangeCard(marks: widget.cell.marks),
     child: MouseRegion(
       cursor: SystemMouseCursors.click,
       child: CustomPaint(
-        painter: painted
-            ? _MarkPainter(cell, barX, NushiTheme.of(context).t)
+        painter: widget.painted
+            ? _MarkPainter(widget.cell, widget.barX, NushiTheme.of(context).t)
             : null,
         child: const SizedBox.expand(),
       ),
@@ -217,7 +261,8 @@ class _OldLines extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(shown.isEmpty ? ' ' : shown, style: style, softWrap: false),
+          // Wrapped: a long line is read whole, not cut at the card's edge.
+          Text(shown.isEmpty ? ' ' : shown, style: style),
           if (more > 0)
             SelectionContainer.disabled(
               child: Text(

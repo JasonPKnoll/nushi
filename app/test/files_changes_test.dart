@@ -48,6 +48,7 @@ Future<(Daemon, FakeDaemon)> _open(
   List<String> open = const ['main.go'],
   double width = 1700,
   Brightness brightness = Brightness.light,
+  String base = changeBase,
 }) => openEditor(
   tester,
   {
@@ -64,7 +65,7 @@ Future<(Daemon, FakeDaemon)> _open(
     '/Users/me/nushi/main.go': FileChange(
       path: 'main.go',
       status: 'modified',
-      oldText: changeBase,
+      oldText: base,
     ),
     '/Users/me/nushi/notes.md': FileChange(
       path: 'notes.md',
@@ -185,6 +186,31 @@ void main() {
           chatC(d).openInFiles('notes.md');
           await tester.pumpAndSettle();
           await render(tester, app, 'cl_${w}_new_file_$theme');
+          await endEditor(tester, d);
+        },
+        variant: onMac,
+        skip: rendersDir == null,
+      );
+      testWidgets(
+        "renders: a long old line's card, $w, $theme",
+        (tester) async {
+          // The comment was 130 columns long before.
+          final long = '// greet says hello. ${'and more words ' * 7}end.';
+          final (d, _) = await _open(
+            tester,
+            width: width,
+            brightness: brightness,
+            base: changeBase.replaceFirst('// greet says hello.', long),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(ChangeMark).first);
+          await tester.pumpAndSettle();
+          expectTextInside(tester, width);
+          await render(
+            tester,
+            find.byType(NushiApp),
+            'cl_${w}_card_long_$theme',
+          );
           await endEditor(tester, d);
         },
         variant: onMac,

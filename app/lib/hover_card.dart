@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -7,6 +8,10 @@ import 'package:flutter/material.dart';
 /// With [showOnTap] a click on [child] shows it at once, and it stays
 /// until a second click, or one elsewhere. With [above], it opens over
 /// [child] instead when the window has less than that much room under it.
+/// With [around], it keeps clear of that box (global, [child]'s own
+/// lines and those it speaks of) instead of [child]'s alone. It never
+/// runs past the window's right edge: it narrows to the room there, down
+/// to [minWidth], and moves left past that.
 class HoverCard extends StatefulWidget {
   const new({
     required this.child,
@@ -17,6 +22,8 @@ class HoverCard extends StatefulWidget {
     this.delay = const Duration(milliseconds: 400),
     this.showOnTap = false,
     this.above,
+    this.around,
+    this.minWidth = 240,
   });
 
   final Widget child;
@@ -25,6 +32,11 @@ class HoverCard extends StatefulWidget {
   final Duration delay;
   final bool showOnTap;
   final double? above;
+  final Rect Function()? around;
+  final double minWidth;
+
+  /// The least room a card keeps from the window's edges.
+  static const double margin = 8;
 
   @override
   State<HoverCard> createState() => _HoverCardState();
@@ -82,14 +94,31 @@ class _HoverCardState extends State<HoverCard> {
     super.dispose();
   }
 
-  /// Whether it opens over its child: [HoverCard.above] asks, and the
-  /// window has less room than that under the child.
-  bool _over() {
-    final room = widget.above;
+  /// Where the card goes: over or under its child (over when
+  /// [HoverCard.above] asks and the window has less room than that under
+  /// what it keeps clear of), how far past the child's edge that is, and
+  /// how far left and how wide it may be to stay in the window.
+  ({bool over, Offset shift, double width}) _place() {
     final box = context.findRenderObject();
-    if (room == null || box is! RenderBox || !box.hasSize) return false;
-    final bottom = box.localToGlobal(Offset(0, box.size.height)).dy;
-    return MediaQuery.sizeOf(context).height - bottom < room;
+    final window = MediaQuery.sizeOf(context);
+    if (box is! RenderBox || !box.hasSize) {
+      return (over: false, shift: Offset.zero, width: window.width);
+    }
+    final own = box.localToGlobal(Offset.zero) & box.size;
+    final clear = widget.around?.call() ?? own;
+    final over =
+        widget.above != null && window.height - clear.bottom < widget.above!;
+    final room = window.width - own.left - HoverCard.margin;
+    final width = max(room, widget.minWidth);
+    final left = max(room - width, HoverCard.margin - own.left);
+    return (
+      over: over,
+      shift: Offset(
+        left,
+        over ? clear.top - own.top - 4 : clear.bottom - own.bottom + 4,
+      ),
+      width: width,
+    );
   }
 
   @override
@@ -115,18 +144,21 @@ class _HoverCardState extends State<HoverCard> {
       child: OverlayPortal(
         controller: _portal,
         overlayChildBuilder: (context) {
-          final over = _over();
+          final (:over, :shift, :width) = _place();
           Widget card = MouseRegion(
             onEnter: (_) => _enter(),
             onExit: (_) => _exit(),
-            child: widget.card(context),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: width),
+              child: widget.card(context),
+            ),
           );
           if (widget.showOnTap) card = TapRegion(groupId: this, child: card);
           return CompositedTransformFollower(
             link: _link,
             targetAnchor: over ? Alignment.topLeft : Alignment.bottomLeft,
             followerAnchor: over ? Alignment.bottomLeft : Alignment.topLeft,
-            offset: Offset(0, over ? -4 : 4),
+            offset: shift,
             child: Align(
               alignment: over ? Alignment.bottomLeft : Alignment.topLeft,
               child: card,
