@@ -5,6 +5,7 @@ import 'package:nushi/controls.dart';
 import 'package:nushi/file_view.dart';
 import 'package:nushi/files_bar.dart';
 import 'package:nushi/files_pane.dart';
+import 'package:nushi/files_split.dart' show filesTreeFolds;
 import 'package:nushi/files_tree.dart';
 import 'package:nushi/folder_tree.dart';
 import 'package:nushi/settings.dart' show filesTree;
@@ -16,7 +17,9 @@ import 'panes_app.dart';
 // Panes in a narrow window (ADR 0123): under their summed least they lie
 // over the transcript and narrow to fit, each down to the least its rows
 // hold before the others give, so no row overflows in a window from 600:
-// theirs, or the transcript's beside them at its own least.
+// theirs, or the transcript's beside them at its own least. One pane
+// alone holds down to a 400 window, the sidebar shown or not (it tucks
+// itself away there). Any overflow fails a test: none is let through.
 
 final _mac = TargetPlatformVariant.only(TargetPlatform.macOS);
 
@@ -49,19 +52,6 @@ PanesOpen _with({
   browser: browser ? 1 : 0,
 );
 
-/// Overflows reported only as [_overflows] finds them: a row reports its
-/// overflow once, in whichever frame it first has one (a pane sliding in,
-/// too), so the settled rows are what's checked, each window afresh. The
-/// handler that was, to put back.
-void Function(FlutterErrorDetails)? _settledRowsOnly() {
-  final was = FlutterError.onError;
-  FlutterError.onError = (d) {
-    if (!d.toString().contains('overflowed')) was?.call(d);
-  };
-  addTearDown(() => FlutterError.onError = was);
-  return was;
-}
-
 /// The width the Files pane gives its tree (its edge's box), 0 when it's
 /// squeezed out and so not there.
 double _treeRoom(WidgetTester tester) {
@@ -92,27 +82,34 @@ List<String> _pastFiles(WidgetTester tester) {
 }
 
 void main() {
-  for (final width in [400.0, 480.0]) {
-    testWidgets('Files alone in a ${width.round()} window: the tree squeezed '
-        'out, its search field runs nowhere past the pane', (tester) async {
-      _settledRowsOnly();
-      final (d, _) = await panesApp(
-        tester,
-        width: width,
-        open: (
-          side: false,
-          files: true,
-          subagent: false,
-          command: false,
-          previews: 0,
-          browser: 0,
-        ),
-      );
-      expect(_treeRoom(tester), 0);
-      expect(_pastFiles(tester), isEmpty);
-      expectTextInside(tester, width);
-      await closeView(tester, d);
-    }, variant: _mac);
+  for (final width in [400.0, 480.0, 520.0, 560.0]) {
+    for (final sidebar in [true, false]) {
+      testWidgets('Files alone in a ${width.round()} window, sidebar '
+          "${sidebar ? 'shown' : 'hidden'}: the tree there at a width its "
+          'rows hold or not at all, nothing past the pane', (tester) async {
+        final (d, _) = await panesApp(
+          tester,
+          width: width,
+          sidebar: sidebar,
+          open: (
+            side: false,
+            files: true,
+            subagent: false,
+            command: false,
+            previews: 0,
+            browser: 0,
+          ),
+        );
+        final tree = _treeRoom(tester);
+        // In 520 to 580 the tree was a sliver of 1 to 70, its field and
+        // rows running past it.
+        expect(tree == 0 || tree >= filesTreeFolds, isTrue, reason: '$tree');
+        expect(_pastFiles(tester), isEmpty);
+        expect(_overflows(tester), isEmpty);
+        expectTextInside(tester, width);
+        await closeView(tester, d);
+      }, variant: _mac);
+    }
   }
 
   for (final (name, open) in [
@@ -124,7 +121,6 @@ void main() {
           'nothing overflows from 600 to 900', (tester) async {
         browserFakes();
         final found = <String>[];
-        final was = _settledRowsOnly();
         for (var w = 900.0; w >= 600; w -= 10) {
           final (d, _) = await panesApp(
             tester,
@@ -135,7 +131,6 @@ void main() {
           found.addAll([for (final o in _overflows(tester)) '$w: $o']);
           await closeView(tester, d);
         }
-        FlutterError.onError = was;
         expect(found, isEmpty);
       }, variant: _mac);
     }
@@ -146,7 +141,6 @@ void main() {
         "${sidebar ? 'shown' : 'hidden'}: Files' viewer has all of it, the "
         'tree slid away, its choice kept', (tester) async {
       browserFakes();
-      _settledRowsOnly();
       final (d, _) = await panesApp(
         tester,
         width: 720,
@@ -170,17 +164,19 @@ void main() {
     tester,
   ) async {
     browserFakes();
-    _settledRowsOnly();
-    // A chat of 969, 980 past the title buttons: the three need 1100,
-    // and Files narrows to 400.
+    // The three need 1100; a chat of 1009, 1020 past the title buttons,
+    // narrows Files, the widest, to 433: its viewer at its least, its
+    // tree over its fold.
     final (d, _) = await panesApp(
       tester,
-      width: 1185,
+      width: 1225,
       open: _with(browser: true),
     );
-    expect(tester.getSize(find.byType(FilesPane)).width, closeTo(400, 0.01));
+    final files = tester.getSize(find.byType(FilesPane)).width;
+    expect(files, closeTo(433.3, 0.1));
     expect(tester.getSize(find.byType(FileView)).width, closeTo(300, 0.01));
-    expect(_treeRoom(tester), closeTo(100, 0.01));
+    expect(_treeRoom(tester), closeTo(files - 300, 0.01));
+    expect(_overflows(tester), isEmpty);
     await closeView(tester, d);
 
     final (e, _) = await panesApp(
@@ -197,7 +193,6 @@ void main() {
   testWidgets('squeezed out, the tree has no lit button: it says Show, '
       "it and Collapse can't be had, and the choice is kept", (tester) async {
     browserFakes();
-    _settledRowsOnly();
     final (d, _) = await panesApp(
       tester,
       width: 720,
