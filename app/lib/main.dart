@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
@@ -30,7 +29,6 @@ import 'package:nushi/nothing_open.dart';
 import 'package:nushi/palette.dart';
 import 'package:nushi/panes.dart';
 import 'package:nushi/preview.dart' show baseName;
-import 'package:nushi/project_rail.dart';
 import 'package:nushi/remote.dart';
 import 'package:nushi/removed_chats.dart';
 import 'package:nushi/settings.dart';
@@ -38,7 +36,6 @@ import 'package:nushi/settings_modal.dart';
 import 'package:nushi/sidebar.dart';
 import 'package:nushi/sidebar_beside.dart';
 import 'package:nushi/sidebar_button.dart';
-import 'package:nushi/sidebar_view.dart';
 import 'package:nushi/slides.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/theme_files.dart';
@@ -97,6 +94,7 @@ class _NushiAppState extends State<NushiApp> {
     widget.daemon.addListener(_pinChanged);
     _followTab();
     sidebarHidden.addListener(_sidebarChanged);
+    sidebarTucked.addListener(_sidebarTucked);
     // The Files pane's options' labels (view_options.dart).
     for (final p in _viewPrefs) {
       p.addListener(_sidebarChanged);
@@ -214,6 +212,13 @@ class _NushiAppState extends State<NushiApp> {
   /// says Hide Whitespace while it shows.
   void _sidebarChanged() => setState(() {});
 
+  /// The sidebar tucked away or back, as the window's layout decides: the
+  /// menu bar's Show Sidebar follows after the frame, as it's set while
+  /// what's under this is built.
+  void _sidebarTucked() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) setState(() {});
+  });
+
   @override
   void didUpdateWidget(NushiApp old) {
     super.didUpdateWidget(old);
@@ -227,6 +232,7 @@ class _NushiAppState extends State<NushiApp> {
   @override
   void dispose() {
     sidebarHidden.removeListener(_sidebarChanged);
+    sidebarTucked.removeListener(_sidebarTucked);
     for (final p in _viewPrefs) {
       p.removeListener(_sidebarChanged);
     }
@@ -512,7 +518,6 @@ class _Shell extends StatelessWidget {
       return TitleBand(child: OutdatedScreen(daemon));
     }
     final chat = daemon.selected;
-    final shut = sidebarShut;
     // The bars take a row of their own under the header (ADR 0128,
     // amended 2026-11-17): they stay for minutes, so they push the view
     // down rather than lie over its first lines. Always a column of the
@@ -560,79 +565,82 @@ class _Shell extends StatelessWidget {
     final app = LayoutBuilder(
       // The sidebar slides in and out over the view, which keeps its
       // state either way.
-      builder: (context, box) => SidebarBeside(
-        daemon: daemon,
-        shut: shut,
-        // Shown, or floating over the view while it's hidden and peeks.
-        sidebar: ({required floating}) => ListenableBuilder(
-          listenable: Listenable.merge([projectRail, sidebarGroupBy]),
-          builder: (context, child) {
-            final most = min(480.0, box.maxWidth - 560);
-            return Resizable(
+      builder: (context, box) {
+        // A window too narrow for a chat beside the sidebar tucks it away
+        // (never saved). Set before what's under it reads it as it's laid
+        // out; its listeners are under it too, but for the app's menu
+        // bar, which hears it after the frame.
+        sidebarTucked.value =
+            !sidebarHidden.value && sidebarTucksIn(box.maxWidth);
+        final shut = sidebarShut;
+        return SidebarBeside(
+          daemon: daemon,
+          shut: shut,
+          // Shown, or floating over the view while it's hidden and peeks.
+          sidebar: ({required floating}) => ListenableBuilder(
+            listenable: Listenable.merge([projectRail, sidebarGroupBy]),
+            builder: (context, child) => Resizable(
               name: 'sidebar',
-              initial: 260,
-              // With the project rail wanted, no narrower than it
-              // needs, as far as the window has room.
-              min: railWanted
-                  ? min(ProjectRail.minSidebar, max(Sidebar.minWidth, most))
-                  : Sidebar.minWidth,
-              max: most,
+              initial: sidebarInitial,
+              min: sidebarLeast(box.maxWidth),
+              max: sidebarMost(box.maxWidth),
               line: false,
               child: child!,
-            );
-          },
-          child: Sidebar(daemon: daemon, floating: floating),
-        ),
-        // Beside the sidebar, which brings the gap between them, or alone
-        // in the window, in from its left edge too.
-        main: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const WindowEdge(),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: shut ? NushiTheme.windowPad : 0,
-                  right: NushiTheme.windowPad,
-                ),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      // A view but a chat puts the bars under its header.
-                      child: TopBars(
-                        bars: inChat ? null : bars,
-                        child: daemon.trustAsk != null
-                            ? pane(TrustCard(daemon.trustAsk!), header: true)
-                            : switch (daemon.place) {
-                                JiraPlace() => pane(JiraView(daemon)),
-                                GitHubPlace() => pane(GitHubView(daemon)),
-                                ChatPlace() when chat == null => pane(
-                                  NothingOpen(daemon),
-                                  header: true,
-                                ),
-                                ChatPlace() => ChatArea(
-                                  key: ValueKey(chat!.id),
-                                  chat,
-                                  daemon,
-                                  notices: (bars: bars, card: card),
-                                ),
-                              },
+            ),
+            child: Sidebar(daemon: daemon, floating: floating),
+          ),
+          // Beside the sidebar, which brings the gap between them, or alone
+          // in the window, in from its left edge too.
+          main: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const WindowEdge(),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: shut ? NushiTheme.windowPad : 0,
+                    right: NushiTheme.windowPad,
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        // A view but a chat puts the bars under its header.
+                        child: TopBars(
+                          bars: inChat ? null : bars,
+                          child: daemon.trustAsk != null
+                              ? pane(TrustCard(daemon.trustAsk!), header: true)
+                              : switch (daemon.place) {
+                                  JiraPlace() => pane(JiraView(daemon)),
+                                  GitHubPlace() => pane(GitHubView(daemon)),
+                                  ChatPlace() when chat == null => pane(
+                                    NothingOpen(daemon),
+                                    header: true,
+                                  ),
+                                  ChatPlace() => ChatArea(
+                                    key: ValueKey(chat!.id),
+                                    chat,
+                                    daemon,
+                                    notices: (bars: bars, card: card),
+                                  ),
+                                },
+                        ),
                       ),
-                    ),
-                    // The newer release's card; the bars and the toasts are
-                    // under the view's header ([BarsRow]). A chat places
-                    // all three itself (ADR 0128).
-                    if (!inChat) Positioned.fill(child: TopNotices(card: card)),
-                  ],
+                      // The newer release's card; the bars and the toasts are
+                      // under the view's header ([BarsRow]). A chat places
+                      // all three itself (ADR 0128).
+                      if (!inChat)
+                        Positioned.fill(child: TopNotices(card: card)),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            // The window's margin, the same with the sidebar hidden: the
-            // pane keeps its height as the sidebar comes and goes.
-            const SizedBox(height: NushiTheme.windowPad),
-          ],
-        ),
-      ),
+              // The window's margin, the same with the sidebar hidden: the
+              // pane keeps its height as the sidebar comes and goes.
+              const SizedBox(height: NushiTheme.windowPad),
+            ],
+          ),
+        );
+      },
     );
     // Settings opens over all of it (ADR 0087).
     return SettingsModal(

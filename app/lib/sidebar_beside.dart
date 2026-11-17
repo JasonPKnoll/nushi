@@ -24,7 +24,8 @@ import 'package:nushi/theme/theme.dart';
 /// away once the pointer has been off it, the title buttons and the edge
 /// for [grace], never while one of its menus or a dialog is open. The
 /// sidebar's button, pressed then, shows it for good, at once where it
-/// floated.
+/// floated. Tucked away for a narrow window ([sidebarTucked]), its button
+/// and ⌘\ peek at it instead.
 class SidebarBeside extends StatefulWidget {
   const new({
     required this.daemon,
@@ -99,10 +100,31 @@ class _SidebarBesideState extends State<SidebarBeside> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    sidebarPeekAsks.addListener(_asked);
+  }
+
+  @override
   void dispose() {
+    sidebarPeekAsks.removeListener(_asked);
     _close?.cancel();
     _dwell?.cancel();
     super.dispose();
+  }
+
+  /// The sidebar asked for while it's tucked away for a narrow window
+  /// ([toggleSidebar]): it peeks, or, peeking with the pointer elsewhere
+  /// (the key pressed again), goes. A press of its button, which the
+  /// pointer on it already peeked at, keeps the peek.
+  void _asked() {
+    if (!widget.shut) return;
+    if (!_peek) {
+      _open();
+    } else if (!_onButton && !_onCard) {
+      _close?.cancel();
+      setState(() => _peek = false);
+    }
   }
 
   void _open() {

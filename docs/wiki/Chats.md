@@ -42,6 +42,8 @@ Press **⌘\**, or click the sidebar button at the top left of the window, right
 
 To glance at the sidebar while it's hidden, point at the sidebar button (or rest the pointer on the window's left edge). The sidebar slides in over the chat: pick a chat or use its menus there. It slides away when the pointer leaves it. Click the button while it's out to keep it shown.
 
+In a narrow window (about 600 wide or less) the sidebar tucks itself away so the chat keeps room to read. It comes back on its own when the window is wider. While it's tucked away, **⌘\** or the sidebar button slides it in over the chat as above.
+
 ## Go back to a chat
 
 The **<** and **>** buttons right of the sidebar button go back to the chat you had open before, and forward again, as a browser's Back and Forward do. Jira and GitHub count as places too. A chat you've since deleted or archived is skipped.

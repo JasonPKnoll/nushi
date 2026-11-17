@@ -5,11 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'package:nushi/app_actions.dart';
+import 'package:nushi/chat_view.dart';
 import 'package:nushi/controls.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/panes.dart';
+import 'package:nushi/project_rail.dart';
+import 'package:nushi/run_state.dart';
 import 'package:nushi/settings.dart';
+import 'package:nushi/sidebar.dart';
+import 'package:nushi/sidebar_view.dart';
 import 'package:nushi/theme/theme.dart';
 
 part 'sidebar_glide.dart';
@@ -29,12 +34,65 @@ double get hiddenHeaderStart =>
     TitleButtons.right - NushiTheme.windowPad + SidebarButton.iconInset;
 
 /// Whether the sidebar is hidden, so the main area reaches the window's left
-/// edge. The phone has none, whatever is saved.
-bool get sidebarShut => !kIsWeb && sidebarHidden.value;
+/// edge: hidden by the user, or tucked away for a narrow window
+/// ([sidebarTucked]). The phone has none, whatever is saved.
+bool get sidebarShut => !kIsWeb && (sidebarHidden.value || sidebarTucked.value);
+
+/// Whether the sidebar, shown by the user, is tucked away because the
+/// window would leave the main area beside it narrower than a chat's least
+/// ([sidebarTucksIn]); never saved, so it's back as soon as the window is
+/// wide enough. `NushiApp` sets it as it lays the window out, before what
+/// reads [sidebarShut] below it is laid out in the same frame.
+final ValueNotifier<bool> sidebarTucked = runValue(false);
+
+/// The sidebar's width as first shown, before it's dragged.
+const sidebarInitial = 260.0;
+
+/// The widest the sidebar is dragged in a window [window] wide: it leaves
+/// the main area 560.
+double sidebarMost(double window) => min(480, window - 560);
+
+/// The narrowest the sidebar is dragged in a window [window] wide: with
+/// the project rail wanted, no narrower than it needs, as far as the
+/// window has room.
+double sidebarLeast(double window) => railWanted
+    ? min(ProjectRail.minSidebar, max(Sidebar.minWidth, sidebarMost(window)))
+    : Sidebar.minWidth;
+
+/// The sidebar's width in a window [window] wide, as `Resizable` gives it:
+/// as dragged, within its least and most ([sidebarLeast] wins).
+double sidebarWidthIn(double window) {
+  final least = sidebarLeast(window);
+  return paneWidth(
+    'sidebar',
+    sidebarInitial,
+  ).clamp(least, max(least, sidebarMost(window)));
+}
+
+/// Whether a window [window] wide tucks the shown sidebar away: beside it,
+/// the main area (less the window's margin at its right) would be
+/// narrower than [ChatView.leastBesideWide], the least a chat's transcript
+/// is ever laid out at, beside the side panes or under them (ADR 0123).
+/// Wider, the sidebar shows; the panes then decide on the room it leaves.
+bool sidebarTucksIn(double window) =>
+    window - sidebarWidthIn(window) - NushiTheme.windowPad <
+    ChatView.leastBesideWide;
+
+/// Each ask to see the sidebar while it's tucked away: the button, ⌘\,
+/// the palette and the menu bar float it over the view, as a peek
+/// (`SidebarBeside`), or put a peek away.
+final ValueNotifier<int> sidebarPeekAsks = runValue(0);
 
 /// Hides the sidebar, or shows it again (the button, ⌘\, the palette and
-/// the menu bar).
-void toggleSidebar() => sidebarHidden.value = !sidebarHidden.value;
+/// the menu bar). While it's tucked away for a narrow window, it floats
+/// over the view instead, and the user's choice stays as it is.
+void toggleSidebar() {
+  if (sidebarTucked.value && !sidebarHidden.value) {
+    sidebarPeekAsks.value++;
+    return;
+  }
+  sidebarHidden.value = !sidebarHidden.value;
+}
 
 /// The button that hides the sidebar or shows it, the box of
 /// [LineIcon.sidebar] with its left side marked off. It's the first of
@@ -54,9 +112,9 @@ class SidebarButton extends StatelessWidget {
   static const double reach = IconTap.header - iconInset;
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder(
-    valueListenable: sidebarHidden,
-    builder: (context, _, _) => IconTap.line(
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([sidebarHidden, sidebarTucked]),
+    builder: (context, _) => IconTap.line(
       LineIcon.sidebar,
       tooltip: withKey(
         '${sidebarShut ? 'Show' : 'Hide'} the sidebar',

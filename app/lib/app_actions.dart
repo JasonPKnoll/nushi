@@ -377,7 +377,7 @@ List<AppAction> appActions(BuildContext context, Daemon d) {
     ),
     AppAction(
       .sidebar,
-      sidebarHidden.value ? 'Show the sidebar' : 'Hide the sidebar',
+      sidebarShut ? 'Show the sidebar' : 'Hide the sidebar',
       run: toggleSidebar,
     ),
     AppAction(.back, 'Back', enabled: d.canGoBack, run: d.goBack),
