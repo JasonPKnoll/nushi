@@ -399,7 +399,10 @@ DiffThemeData diffTheme(Tokens t, {Color? surface, String? family}) {
     foldPlaceholderBackground: on(d.foldPlaceholderBackground),
     foldPlaceholderText: d.foldPlaceholderText,
     loadingBar: on(d.loadingBar),
-    hoverAffordance: d.hoverAffordance,
+    // Nushi draws its own + on the line under the pointer
+    // (DiffCommentButton); the package's, over the numbers only, would
+    // show beside it.
+    hoverAffordance: d.hoverAffordance.withValues(alpha: 0),
     syntax: {
       for (final MapEntry(key: c, value: ink) in t.syntax.entries)
         c.name: SyntaxStyle(ink.color, italic: ink.italic, bold: ink.bold),
