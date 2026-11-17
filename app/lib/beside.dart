@@ -51,7 +51,8 @@ part 'beside_layout.dart';
 ///
 /// Over it all, [notices]: the bars across it, the newer release's card
 /// and the toasts over [main], what the rail and the panes leave of it
-/// ([NoticesPlace], ADR 0128).
+/// ([NoticesPlace], ADR 0128); with the panes over [main], the card under
+/// them, as [main] is.
 class Beside extends StatefulWidget {
   const new({
     required this.main,
@@ -300,6 +301,19 @@ class _BesideState extends State<Beside> {
             ? squeeze(fit.widths, panes, fits)
             : const <String, double>{};
         final railName = details?.name ?? _BesideState._railName;
+        final notices = [
+          if (widget.notices case (:final bars, :final card))
+            ...TopNotices.slots(bars: bars, card: card),
+        ];
+        // Over the view, the card is its transcript's and lies under the
+        // panes, as the rest of the view does, so it never covers a pane's
+        // rows; the bars and the toasts stay over all.
+        final cardUnder = over && cover == null
+            ? notices
+                  .where((w) => w.key == const ValueKey(NoticeSlot.card))
+                  .firstOrNull
+            : null;
+        notices.remove(cardUnder);
         final children = [
           // First in the tree, as they were above and below the rest: they
           // never lie over what's after them.
@@ -385,6 +399,7 @@ class _BesideState extends State<Beside> {
           // Those closing: over the main view and the rail, under the rest.
           for (final s in _seen)
             if (!now.contains(s) && s != railName) pane(s, null),
+          ?cardUnder,
           // Beside, a pane's edge stops where [main] keeps its least; over
           // it, at the pane's own least. Over it, the first one's shadow
           // falls on it.
@@ -415,9 +430,7 @@ class _BesideState extends State<Beside> {
           );
           children.add(children.removeAt(top));
         }
-        if (widget.notices case (:final bars, :final card)) {
-          children.addAll(TopNotices.slots(bars: bars, card: card));
-        }
+        children.addAll(notices);
         return FocusTraversalGroup(
           policy: OrderedTraversalPolicy(),
           child: CustomMultiChildLayout(

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/chat_view.dart';
 import 'package:nushi/daemon.dart';
+import 'package:nushi/files_bar.dart';
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/motion.dart';
 import 'package:nushi/palette.dart';
@@ -194,6 +195,38 @@ void main() {
     expect(updateToast, findsOneWidget);
     d.dispose();
   }, variant: macOSOnly);
+
+  for (final width in [720.0, 900.0]) {
+    testWidgets('Files lying over the transcript, ${width.toInt()} wide: the '
+        "card is the transcript's, under the pane, which keeps its toolbar", (
+      tester,
+    ) async {
+      final d = await openWithUpdate(
+        tester,
+        updateDaemon(() => newerUpdate('0.1.17')),
+        width: width,
+      );
+      filesChats.value = {'c'};
+      await tester.pumpAndSettle();
+      final card = tester.getRect(updateToast);
+      final bar = tester.getRect(find.byType(FilesBar));
+      final both = card.intersect(bar);
+      expect(both.isEmpty, isFalse, reason: 'the card is where it was');
+      // What's drawn and clicked there is the pane's toolbar, not the card.
+      final hit = tester.hitTestOnBinding(both.center);
+      bool reached(Finder f) => hit.path.any(
+        (e) => f.evaluate().any((el) => el.renderObject == e.target),
+      );
+      expect(reached(find.byType(FilesBar)), isTrue);
+      expect(reached(updateToast), isFalse);
+      await render(
+        tester,
+        find.byType(MaterialApp),
+        'update_toast_files_${width.toInt()}',
+      );
+      d.dispose();
+    }, variant: macOSOnly);
+  }
 
   testWidgets('a release arrives as an event; nothing found, no toast', (
     tester,
