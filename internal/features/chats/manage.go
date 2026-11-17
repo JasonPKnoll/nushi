@@ -147,7 +147,7 @@ func (c *chat) reopeningLocked() bool { return c.busy && c.started.IsZero() }
 // from it goes to an agent until the next turn has ended.
 func (s *Service) stop(c *chat) {
 	sides := s.end(c)
-	go s.discard(c, sides)
+	s.later(func() { s.discard(c, sides) })
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.stopping = false
@@ -202,13 +202,14 @@ func (s *Service) dropSides(c *chat) []string {
 // chats, throwaway forks) from its history, once the agent they ran on has
 // stopped: one that still runs would write a little of a session back as it
 // ends it (see model.HarnessInfo.Redelete). The chat then forgets them.
+// Close cancels it: the chat's record keeps them for its next open.
 //
 //nolint:contextcheck // runs on its own, after the request that let the sessions go
 func (s *Service) discard(c *chat, ids []string) {
 	if len(ids) == 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	if err := s.deleteHistory(ctx, c, ids); err != nil {
 		c.log().Warn("deleting thrown-away sessions", "sessions", strings.Join(ids, ","), "err", err)

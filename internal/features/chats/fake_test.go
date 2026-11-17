@@ -133,6 +133,7 @@ type fakeAgent struct {
 	sendGate      chan struct{} // when set, writing a prompt waits until it is closed
 	steerGate     chan struct{} // when set, steering waits until it is closed
 	deleteGate    chan struct{} // when set, deleting a session waits until it is closed
+	gatedDeletes  int           // deletes waiting at deleteGate now
 	silentDeletes int           // it never answers this many deletes, the first ones
 	loadGate      chan struct{} // when set, session/load waits until it is closed
 	forkGate      chan struct{} // when set, session/fork waits until it is closed
@@ -485,11 +486,19 @@ func (f *fakeAgent) CloseSession(context.Context, *acp.CloseSessionRequest) (*ac
 
 func (f *fakeAgent) DeleteSession(ctx context.Context, req *acp.DeleteSessionRequest) (*acp.DeleteSessionResponse, error) {
 	if f.deleteGate != nil {
+		f.mu.Lock()
+		f.gatedDeletes++
+		f.mu.Unlock()
 		f.enter("delete")
 		select {
 		case <-f.deleteGate:
 		case <-ctx.Done():
-			return nil, ctx.Err()
+		}
+		f.mu.Lock()
+		f.gatedDeletes--
+		f.mu.Unlock()
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 	}
 	f.mu.Lock()

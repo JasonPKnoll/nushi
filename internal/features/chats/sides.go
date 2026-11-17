@@ -348,7 +348,7 @@ func (s *Service) closeSides() {
 //nolint:contextcheck // the side chat's session is deleted after the request that closed it
 func (s *Service) throwAway(c *chat, agent Agent, sid string) {
 	del := func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), s.timing.throwAwayWait())
+		ctx, cancel := context.WithTimeout(s.ctx, s.timing.throwAwayWait())
 		defer cancel()
 		_, err := agent.DeleteSession(ctx, &acp.DeleteSessionRequest{SessionID: acp.SessionID(sid)})
 		if err != nil {
@@ -365,6 +365,7 @@ func (s *Service) throwAway(c *chat, agent Agent, sid string) {
 			select {
 			case <-agent.Done():
 			case <-time.After(3 * s.timing.stopGrace()):
+			case <-s.ctx.Done(): // discard won't: the chat keeps it
 			}
 			s.discard(c, []string{sid})
 		}
@@ -374,11 +375,11 @@ func (s *Service) throwAway(c *chat, agent Agent, sid string) {
 		return
 	}
 	_ = del() // logged; last tries again
-	go func() {
+	s.later(func() {
 		select {
 		case <-time.After(c.kind.Redelete):
 			last()
 		case <-s.ctx.Done(): // the chat keeps it (Close's doc)
 		}
-	}()
+	})
 }

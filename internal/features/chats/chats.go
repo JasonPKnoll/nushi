@@ -51,6 +51,10 @@ type Service struct {
 	ctx    context.Context //nolint:containedctx // the service's life, which Close ends
 	cancel context.CancelFunc
 	loops  sync.WaitGroup // its loops (sleep, copies, letting go), which Close waits for
+	// work is what a request left running when it ended (deleting thrown-away
+	// sessions), which Close waits for too: it saves the chat's record, which
+	// must not be written once the daemon has stopped (see later).
+	work sync.WaitGroup
 	// expires are the expires a reopen began (resume), which nothing waits
 	// for but a test, to see what one did.
 	expires sync.WaitGroup

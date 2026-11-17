@@ -52,7 +52,7 @@ func (s *Service) Reload(chatID string) error {
 	c.mu.Lock()
 	c.kept = false // the replay is merged with the copy (restore.go)
 	c.mu.Unlock()
-	go s.discard(c, sides)
+	s.later(func() { s.discard(c, sides) })
 	go s.resume(c)
 	return nil
 }

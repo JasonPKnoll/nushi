@@ -286,7 +286,7 @@ func (s *Service) load(ctx context.Context, c *chat) error {
 	}
 	mode, picks, throwaway := c.record.Mode, c.record.Picks, slices.Clone(c.record.Throwaway)
 	c.mu.Unlock()
-	go s.discard(c, throwaway) //nolint:gosec // discarding outlives the request; left by an agent that stopped before it could
+	s.later(func() { s.discard(c, throwaway) }) // outlives the request; left by an agent that stopped before it could
 	// The agent runs the session now: a mode or pick it refuses leaves
 	// the chat on its own, as for a start, a fork or an open, and the
 	// chat's record keeps the remembered one for the next reopen.

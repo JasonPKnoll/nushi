@@ -14,7 +14,9 @@ import (
 // is cancelled and gets a few seconds to end, so the agent records how it
 // ended. Their side chats are deleted from the agent's history the next
 // time each chat opens (model.ChatRecord.Throwaway). What the service started
-// on its own ends first (its ctx, and its loops are waited for).
+// on its own ends first (its ctx, and its loops are waited for), and what a
+// request left running (later) is waited for last: nothing writes the
+// chats' records once Close has returned.
 func (s *Service) Close() {
 	s.cancel()
 	s.loops.Wait()
@@ -38,6 +40,19 @@ func (s *Service) Close() {
 	for _, agent := range left {
 		_ = agent.Close() // being opened: no turn of it to end
 	}
+	s.work.Wait() // cancelled with ctx; none begins once closing is set (later)
+}
+
+// later runs f on its own, as work Close waits for, unless Close has begun:
+// then it doesn't run, and what it would have deleted stays in the chat's
+// record for the next time the chat opens (model.ChatRecord.Throwaway).
+func (s *Service) later(f func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closing {
+		return
+	}
+	s.work.Go(f)
 }
 
 // started wraps launch: once Close has begun, no agent starts, and the

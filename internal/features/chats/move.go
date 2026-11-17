@@ -107,7 +107,7 @@ func (s *Service) Move(ctx context.Context, chatID, folder string, worktree bool
 			}
 			_ = old.Stop(c.timing.stopGrace()) // its process is gone either way
 		}
-		go s.discard(c, sides) //nolint:gosec // discarding outlives the request
+		s.later(func() { s.discard(c, sides) }) // discarding outlives the request
 		if left := oldWT != nil && wt != oldWT && !oldWT.Found; left && (!fresh || s.inUse(c, oldWT.Path) || !s.dropWorktree(oldWT)) {
 			c.mu.Lock()
 			c.saveLocked(func(s *model.ChatRecord) { // it stays, with the work in it, until Delete
