@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	acp "github.com/afrase/acp-go/unstable"
 
@@ -191,6 +192,57 @@ func TestABackgroundCommandIsStoppedThroughClaude(t *testing.T) {
 	i := slices.IndexFunc(c.items, func(it model.Item) bool { return it.Kind == model.UserMessage })
 	if it := c.items[i]; !it.ToSubagentStop || it.ToSubagent != sleeping || it.ToSubagentName != "sleep 600; echo slept" || it.ToSubagentState != "relayed" || it.Text != "" {
 		t.Errorf("the message: %+v", it)
+	}
+}
+
+// Claude's TaskStop of a background command's task (as recorded) ends its
+// row at once, whatever its file says, and the restart no longer waits for
+// it; so does a TaskStop that finds the task no longer running (the owner's
+// second stop, 2026-11-17, "No task found"), how it ended unsaid. One that
+// failed otherwise changes nothing.
+func TestTaskStopEndsABackgroundCommand(t *testing.T) {
+	const call = "toolu_018dAWSFW2XgQGT1zPQWK8n5"
+	var stop []acp.SessionNotification // its TaskStop call, as Claude answered
+	for _, n := range recorded(t, "stops.jsonl") {
+		if tc := n.Update.ToolCall; tc != nil && tc.ToolCallID == call || n.Update.ToolCallUpdate != nil && n.Update.ToolCallUpdate.ToolCallID == call {
+			stop = append(stop, n)
+		}
+	}
+	failed := func(text string) []acp.SessionNotification { // the call, its last update failing with text
+		notes := slices.Clone(stop[:2])
+		return append(notes, acp.SessionNotification{SessionID: "s1", Update: acp.SessionUpdate{SessionUpdate: "tool_call_update",
+			ToolCallUpdate: &acp.ToolCallUpdate{ToolCallID: call, Status: "failed", Content: []acp.ToolCallContent{{Type: "content",
+				Content: &acp.Content{Content: acp.ContentBlock{Type: "text", Text: &acp.TextContent{Text: "<tool_use_error>" + text + "</tool_use_error>"}}}}}}}})
+	}
+	for name, tc := range map[string]struct {
+		notes      []acp.SessionNotification
+		state, end string
+	}{
+		"stopped":       {stop, "stopped", "killed"},
+		"no task found": {failed("No task found with ID: bgu2i75cc"), "stopped", ""},
+		"not running":   {failed("Task bgu2i75cc is not running (status: killed)"), "stopped", ""},
+		"other failure": {failed("Something else went wrong"), "running", ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc, _, c := newChat(t, claudeSession, &memModes{})
+			c.mu.Lock()
+			c.addLocked(model.Item{ID: sleeping, Kind: model.ToolCall, Tool: "Bash", Title: "sleep 600; echo slept", Status: "completed",
+				BackgroundCommand: &model.BackgroundCommand{ID: "bgu2i75cc", State: "running", Started: time.Now()}})
+			c.mu.Unlock()
+			if holds := svc.Holding(); len(holds) != 1 || holds[0].Why != "in background" {
+				t.Fatalf("the restart waits for %+v", holds)
+			}
+			feed(c, tc.notes)
+			c.mu.Lock()
+			sh, background := *c.itemLocked(sleeping).BackgroundCommand, c.statusLocked().Background
+			c.mu.Unlock()
+			if sh.State != tc.state || sh.End != tc.end || sh.State == "stopped" && sh.Ended.IsZero() {
+				t.Errorf("the command: %+v", sh)
+			}
+			if want := map[bool]int{true: 0, false: 1}[tc.state == "stopped"]; background != want {
+				t.Errorf("%d in the background, want %d", background, want)
+			}
+		})
 	}
 }
 

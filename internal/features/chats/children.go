@@ -229,12 +229,21 @@ func (c *chat) stopTaskLocked(callID string) (*model.ToSubagent, error) {
 
 // stoppedLocked takes a tool call that stopped one of the agent's tasks, or
 // found it already ended (BackgroundTasks.Stopped): a subagent the agent never said
-// ended has.
+// ended has, and so has a background command still shown running. A
+// command shows running only while the agent that started it runs (a
+// reopened chat's read "started"), so that agent knowing no task of its
+// id means it ended too.
 func (c *chat) stoppedLocked(call model.Item) {
 	if c.kind.background == nil || call.Parent != "" {
 		return
 	}
-	id := c.kind.background.Stopped(call)
+	id, unknown := c.kind.background.Stopped(call)
+	if id != "" {
+		c.commandStoppedLocked(id, call.Status == "completed")
+	}
+	if unknown {
+		return
+	}
 	if id != "" && slices.ContainsFunc(c.items, func(it model.Item) bool { return it.Workflow != nil && it.TaskID == id }) {
 		c.pokeWorkflowsLocked() // its snapshot is written as it stops
 	}

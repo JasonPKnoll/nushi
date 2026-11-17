@@ -80,6 +80,29 @@ func (c *chat) followCommand(callID, id, file string, agent Agent) {
 	}
 }
 
+// commandStoppedLocked ends the background command of task id, if the chat
+// still shows it running: the agent's TaskStop stopped it (Claude writes
+// "[killed]" then), or found it no longer running, how it ended unsaid
+// (docs/facts/claude.md). Its follower then stops reading its file.
+func (c *chat) commandStoppedLocked(id string, stopped bool) {
+	for i := range c.items {
+		it := &c.items[i]
+		if it.BackgroundCommand == nil || it.BackgroundCommand.ID != id || it.BackgroundCommand.State != "running" {
+			continue
+		}
+		sh := *it.BackgroundCommand
+		sh.State = "stopped"
+		if !sh.Started.IsZero() {
+			sh.Ended = time.Now()
+		}
+		if stopped {
+			sh.End = "killed"
+		}
+		it.BackgroundCommand = &sh
+		c.publishLocked(*it)
+	}
+}
+
 // commandShellRuns says whether the shell running the command callID left
 // in the background is still among agent's processes (a group's leader:
 // BackgroundTasks.RunsBackgroundCommand). False when Nushi can't look (no

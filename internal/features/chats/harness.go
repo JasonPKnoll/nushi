@@ -128,8 +128,10 @@ type BackgroundTasks interface {
 	// task, "" when only its id).
 	ReadStopTask(prompt string) (label, taskID string, ok bool)
 	// Stopped says a tool call stopped one of the agent's tasks, or found
-	// it already ended: the task's id.
-	Stopped(call model.Item) string
+	// it already ended: the task's id; unknown when the agent knows no task
+	// of that id, which ends only a command Nushi shows running (a subagent
+	// could be named wrongly).
+	Stopped(call model.Item) (taskID string, unknown bool)
 }
 
 // ReadOnly is an agent with a mode that can't change anything. Its name is

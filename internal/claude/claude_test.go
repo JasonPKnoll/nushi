@@ -179,17 +179,18 @@ func TestStopTask(t *testing.T) {
 		t.Fatalf("TaskStop: %+v", it)
 	}
 	for _, tc := range []struct {
-		status, text string
-		want         bool
+		status, text  string
+		want, unknown bool
 	}{
-		{"completed", `{"message":"Successfully stopped task: adddce0a14433f6d6 (Count)"}`, true},
-		{"failed", "Task adddce0a14433f6d6 is not running (status: killed)", true},
-		{"failed", "No task found with ID: adddce0a14433f6d6", false},
-		{"in_progress", "", false},
+		{"completed", `{"message":"Successfully stopped task: adddce0a14433f6d6 (Count)"}`, true, false},
+		{"failed", "Task adddce0a14433f6d6 is not running (status: killed)", true, false},
+		{"failed", "No task found with ID: adddce0a14433f6d6", true, true},
+		{"failed", "Something else", false, false},
+		{"in_progress", "", false, false},
 	} {
 		it.Status, it.Text = tc.status, tc.text
-		if got := harness.Stopped(it) != ""; got != tc.want {
-			t.Errorf("Stopped after %s %q: %v", tc.status, tc.text, got)
+		if id, unknown := harness.Stopped(it); (id != "") != tc.want || unknown != tc.unknown {
+			t.Errorf("Stopped after %s %q: %q %v", tc.status, tc.text, id, unknown)
 		}
 	}
 }
