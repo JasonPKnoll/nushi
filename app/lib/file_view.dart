@@ -7,6 +7,7 @@ import 'package:nushi/diagram_page.dart';
 import 'package:nushi/edit_bars.dart';
 import 'package:nushi/file_edit.dart';
 import 'package:nushi/file_text.dart';
+import 'package:nushi/line_changes.dart';
 import 'package:nushi/native.dart';
 import 'package:nushi/preview.dart';
 import 'package:nushi/preview_marks.dart';
@@ -31,6 +32,7 @@ final class ShownFile {
     diagram = kind == PreviewKind.mermaid ? native.web.diagram() : null;
     source.value = chat.files.sources.contains(path);
     watch.addListener(_fileCame);
+    lines = LineBase(daemon, chat, watch);
   }
 
   final ChatState chat;
@@ -38,6 +40,10 @@ final class ShownFile {
   final String path; // as its tab names it
   final FileWatch watch;
   final PreviewKind kind;
+
+  /// Its last commit's text, its source's change marks drawn against
+  /// (ADR 0131).
+  late final LineBase lines;
 
   /// The web view of a page, or the diagram's, by its kind.
   late final PageHost? page;
@@ -130,6 +136,7 @@ final class ShownFile {
   }
 
   void dispose() {
+    lines.dispose();
     watch
       ..removeListener(_fileCame)
       ..dispose();
@@ -170,6 +177,7 @@ class _FileViewState extends State<FileView> {
       edit: edit,
       wrap: wrap,
       padding: const EdgeInsets.fromLTRB(28, 22, 28, 28),
+      base: _shown.lines,
     ),
     null => null,
   };
@@ -229,6 +237,7 @@ class _FileViewState extends State<FileView> {
                     tabSize,
                     indentGuides,
                     scrollPastEnd,
+                    shown.lines,
                   ]),
                   builder: (context, _) => PreviewBody(
                     watch: shown.watch,
@@ -236,6 +245,7 @@ class _FileViewState extends State<FileView> {
                     tabSize: tabSize.value,
                     guides: indentGuides.value,
                     pastEnd: scrollPastEnd.value,
+                    base: shown.lines.value,
                     onReveal: shown.reveal,
                     editor: _editor,
                     readOnly: shown.readOnly,

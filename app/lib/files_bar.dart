@@ -161,11 +161,15 @@ class FilesBar extends StatelessWidget {
         Expanded(
           child: Align(
             alignment: Alignment.centerLeft,
-            child: PathLine(
-              folder: shown.chat.folder,
-              path: shown.path,
-              top: 0,
-              end: 8,
+            child: ListenableBuilder(
+              listenable: shown.lines,
+              builder: (context, _) => PathLine(
+                folder: shown.chat.folder,
+                path: shown.path,
+                note: shown.lines.isNew ? 'New file' : null,
+                top: 0,
+                end: 8,
+              ),
             ),
           ),
         ),

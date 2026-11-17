@@ -25,13 +25,16 @@ String shownPath(String folder, String path) {
 
 /// The path line: [path] in a quiet line, tinted under the pointer; a click
 /// copies it and says so. [trailing] sits at its right end (the source
-/// button). [inset], [end] and [top] are its sides' room.
+/// button). [note] is a muted word after the path ("New file": git
+/// doesn't know it yet, so it has no change marks, ADR 0131). [inset],
+/// [end] and [top] are its sides' room.
 class PathLine extends StatelessWidget {
   const new({
     required this.folder,
     required this.path,
     super.key,
     this.trailing,
+    this.note,
     this.inset = PathLine.textInset - textPad,
     this.end = 4,
     this.top = 6,
@@ -40,6 +43,7 @@ class PathLine extends StatelessWidget {
   final String folder;
   final String path;
   final Widget? trailing;
+  final String? note;
   final double inset;
   final double end;
   final double top;
@@ -84,11 +88,24 @@ class PathLine extends StatelessWidget {
                       )
                     : null,
                 foregroundDecoration: focusRing(t, look),
-                child: Text(
-                  shownPath(folder, path),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.ui(t.textSecondary),
+                child: Row(
+                  spacing: 8,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        shownPath(folder, path),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.ui(t.textSecondary),
+                      ),
+                    ),
+                    if (note case final note?)
+                      Text(
+                        note,
+                        maxLines: 1,
+                        style: theme.ui(t.textMuted, size: 12),
+                      ),
+                  ],
                 ),
               ),
             ),
