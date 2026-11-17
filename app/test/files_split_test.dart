@@ -3,7 +3,8 @@ import 'package:nushi/files_split.dart';
 
 // How the Files pane shares its width between its viewer and its tree
 // (ADR 0123): the viewer gives first, then the tree, and under both the
-// tree gives on, so no edge ever jumps.
+// tree gives on, no edge jumping, until it would be too narrow for its
+// rows: then it goes at once.
 
 void main() {
   test('the tree at its saved width, the viewer giving first', () {
@@ -13,7 +14,10 @@ void main() {
       (560.0, 260.0),
       (520.0, 220.0),
       (500.0, 200.0),
-      (400.0, 100.0),
+      (440.0, 140.0),
+      (420.0, 120.0),
+      (419.0, 0.0),
+      (400.0, 0.0),
       (300.0, 0.0),
       (100.0, 0.0),
     ]) {
@@ -43,7 +47,10 @@ void main() {
   });
 
   test('a point at a time, from 100 to 1400, no edge moves more than a '
-      'point, the tree on either side, shown or hidden', () {
+      'point but where the tree goes, the tree on either side, shown or '
+      'hidden', () {
+    // Where the tree would be narrower than its rows hold.
+    const folds = filesViewerLeast + filesTreeFolds;
     for (final saved in [200.0, 260.0, 480.0]) {
       for (final right in [true, false]) {
         for (final shown in [true, false]) {
@@ -59,6 +66,10 @@ void main() {
           for (var w = 100.5; w <= 1400; w += 0.5) {
             final now = edges(w);
             for (var i = 0; i < now.length; i++) {
+              if (shown && w == folds) {
+                expect((now[1] - last[1]).abs(), closeTo(filesTreeFolds, 0.5));
+                continue;
+              }
               expect(
                 (now[i] - last[i]).abs(),
                 lessThanOrEqualTo(1),
@@ -73,10 +84,9 @@ void main() {
     }
   });
 
-  test('no jump at the seams where the tree gives on and where it has '
-      'gone', () {
+  test('no jump at the seam where the tree gives on', () {
     for (final saved in [200.0, 260.0, 480.0]) {
-      for (final seam in [500.0, 300.0]) {
+      for (final seam in [500.0]) {
         final at = [
           for (final w in [seam - 0.5, seam, seam + 0.5]) treeWidth(w, saved),
         ];

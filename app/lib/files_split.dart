@@ -15,16 +15,26 @@ const double filesTreeMost = 480;
 /// The least the viewer keeps beside the tree.
 const double filesViewerLeast = 300;
 
+/// The least the tree's search field and rows hold: squeezed narrower, it
+/// isn't there at all ([treeWidth]).
+const double filesTreeFolds = 120;
+
 /// The tree's width in a Files pane [w] wide, [saved] the width it was
 /// dragged to: the viewer gives first, down to [filesViewerLeast]; then
 /// the tree, down to [filesTreeLeast]. Under both (the pane squeezed over
-/// the transcript in a narrow window) the tree gives on, to nothing: the
-/// viewer keeps its least, then has the whole pane, so a file in it reads.
-/// Point by point, so no edge jumps; the same with a file open or none, so
-/// opening one never moves the tree.
+/// the transcript in a narrow window) the tree gives on, the viewer
+/// keeping its least, until it would be narrower than [filesTreeFolds]:
+/// then it's gone and the viewer has the whole pane, so a file in it
+/// reads. Point by point but at that one line, where the viewer takes the
+/// tree's last 120 at once rather than leave a sliver its field and rows
+/// would run past; the same with a file open or none, so opening one never
+/// moves the tree.
 double treeWidth(double w, double saved) {
   const least = filesTreeLeast + filesViewerLeast;
-  if (w < least) return max(0, w - filesViewerLeast);
+  if (w < least) {
+    final tree = w - filesViewerLeast;
+    return tree < filesTreeFolds ? 0 : tree;
+  }
   return saved.clamp(filesTreeLeast, treeMost(w));
 }
 
