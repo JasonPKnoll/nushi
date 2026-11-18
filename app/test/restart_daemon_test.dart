@@ -110,6 +110,48 @@ void main() {
     d.dispose();
   });
 
+  // As above, but the daemon restarted itself into a newer build since the
+  // last ping: the build it's compared with is the one just before the
+  // stop, so a stop that did nothing is still said.
+  testWidgets('a daemon that restarted itself and then never stops is said', (
+    tester,
+  ) async {
+    var build = 'old';
+    final fake = FakeDaemon([])
+      ..answer = (input) => input is PingRequest
+          ? PingResponse(apiVersion: apiVersion, build: build, pid: 7)
+          : null;
+    final d = Daemon(transport: fake);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(d.connected, isTrue);
+    build = 'newer';
+    Object? error;
+    unawaited(d.restartDaemon().then((_) {}, onError: (Object e) => error = e));
+    await tester.pump(const Duration(seconds: 11));
+    expect(error, isA<StateError>());
+    d.dispose();
+  });
+
+  test("a failed ping forgets the daemon's pid", () async {
+    var up = true;
+    final fake = FakeDaemon([])
+      ..answer = (input) => switch (input) {
+        PingRequest() when !up => throw ConnectException(
+          Code.unavailable,
+          'no daemon',
+        ),
+        PingRequest() => PingResponse(apiVersion: apiVersion, pid: 4242),
+        _ => null,
+      };
+    final d = Daemon(transport: fake);
+    addTearDown(d.dispose);
+    await _connected(d);
+    expect(d.daemonPid, 4242);
+    up = false;
+    expect(await d.ping(), isFalse);
+    expect(d.daemonPid, 0);
+  });
+
   test(
     'one restart at a time: a second asked meanwhile is the same one',
     () async {
