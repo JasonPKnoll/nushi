@@ -37,7 +37,7 @@ type Chats interface {
 
 type Service struct {
 	start   Start
-	shell   string // the shell's name, such as "zsh"
+	shell   string // the shell's name, such as "zsh", for one that doesn't say its own
 	chats   Chats
 	publish func(model.Event)
 
@@ -71,12 +71,17 @@ func (s *Service) Open(chatID, folder string, cols, rows int) (model.Terminal, e
 	if t.shell, err = s.start(folder, cols, rows, func() { s.changed(chatID) }); err != nil {
 		return model.Terminal{}, err
 	}
+	// The shell started may differ from one terminal to the next (on
+	// Windows, Windows Terminal's default profile's, read for each).
+	if n, ok := t.shell.(interface{ Name() string }); ok && n.Name() != "" {
+		t.Shell = n.Name()
+	}
 	s.mu.Lock()
 	s.terms = append(s.terms, t)
 	m := t.state()
 	s.mu.Unlock()
 	s.changed(chatID)
-	slog.Info("terminal opened", "chat", chatID, "terminal", t.ID, "folder", folder, "shell", s.shell)
+	slog.Info("terminal opened", "chat", chatID, "terminal", t.ID, "folder", folder, "shell", t.Shell)
 	return m, nil
 }
 

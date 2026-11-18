@@ -56,3 +56,20 @@ func (o *output) wait(t *testing.T, re string) []string {
 	}
 	return m
 }
+
+// A terminal is named for its shell's program, without its folder (either
+// slash) or a Windows .exe, whatever its case.
+func TestShellName(t *testing.T) {
+	for program, want := range map[string]string{
+		"/bin/zsh":                               "zsh",
+		"/usr/bin/fish":                          "fish",
+		`C:\Program Files\PowerShell\7\pwsh.exe`: "pwsh",
+		"cmd.EXE":                                "cmd",
+		"bash":                                   "bash",
+		"nu.exe.sh":                              "nu.exe.sh",
+	} {
+		if got := ShellName(program); got != want {
+			t.Errorf("ShellName(%q) = %q, want %q", program, got, want)
+		}
+	}
+}

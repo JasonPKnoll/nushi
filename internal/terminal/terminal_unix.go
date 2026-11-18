@@ -39,7 +39,7 @@ func Start(argv []string, dir string, env []string, cols, rows int, changed func
 		_ = master.Close()
 		return nil, err
 	}
-	t := &Terminal{pty: master, cmd: cmd, tty: dev, out: master, in: master,
+	t := &Terminal{shell: ShellName(argv[0]), pty: master, cmd: cmd, tty: dev, out: master, in: master,
 		changed: changed, done: make(chan struct{}), subs: map[*sub]struct{}{}}
 	if err := t.Resize(cols, rows); err != nil {
 		_ = master.Close()

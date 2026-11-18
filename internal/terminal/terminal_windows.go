@@ -19,6 +19,7 @@ import (
 	"github.com/afrase/nushi/internal/batchfile"
 	"github.com/afrase/nushi/internal/model"
 	"github.com/afrase/nushi/internal/proctree"
+	"github.com/afrase/nushi/internal/shellenv"
 )
 
 // On Windows (ADR 0132) the pseudo-terminal is ConPTY's pseudo-console: the
@@ -26,19 +27,20 @@ import (
 // pipes, one the program reads (Terminal's in) and one it writes (out).
 // Go's exec can't attach a program to one, so Start calls CreateProcess
 // itself, on the command line exec and batchfile.Guard would have used.
-// The program starts suspended and joins a job object before it runs, so
-// all it starts is in the job, which Close ends. Windows has no
-// foreground process group: the foreground program is the newest process
-// under the shell.
+// Closing the pseudo-console ends what is attached to it, as a hangup
+// does on Unix; what left it (a window of its own, a detached process)
+// lives on, as what leaves a Unix session does. Windows has no foreground
+// process group: the foreground program is the shell's newest child.
 
-// sys is a Windows terminal's own: its pseudo-console, the job its
-// program's tree runs in, and the daemon's ends of the pipes.
+// sys is a Windows terminal's own: its pseudo-console and the daemon's
+// ends of the pipes.
 type sys struct {
-	console     windows.Handle
-	job         windows.Handle
-	conIn       *os.File // written: what the program reads
-	conOut      *os.File // read: what the program writes
-	consoleOnce sync.Once
+	consoleMu     sync.Mutex // the console's handle, freed once closed
+	console       windows.Handle
+	consoleClosed bool
+	conIn         *os.File // written: what the program reads
+	conOut        *os.File // read: what the program writes
+	began         time.Time
 }
 
 // ctrlC is what typing Ctrl+C sends: ConPTY makes it the console's
@@ -71,7 +73,7 @@ func Start(argv []string, dir string, env []string, cols, rows int, changed func
 		closeAll(inWrite, outRead)
 		return nil, fmt.Errorf("creating a pseudo-console: %w", err)
 	}
-	t := &Terminal{console: console, conIn: os.NewFile(uintptr(inWrite), "conpty-in"), conOut: os.NewFile(uintptr(outRead), "conpty-out"),
+	t := &Terminal{shell: ShellName(argv[0]), console: console, conIn: os.NewFile(uintptr(inWrite), "conpty-in"), conOut: os.NewFile(uintptr(outRead), "conpty-out"),
 		changed: changed, done: make(chan struct{}), subs: map[*sub]struct{}{}}
 	t.out, t.in = t.conOut, t.conIn
 	if err := t.spawn(app, line, dir, env); err != nil {
@@ -104,7 +106,13 @@ func startLine(argv []string, dir string, env []string) (app, line string, progE
 	if len(argv) == 0 {
 		return "", "", nil, errors.New("no program")
 	}
-	cmd := exec.Command(argv[0], argv[1:]...) //nolint:gosec,noctx // only read for its path, arguments and environment; Start starts it
+	// Found on the terminal's own Path, which is the registry's, not on
+	// the daemon's, which is the app's from when it started.
+	prog := argv[0]
+	if p := shellenv.LookPath(prog, env); p != "" {
+		prog = p
+	}
+	cmd := exec.Command(prog, argv[1:]...) //nolint:gosec,noctx // only read for its path, arguments and environment; Start starts it
 	cmd.Dir, cmd.Env = dir, env
 	batchfile.Guard(cmd)
 	if cmd.Err != nil {
@@ -117,8 +125,8 @@ func startLine(argv []string, dir string, env []string) (app, line string, progE
 	return cmd.Path, line, cmd.Environ(), nil
 }
 
-// spawn starts the program on the pseudo-console, suspended until it has
-// joined the job, and takes it as t's process.
+// spawn starts the program on the pseudo-console and takes it as t's
+// process.
 func (t *Terminal) spawn(app, line, dir string, env []string) error {
 	attrs, err := windows.NewProcThreadAttributeList(1)
 	if err != nil {
@@ -153,39 +161,24 @@ func (t *Terminal) spawn(app, line, dir string, env []string) error {
 	if err != nil {
 		return err
 	}
-	job, err := killJob()
-	if err != nil {
-		return err
-	}
 	var pi windows.ProcessInformation
-	flags := uint32(windows.EXTENDED_STARTUPINFO_PRESENT | windows.CREATE_UNICODE_ENVIRONMENT | windows.CREATE_SUSPENDED)
+	flags := uint32(windows.EXTENDED_STARTUPINFO_PRESENT | windows.CREATE_UNICODE_ENVIRONMENT)
 	err = withCtrlC(func() error {
 		return windows.CreateProcess(appW, &lineW[0], nil, nil, false, flags, &block[0], dirW, &si.StartupInfo, &pi)
 	})
 	runtime.KeepAlive(attrs)
 	if err != nil {
-		_ = windows.CloseHandle(job)
 		return fmt.Errorf("starting %s: %w", filepath.Base(app), err)
 	}
 	defer closeAll(pi.Thread, pi.Process) // os.FindProcess holds its own
-	if err := windows.AssignProcessToJobObject(job, pi.Process); err != nil {
-		_ = windows.TerminateProcess(pi.Process, 1)
-		_ = windows.CloseHandle(job)
-		return err
-	}
 	// Found while the process's handle above is still open, so its id
 	// can't name another yet.
 	proc, err := os.FindProcess(int(pi.ProcessId))
 	if err != nil {
-		_ = windows.CloseHandle(job) // ends it
+		_ = windows.TerminateProcess(pi.Process, 1)
 		return err
 	}
-	if _, err := windows.ResumeThread(pi.Thread); err != nil {
-		_ = windows.CloseHandle(job)
-		_ = proc.Release()
-		return err
-	}
-	t.job, t.proc = job, proc
+	t.proc, t.began = proc, time.Now()
 	return nil
 }
 
@@ -210,7 +203,10 @@ func ignoresCtrlC() bool {
 // back: a terminal's Ctrl+C must reach what runs on it, while the daemon,
 // which stops on Ctrl+C (os.Interrupt), keeps ignoring one on its own
 // console. A daemon started from a terminal, which takes Ctrl+C, is left
-// as it is.
+// as it is. A process another goroutine starts in that moment gets Ctrl+C
+// on too (Go's exec takes no lock on Windows this could share): it would
+// matter only were Ctrl+C sent to the daemon's own console, which has no
+// window to type it in.
 func withCtrlC(start func() error) error {
 	ctrlCMu.Lock()
 	defer ctrlCMu.Unlock()
@@ -239,27 +235,6 @@ func envBlock(env []string) ([]uint16, error) {
 	return append(block, 0), nil
 }
 
-// killJob is a job object whose processes are killed when it is closed
-// (as procgroup's).
-func killJob() (windows.Handle, error) {
-	job, err := windows.CreateJobObject(nil, nil)
-	if err != nil {
-		return 0, err
-	}
-	// On the heap, which doesn't move, as the call takes it as a uintptr.
-	info := &windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
-		BasicLimitInformation: windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE},
-	}
-	_, err = windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
-		uintptr(unsafe.Pointer(info)), uint32(unsafe.Sizeof(*info))) //nolint:gosec // the system's own struct, kept alive below
-	runtime.KeepAlive(info)
-	if err != nil {
-		_ = windows.CloseHandle(job)
-		return 0, err
-	}
-	return job, nil
-}
-
 // closeAll closes handles, those that are set.
 func closeAll(hs ...windows.Handle) {
 	for _, h := range hs {
@@ -270,10 +245,16 @@ func closeAll(hs ...windows.Handle) {
 }
 
 // closeConsole closes the pseudo-console, once: what is attached to it
-// gets CTRL_CLOSE_EVENT, and once the console host has written the last of
-// its output, the output pipe ends.
+// gets CTRL_CLOSE_EVENT and is ended, and once the console host has
+// written the last of its output, the output pipe ends. It holds the lock
+// Resize takes, which must never use the handle once it's freed.
 func (t *Terminal) closeConsole() {
-	t.consoleOnce.Do(func() { windows.ClosePseudoConsole(t.console) })
+	t.consoleMu.Lock()
+	defer t.consoleMu.Unlock()
+	if !t.consoleClosed {
+		t.consoleClosed = true
+		windows.ClosePseudoConsole(t.console)
+	}
 }
 
 // waitProgram waits for the program to exit, and says its exit code. The
@@ -287,16 +268,31 @@ func (t *Terminal) waitProgram() int {
 	return code
 }
 
-// foreground returns the newest process under the program, or 0 while it
-// has none: what the user is running at the shell's prompt.
+// foreground returns the shell's newest child, or 0 while it has none:
+// the command the user ran at its prompt, not what that command started
+// in turn (a Unix shell's job leads its group). A shell that starts the
+// real one at once, of its own name (Git for Windows's bin\bash.exe
+// starts usr\bin\bash.exe), counts as that one.
 func (t *Terminal) foreground() int {
-	ps, err := proctree.Tree{}.Under(t.proc.Pid)
-	if err != nil || len(ps) == 0 {
+	shell := t.proc.Pid
+	kids, err := proctree.Tree{}.Children(shell)
+	if err != nil {
 		return 0
 	}
-	newest := slices.MaxFunc(ps, func(a, b model.Process) int { return a.Started.Compare(b.Started) })
-	return newest.Pid
+	if len(kids) == 1 && kids[0].Started.Sub(t.began) < launcherWait && strings.EqualFold(name(kids[0].Pid), name(shell)) {
+		shell = kids[0].Pid
+		if kids, err = (proctree.Tree{}).Children(shell); err != nil {
+			return 0
+		}
+	}
+	if len(kids) == 0 {
+		return 0
+	}
+	return slices.MaxFunc(kids, func(a, b model.Process) int { return a.Started.Compare(b.Started) }).Pid
 }
+
+// launcherWait is how soon after the shell a launcher's real shell starts.
+const launcherWait = 2 * time.Second
 
 // Terminate asks the foreground program to end: Ctrl+C, as typed. A dev
 // server's stop sends it before Close (ADR 0098).
@@ -316,25 +312,25 @@ func (t *Terminal) Resize(cols, rows int) error {
 	if err != nil {
 		return err
 	}
-	select {
-	case <-t.done:
-		return nil // the pseudo-console is closed
-	default:
+	t.consoleMu.Lock()
+	defer t.consoleMu.Unlock()
+	if t.consoleClosed {
+		return nil
 	}
 	return windows.ResizePseudoConsole(t.console, size)
 }
 
-// hangUp is Close's work: the pseudo-console closed, a grace for what ran
-// on it to end, then the job ended, with all that is left in it.
+// hangUp is Close's work: the pseudo-console closed, which ends what is
+// attached to it, and the program ended outright should it outlast the
+// grace.
 func (t *Terminal) hangUp() {
 	t.closeConsole()
 	select {
 	case <-t.done:
 	case <-time.After(grace):
+		_ = t.proc.Kill()
+		<-t.done
 	}
-	_ = windows.TerminateJobObject(t.job, 1)
-	<-t.done
-	_ = windows.CloseHandle(t.job)
 	_ = t.conIn.Close()
 	_ = t.conOut.Close()
 	_ = t.proc.Release()

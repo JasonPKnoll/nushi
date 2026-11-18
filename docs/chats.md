@@ -310,7 +310,7 @@ A chat in a git repository can run in a worktree of its own, `.worktrees/<two wo
 ⌃\` (or the terminal button in the chat's header) shows the chat's terminals, in tabs under it, in the chat's folder ([ADR 0022](adr/0022-the-daemon-owns-terminals.md)).
 
 - The daemon owns them, so they keep running when the app quits and reopens. A daemon restart ends them.
-- The shell is your login shell. Archiving or deleting the chat closes its terminals.
+- The shell is your login shell; on Windows, the one Windows Terminal's default profile opens, else PowerShell ([ADR 0132](adr/0132-terminals-on-windows-run-on-conpty.md)). Archiving or deleting the chat closes its terminals.
 - ⌘T opens another, ⌘W closes one, ⌥⌘1 – ⌥⌘9 pick one, and ⌘F finds in its scrollback.
 
 ### Running a code block

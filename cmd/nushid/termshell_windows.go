@@ -2,13 +2,13 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/windows"
 
 	"github.com/afrase/nushi/internal/regularfile"
+	"github.com/afrase/nushi/internal/shellenv"
 )
 
 // maxWTSettings bounds what is read of a Windows Terminal settings file
@@ -17,16 +17,16 @@ const maxWTSettings = 4 << 20
 
 // terminalShell is the program a terminal starts and its arguments:
 // Windows Terminal's default profile's (wtprofile.go, ADR 0132), else
-// PowerShell 7 where it's installed, else Windows PowerShell, which every
-// Windows has. It is read again for each terminal, so a change there
-// counts from the next.
-func terminalShell() []string {
+// PowerShell 7 where it's installed (on env's Path, the terminal's own),
+// else Windows PowerShell, which every Windows has. It is read again for
+// each terminal, so a change there counts from the next.
+func terminalShell(env []string) []string {
 	if line := wtDefaultLine(wtSettings(), wtFragments()); line != "" {
 		if argv, err := windows.DecomposeCommandLine(expandEnv(line)); err == nil && len(argv) > 0 && argv[0] != "" {
 			return argv
 		}
 	}
-	if pwsh, err := exec.LookPath("pwsh.exe"); err == nil {
+	if pwsh := shellenv.LookPath("pwsh.exe", env); pwsh != "" {
 		return []string{pwsh}
 	}
 	return []string{expandEnv(windowsPowerShellLine)}

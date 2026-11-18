@@ -178,7 +178,8 @@ func run() error {
 		Viewers: remoteSvc, Processes: proctree.Tree{}, Copies: copies, CopiesOn: st.KeepTranscripts, CopyDays: st.TranscriptDays, Sleep: st})
 	shows.UseChats(chatSvc)
 	go chatSvc.EndStalePrompts() // what a daemon that stopped left pending
-	termSvc := terminals.New(shellStarter(agentSvc), shellName(terminalShell()[0]), chatSvc, hub.Publish)
+	// Each terminal names its own shell (terminal.Terminal's Name).
+	termSvc := terminals.New(shellStarter(agentSvc), "", chatSvc, hub.Publish)
 	chatSvc.UseTerminals(termSvc)
 	go follow(hub, termSvc.Follow)
 	srvSvc := newServers(dir, chatSvc, agentSvc, hub.Publish)
@@ -341,19 +342,10 @@ var loginShell = sync.OnceValue(func() string {
 // terminalEnv's environment, built on terminalBase's.
 func shellStarter(agents interface{ Environ() []string }) terminals.Start {
 	return func(folder string, cols, rows int, changed func()) (terminals.Shell, error) {
-		argv := terminalShell()
-		return terminal.Start(argv, folder, terminalEnv(terminalBase(agents), argv[0]), cols, rows, changed)
+		base := terminalBase(agents)
+		argv := terminalShell(base)
+		return terminal.Start(argv, folder, terminalEnv(base, argv[0]), cols, rows, changed)
 	}
-}
-
-// shellName is a shell's name as a terminal shows it: its program's,
-// without its folder or Windows's .exe ("zsh", "pwsh").
-func shellName(program string) string {
-	name := filepath.Base(program)
-	if ext := filepath.Ext(name); strings.EqualFold(ext, ".exe") {
-		name = strings.TrimSuffix(name, ext)
-	}
-	return name
 }
 
 // terminalEnv is a terminal's environment: the daemon's, $SHELL naming

@@ -74,7 +74,7 @@ If your project lists dev servers in a launch file (`.claude/launch.json` or `.a
 
 ## Open a terminal
 
-Each chat has its own terminals, in tabs under the chat. They start in the chat's folder, using your normal login shell.
+Each chat has its own terminals, in tabs under the chat. They start in the chat's folder, using your normal login shell (on Windows, the shell Windows Terminal opens by default).
 
 1. Click the terminal button in the chat's header, or press ⌃\`.
 2. Press ⌘T (Ctrl+Shift+T on Linux), or click the **+** after the tabs, for another terminal.

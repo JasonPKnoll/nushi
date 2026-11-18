@@ -29,6 +29,7 @@ type Terminal struct {
 	out     io.Reader // what the program writes
 	in      io.Writer // what the program reads
 	proc    *os.Process
+	shell   string // the shell's name, its program's (ShellName)
 	changed func()
 	done    chan struct{} // closed once the program has exited
 	closing sync.Once     // Close's work, done once
@@ -170,6 +171,19 @@ func commandLine(pid int) string {
 // Pid is the program's process id: on Unix it leads the terminal's session
 // and its own process group; on Windows its job holds what it starts.
 func (t *Terminal) Pid() int { return t.proc.Pid }
+
+// Name is the shell's name, as a terminal's tab shows it (ShellName).
+func (t *Terminal) Name() string { return t.shell }
+
+// ShellName is a shell's name as a terminal shows it: its program's,
+// without its folder or Windows's .exe ("zsh", "pwsh").
+func ShellName(program string) string {
+	name := filepath.Base(strings.ReplaceAll(program, `\`, "/"))
+	if ext := filepath.Ext(name); strings.EqualFold(ext, ".exe") {
+		name = strings.TrimSuffix(name, ext)
+	}
+	return name
+}
 
 // Done is closed once the program has exited.
 func (t *Terminal) Done() <-chan struct{} { return t.done }
