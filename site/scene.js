@@ -10,7 +10,10 @@
 // always sits on its line, never behind it.
 // The cursor tilts the camera at once, and planets lean toward a nearby cursor and spring back. Scrolling fast
 // winds the rings a little. Nothing turns on its own.
-// Dust: each planet sheds a thin trail of grains along its ring behind it, in the same 3D space (projected, sorted
+// The bodies are luminous: each planet has its own colour temperature, a hot core, rim light from the sun's side,
+// a specular glint and a bloom that breathes slowly (a few percent over seconds); the sun has a layered corona
+// with a faint shimmer. Glow is added light ('lighter') on the same canvas, and fades away into the flat mark.
+// Dust: each planet sheds a stream of star-like grains along its ring behind it, in the same 3D space (projected, sorted
 // among the planets, blurred by the same depth of field). The grains drift slowly back along the trail; the pointer
 // (or a dragging finger) pushes them aside and drags them along its path, and they spring back. While dust is
 // showing the loop keeps running (at half rate when nothing but the drift moves); once the scene is flat the dust
@@ -42,14 +45,17 @@
     { r: 1, from: 0, span: 68.7, wind: 1, turn: 0 },
     { r: 19 / 31, from: 30, span: 64, wind: 1.6, turn: 0 },
   ];
+  // Each planet glows with its own colour temperature (cool white-blue, warm white, pale gold) and breathes on its
+  // own slow period (s) and phase; once the scene is flat they are all the mark's mist.
+  const COOL = [190, 216, 250], WARM = [252, 234, 210], GOLD = [252, 218, 150];
   const PLANETS = [
-    { name: 'Claude', ring: 0, a: 0, size: 3.8 / 31, mark: true },
-    { name: 'OpenCode', ring: 0, a: 135, size: 3.8 / 31, mark: true },
-    { name: 'Ante', ring: 0, a: 222, size: 0.085 },
-    { name: 'oh-my-pi', ring: 0, a: 296, size: 0.074 },
-    { name: 'Codex', ring: 1, a: 270, size: 3.2 / 31, mark: true },
-    { name: 'Pi', ring: 1, a: 30, size: 3.2 / 31, mark: true },
-    { name: 'PiG', ring: 1, a: 152, size: 0.078 },
+    { name: 'Claude', ring: 0, a: 0, size: 3.8 / 31, mark: true, tint: GOLD, per: 6.2, ph: 0 },
+    { name: 'OpenCode', ring: 0, a: 135, size: 3.8 / 31, mark: true, tint: COOL, per: 7.4, ph: 2.1 },
+    { name: 'Ante', ring: 0, a: 222, size: 0.085, tint: WARM, per: 5.6, ph: 4.0 },
+    { name: 'oh-my-pi', ring: 0, a: 296, size: 0.074, tint: COOL, per: 8.1, ph: 1.2 },
+    { name: 'Codex', ring: 1, a: 270, size: 3.2 / 31, mark: true, tint: COOL, per: 6.8, ph: 3.3 },
+    { name: 'Pi', ring: 1, a: 30, size: 3.2 / 31, mark: true, tint: WARM, per: 5.9, ph: 5.0 },
+    { name: 'PiG', ring: 1, a: 152, size: 0.078, tint: GOLD, per: 7.7, ph: 0.6 },
   ].map((p) => ({ ...p, ox: 0, oy: 0, vx: 0, vy: 0, label: 0, X: 0, Y: 0, s: 0, rad: 0, depth: 0, el: null }));
   const SUN = 5.6 / 31;
 
@@ -170,13 +176,14 @@
   // near the planet and spread and fade further back. Scatter across and above/below the ring grows with that
   // distance. The pointer acts in screen space, on an offset per grain held by a spring.
   const DUST_ON = Q.get('dust') !== '0';
-  const DUST_CAP = 1000;
+  const DUST_CAP = 4000;
   const SPAN = [88, 104]; // degrees of trail behind a planet, per ring
   const DPAT = []; // a grain's planet, interleaved so any prefix is balanced; the marked planets shed a little more
   for (let r = 0; r < 3; r++) PLANETS.forEach((p, i) => { if (r < (p.mark ? 3 : 2)) DPAT.push(i); });
-  const dP = new Uint8Array(DUST_CAP), dCol = new Uint8Array(DUST_CAP), dGl = new Uint8Array(DUST_CAP), dLay = new Uint8Array(DUST_CAP);
+  const dP = new Uint8Array(DUST_CAP), dCol = new Uint8Array(DUST_CAP), dSt = new Uint8Array(DUST_CAP), dLay = new Uint8Array(DUST_CAP);
   const dAge = new Float32Array(DUST_CAP), dRate = new Float32Array(DUST_CAP), dN1 = new Float32Array(DUST_CAP),
-    dN2 = new Float32Array(DUST_CAP), dPh = new Float32Array(DUST_CAP), dSz = new Float32Array(DUST_CAP), dBr = new Float32Array(DUST_CAP);
+    dN2 = new Float32Array(DUST_CAP), dPh = new Float32Array(DUST_CAP), dSz = new Float32Array(DUST_CAP), dBr = new Float32Array(DUST_CAP),
+    dTw = new Float32Array(DUST_CAP);
   const dOx = new Float32Array(DUST_CAP), dOy = new Float32Array(DUST_CAP), dVx = new Float32Array(DUST_CAP), dVy = new Float32Array(DUST_CAP);
   const dX = new Float32Array(DUST_CAP), dY = new Float32Array(DUST_CAP), dD = new Float32Array(DUST_CAP),
     dR = new Float32Array(DUST_CAP), dA = new Float32Array(DUST_CAP);
@@ -187,15 +194,20 @@
     dAge[i] = ran(); dRate[i] = rnd(0.8, 1.25) / 80; // about 80 s from the planet to the trail's end
     dN1[i] = gauss(); dN2[i] = gauss(); dPh[i] = rnd(0, TAU);
     const q = ran();
-    dSz[i] = 0.6 + 0.8 * q * q; dBr[i] = rnd(0.35, 1);
-    const c = ran();
-    dCol[i] = c < 0.06 ? 2 : c < 0.45 ? 0 : 1; // mist, slate-mist, rarely pale amber
-    if (ran() < 0.03) { dGl[i] = 1; dSz[i] *= 1.9; dBr[i] = 1; }
+    dSz[i] = 0.55 + 0.85 * q * q; dBr[i] = rnd(0.4, 1);
+    dTw[i] = rnd(0.5, 1.4); // twinkle, radians a second: slow
+    // Most grains take their planet's colour, the rest are mist.
+    const c = ran(), tint = PLANETS[dP[i]].tint;
+    dCol[i] = c < 0.4 ? 0 : tint === COOL ? 1 : tint === WARM ? 2 : 3;
+    // A few are distinctly bright stars, and a few of those carry a small four-point glint.
+    const st = ran();
+    if (st < 0.07) { dSt[i] = st < 0.009 ? 2 : 1; dSz[i] = rnd(1.3, 1.9); dBr[i] = 1; }
   }
-  // A grain is one soft disc: a radial gradient made once per colour (mist, slate-mist, pale amber) at unit size,
+  // A grain is one soft disc: a radial gradient made once per colour (mist, cool, warm, gold) at unit size,
   // drawn under a transform that places and scales it, so its falloff is smooth at any size and nothing is
-  // allocated per frame (plain discs stacked to fake the falloff showed rings once blurred).
-  const DCOL = ['238,241,245', '150,172,186', '255,214,140'].map((rgb) => {
+  // allocated per frame (plain discs stacked to fake the falloff showed rings once blurred). A glint is the
+  // same gradient squeezed into two thin crossed streaks.
+  const DCOL = ['238,241,245', '205,225,255', '255,238,214', '255,216,140'].map((rgb) => {
     const r = g.createRadialGradient(0, 0, 0, 0, 0, 1);
     r.addColorStop(0, `rgba(${rgb},1)`); r.addColorStop(0.18, `rgba(${rgb},.85)`); r.addColorStop(0.4, `rgba(${rgb},.38)`);
     r.addColorStop(0.65, `rgba(${rgb},.1)`); r.addColorStop(1, `rgba(${rgb},0)`);
@@ -209,8 +221,8 @@
     dptr.x = x; dptr.y = y; dptr.in = true;
   };
   function sizeDust() {
-    // About 650 grains on a 1440 x 900 window, scaled by area: fewer on a phone, never more than the cap.
-    dustN = DUST_ON ? Math.round(Math.min(DUST_CAP, Math.max(110, (vw * vh) / (1440 * 900) * 650)) * (frozen ? 0.5 : 1)) : 0;
+    // About 2600 grains on a 1440 x 900 window, scaled by area: fewer on a phone, never more than the cap.
+    dustN = DUST_ON ? Math.round(Math.min(DUST_CAP, Math.max(400, (vw * vh) / (1440 * 900) * 2600))) : 0;
     RP = Math.max(80, 0.11 * Math.hypot(vw, vh)); // the pointer's reach
   }
 
@@ -246,7 +258,7 @@
         if (a >= 1) { a -= 1; dN1[i] = gauss(); dN2[i] = gauss(); } // off the end, unseen: shed again at the planet
         dAge[i] = a;
       }
-      const age = dAge[i], u = age ** 1.6, ph = dPh[i];
+      const age = dAge[i], u = age ** 1.7, ph = dPh[i];
       const ang = (p.a + gR.turn - u * SPAN[p.ring]) * D2R;
       const r = gR.r + dN1[i] * (0.008 + 0.075 * u) + 0.004 * Math.sin(dustT * 0.37 + ph);
       const y = dN2[i] * (0.006 + 0.05 * u) + 0.003 * Math.sin(dustT * 0.29 + ph * 1.7);
@@ -284,33 +296,46 @@
       const r0 = dSz[i] * (P.s / cam.R) * (cam.R / 260) ** 0.3, b = Math.abs(coc(P.depth)), rr = r0 + b;
       dR[i] = rr;
       // Fade in once clear of the planet, so grains never speckle its face; fade out down the trail.
+      // Brightest just behind the planet. A slow twinkle, deeper for the bright stars; none under Reduce Motion,
+      // where the clock never runs.
       const fade = Math.min(1, (u * SPAN[p.ring] * D2R * gR.r) / (p.size * 1.3)) * (1 - u) ** 1.8;
-      dA[i] = 0.8 * dBr[i] * fade * dustA * ((r0 + 0.5) / (rr + 0.5)) ** 1.1;
+      const tw = 1 - (dSt[i] ? 0.45 : 0.3) * (0.5 + 0.5 * Math.sin(dustT * dTw[i] + ph * 3));
+      dA[i] = dBr[i] * fade * (0.7 + 0.4 * (1 - u) ** 5) * tw * dustA * ((r0 + 0.5) / (rr + 0.5)) ** 1.1;
     }
     dustCalm = motion === 0 && speed < 1;
     return live;
   }
 
-  // Draws the grains of layer L (the ones between bodies L-1 and L, far to near).
+  // Draws the grains of layer L (the ones between bodies L-1 and L, far to near), adding light, so where grains
+  // overlap they brighten.
   function drawDust(L) {
     const end = dStart[L + 1];
+    if (end === dStart[L]) return;
     let col = -1;
+    g.globalCompositeOperation = 'lighter';
     for (let k = dStart[L]; k < end; k++) {
       const i = dOrder[k], a = dA[i];
       if (a < 0.004) continue;
       const X = dX[i], Y = dY[i], r = dR[i] * 2.4;
-      if (X < -r || Y < -r || X > vw + r || Y > vh + r) continue;
+      if (X < -r * 3 || Y < -r * 3 || X > vw + r * 3 || Y > vh + r * 3) continue;
       if (dCol[i] !== col) { col = dCol[i]; g.fillStyle = DCOL[col]; }
-      g.globalAlpha = a;
+      g.globalAlpha = Math.min(1, a);
       g.setTransform(dpr * r, 0, 0, dpr * r, dpr * X, dpr * Y);
       g.fillRect(-1, -1, 2, 2);
-      if (dGl[i]) { // a larger grain catches the light: a faint wide halo round it
-        g.globalAlpha = a * 0.12;
-        g.setTransform(dpr * r * 2.4, 0, 0, dpr * r * 2.4, dpr * X, dpr * Y);
+      if (dSt[i]) { // a bright star: a soft halo, and on a few a small four-point glint
+        g.globalAlpha = Math.min(1, a) * 0.18;
+        g.setTransform(dpr * r * 2.6, 0, 0, dpr * r * 2.6, dpr * X, dpr * Y);
         g.fillRect(-1, -1, 2, 2);
+        if (dSt[i] === 2) {
+          const l = r * 2.8, w = Math.max(0.35, r * 0.15);
+          g.globalAlpha = Math.min(1, a) * 0.5;
+          g.setTransform(dpr * l, 0, 0, dpr * w, dpr * X, dpr * Y); g.fillRect(-1, -1, 2, 2);
+          g.setTransform(dpr * w, 0, 0, dpr * l, dpr * X, dpr * Y); g.fillRect(-1, -1, 2, 2);
+        }
       }
     }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.globalCompositeOperation = 'source-over';
   }
 
   // ---------- step: move everything toward where it wants to be; say whether anything still moves ----------
@@ -407,6 +432,73 @@
     g.fillStyle = h; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
   }
 
+  // A soft glow added to what's there: `rgb` at alpha `a` in the middle, falling off smoothly to nothing at R.
+  function glow(x, y, R, rgb, a) {
+    if (a < 0.003 || R < 0.5) return;
+    const gr = g.createRadialGradient(x, y, 0, x, y, R);
+    gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(0.25, `rgba(${rgb},${a * 0.5})`);
+    gr.addColorStop(0.55, `rgba(${rgb},${a * 0.14})`); gr.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, R, 0, TAU); g.fill();
+  }
+
+  // A planet lit from within and by the sun: a bloom well past its edge (breathing slowly), a body that is its
+  // colour with a hot core and a darker limb, rim light on the sun's side, and a crisp specular glint. Blurred,
+  // it is a bigger soft glowing disc. `life` (0 once flat) scales everything that isn't the flat mark's disc.
+  function planet(p, sunX, sunY, flat, life) {
+    const X = p.X + p.ox, Y = p.Y + p.oy, r = p.rad, b = Math.abs(coc(p.depth)), e = r / (r + 0.6 * b);
+    const tc = p.tint, rgb = `${mix(tc[0], 238, flat)},${mix(tc[1], 241, flat)},${mix(tc[2], 245, flat)}`;
+    const breath = 1 + 0.08 * Math.sin((dustT * TAU) / p.per + p.ph);
+    let lx = sunX - X, ly = sunY - Y;
+    const dl = Math.hypot(lx, ly) || 1; lx /= dl; ly /= dl;
+    if (life > 0.01) {
+      g.globalCompositeOperation = 'lighter';
+      glow(X, Y, r * 5 + b * 2, rgb, 0.2 * life * breath);
+      glow(X, Y, r * 2 + b, rgb, 0.3 * life * breath);
+      g.globalCompositeOperation = 'source-over';
+    }
+    const limb = `${mix(tc[0] * 0.42, 238, flat)},${mix(tc[1] * 0.42, 241, flat)},${mix(tc[2] * 0.45, 245, flat)}`;
+    disc(X, Y, r, b, rgb, limb, null, 0, 0);
+    if (life < 0.01) return;
+    g.globalCompositeOperation = 'lighter';
+    // Hot core, a little toward the sun.
+    {
+      const cx = X + lx * r * 0.25, cy = Y + ly * r * 0.25, gr = g.createRadialGradient(cx, cy, 0, cx, cy, r * 0.9 + b);
+      gr.addColorStop(0, `rgba(255,252,244,${0.55 * life * e})`); gr.addColorStop(0.45, `rgba(${rgb},${0.3 * life * e})`);
+      gr.addColorStop(1, `rgba(${rgb},0)`);
+      g.fillStyle = gr; g.beginPath(); g.arc(X, Y, r + b, 0, TAU); g.fill();
+    }
+    // Rim light: a gradient centred away from the sun lights only the sun-side edge.
+    if (e > 0.3) {
+      const cx = X - lx * r * 0.35, cy = Y - ly * r * 0.35, R = r * 1.4;
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R);
+      gr.addColorStop(0.74, 'rgba(255,214,150,0)'); gr.addColorStop(0.95, `rgba(255,222,170,${0.7 * life * e})`);
+      gr.addColorStop(1, `rgba(255,222,170,${0.7 * life * e})`);
+      g.fillStyle = gr; g.beginPath(); g.arc(X, Y, r, 0, TAU); g.fill();
+    }
+    g.globalCompositeOperation = 'source-over';
+    // Specular: small and crisp, up and toward the sun.
+    if (e > 0.25) {
+      const sx = X + (lx * 0.32 - 0.12) * r, sy = Y + (ly * 0.32 - 0.3) * r, R = r * 0.34;
+      const gr = g.createRadialGradient(sx, sy, 0, sx, sy, R);
+      gr.addColorStop(0, `rgba(255,255,255,${0.95 * life * e})`); gr.addColorStop(0.35, `rgba(255,255,255,${0.55 * life * e})`);
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(sx, sy, R, 0, TAU); g.fill();
+    }
+  }
+
+  // The sun: a layered corona with a faint slow shimmer, then a disc white-hot in the middle to amber at its edge.
+  function sun(x, y, r, b, flat, life) {
+    if (life > 0.01) {
+      const sh = 1 + 0.035 * Math.sin(dustT * 0.8) + 0.025 * Math.sin(dustT * 1.9 + 1.3);
+      g.globalCompositeOperation = 'lighter';
+      glow(x, y, (r * 7 + b * 2) * (1 + 0.02 * Math.sin(dustT * 0.5)), '245,150,40', 0.13 * life * sh);
+      glow(x, y, r * 3.4 + b * 1.5, '250,175,70', 0.42 * life * sh);
+      glow(x, y, r * 1.8 + b, '255,210,130', 0.6 * life * sh);
+      g.globalCompositeOperation = 'source-over';
+    }
+    disc(x, y, r, b, `${mix(255, 245, flat)},${mix(244, 165, flat)},${mix(214, 36, flat)}`, AMBER, flat > 0.9 ? null : '255,250,235', -0.3, -0.3);
+  }
+
   // One run of a ring, from b0 to b1 degrees, as a single shape: the band's two edges (and round ends where the
   // arc itself ends), each point pushed out from the centre line by `grow` times the blur at that point.
   // The soft edge is built from shapes laid over each other, widest and faintest first, close enough together
@@ -416,7 +508,7 @@
   const cx_ = new Float32Array(MAXP), cy_ = new Float32Array(MAXP), ox_ = new Float32Array(MAXP), oy_ = new Float32Array(MAXP),
     ix_ = new Float32Array(MAXP), iy_ = new Float32Array(MAXP), bl_ = new Float32Array(MAXP);
   function run(gR, b0, b1, capA, capB, col) {
-    const w = W * (0.24 + 0.76 * cam.flat); // a fine orbit line in 3D, the mark's weight once flat
+    const w = W * (0.16 + 0.84 * cam.flat); // a fine orbit line in 3D, the mark's weight once flat
     const n = Math.min(MAXP - 1, Math.max(2, Math.ceil((b1 - b0) / 2.5)));
     let sum = 0, wpx = 0;
     for (let j = 0; j <= n; j++) {
@@ -449,7 +541,7 @@
     g.fillStyle = col;
     for (const [grow, alpha] of PASSES) {
       if (grow && avg < 0.25) continue;
-      g.globalAlpha = grow ? alpha : Math.min(1, energy + 0.15) * (avg > 0.25 ? 0.5 : 1);
+      g.globalAlpha = ringA * (grow ? alpha : Math.min(1, energy + 0.15) * (avg > 0.25 ? 0.5 : 1));
       g.beginPath();
       for (let j = 0; j <= n; j++) out(ox_[j], oy_[j], j, bl_[j] * grow, 1);
       if (capB) cap(b1, n, 1, bl_[n] * grow);
@@ -461,12 +553,14 @@
   }
 
   const bodies = [];
+  let ringA = 1;
   let shownDim = -1;
   function draw() {
     if (Math.abs(T.dim - shownDim) > 0.005) { shownDim = T.dim; sky.style.opacity = T.dim.toFixed(3); }
     g.globalAlpha = 1;
     g.clearRect(0, 0, vw, vh);
     const flat = cam.flat;
+    const life = 1 - smooth(Math.min(1, flat / 0.85)); // the glow, gone by the flat mark
 
     for (const st of STARS) {
       proj(st.x, st.y, st.z, P);
@@ -485,9 +579,11 @@
       g.fillStyle = gr; g.beginPath(); g.arc(sunX, sunY, R, 0, TAU); g.fill();
     }
 
-    // Rings: slate-mist when seen in 3D, mist once it's the flat mark.
-    const t = 0.36 + 0.64 * flat;
+    // Rings: a quiet slate line when seen in 3D (the bodies and dust carry the picture), mist once it's the
+    // flat mark.
+    const t = 0.3 + 0.7 * flat;
     const col = `rgb(${mix(47, 238, t)},${mix(74, 241, t)},${mix(87, 245, t)})`;
+    ringA = 0.6 + 0.4 * flat;
     for (const gR of RINGS) {
       for (let a = 0; a < 4; a++) {
         const a0 = gR.from + a * 90 + gR.turn;
@@ -516,16 +612,8 @@
       if (dustA) { drawDust(L); g.globalAlpha = 1; }
       if (L === nb) break;
       const b = bodies[L];
-      if (b.sun) {
-        disc(sunX, sunY, SUN * sunS * (0.62 + 0.38 * flat), Math.abs(coc(sunD)), AMBER, AMBER, flat > 0.9 ? null : '255,214,140', -0.3, -0.3);
-        continue;
-      }
-      const p = b.p, X = p.X + p.ox, Y = p.Y + p.oy;
-      const dx = sunX - X, dy = sunY - Y, dl = Math.hypot(dx, dy) || 1, lit = 0.5 * (1 - flat);
-      disc(X, Y, p.rad, Math.abs(coc(p.depth)),
-        `${mix(118, 238, flat)},${mix(138, 241, flat)},${mix(150, 245, flat)}`,
-        `${mix(52, 238, flat)},${mix(72, 241, flat)},${mix(84, 245, flat)}`,
-        flat > 0.9 ? null : '226,232,238', (dx / dl) * lit, (dy / dl) * lit);
+      if (b.sun) sun(sunX, sunY, SUN * sunS * (0.62 + 0.38 * flat), Math.abs(coc(sunD)), flat, life);
+      else planet(b.p, sunX, sunY, flat, life);
     }
 
     for (const p of PLANETS) {
