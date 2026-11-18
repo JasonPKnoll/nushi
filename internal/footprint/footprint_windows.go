@@ -35,7 +35,7 @@ type processMemoryCountersEx struct {
 // counts none of it twice. 0 when it can't be read: gone, or one the
 // user can't open (a service's, a protected process).
 func Of(pid int) uint64 {
-	if pid <= 0 || pid > math.MaxUint32 {
+	if pid <= 0 || uint64(pid) > math.MaxUint32 {
 		return 0
 	}
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
