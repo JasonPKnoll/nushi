@@ -52,7 +52,8 @@ void main() {
     projectRail.value = true;
     await tester.pumpAndSettle();
     expect(find.byType(ProjectRail), findsOneWidget);
-    expect(shownInOrder(tester, arrangeTitles), ['Cap the rates']);
+    // Its chats, under Pinned's: attic's pin shows in every project.
+    expect(shownInOrder(tester, arrangeTitles), ['Keep this', 'Cap the rates']);
     final saved = readSaved();
     expect(saved.containsKey('projectRail'), isFalse);
     expect(saved['projectRailOn'], isTrue);

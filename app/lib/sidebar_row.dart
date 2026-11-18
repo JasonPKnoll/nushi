@@ -18,6 +18,7 @@ import 'package:nushi/settings.dart';
 import 'package:nushi/sidebar.dart';
 import 'package:nushi/sidebar_rows.dart';
 import 'package:nushi/sidebar_sections.dart';
+import 'package:nushi/sidebar_view.dart';
 import 'package:nushi/status.dart';
 import 'package:nushi/theme/theme.dart';
 import 'package:nushi/widgets.dart';
@@ -31,7 +32,9 @@ import 'package:nushi/widgets.dart';
 /// else it shows is the Arrange menu's Show ([sidebarShows]): its state's
 /// dot, its agent's mark, its branch, and [time] as an age. One that needs
 /// you says so in a pill at its end, in the place of its branch or
-/// project, where the row has the room (ADR 0111). A chat with a color has
+/// project, where the row has the room (ADR 0111). A [tile] (a project's,
+/// for a chat pinned in a project other than the one the sidebar is
+/// narrowed to) goes before its title. A chat with a color has
 /// a chip of it at the row's end ([ColorChip]); only the open chat's row
 /// is filled in the accent, so a blue chat never reads as the open one.
 class SidebarRow extends StatefulWidget {
@@ -42,6 +45,7 @@ class SidebarRow extends StatefulWidget {
     this.number,
     this.movable,
     this.project = false,
+    this.tile,
     this.time,
   });
 
@@ -49,6 +53,7 @@ class SidebarRow extends StatefulWidget {
   final Daemon daemon;
   final Movable? movable;
   final bool project;
+  final Widget? tile;
   final DateTime? time;
 
   /// The number ⌘ opens it with, shown while ⌘ is held.
@@ -159,6 +164,10 @@ class _SidebarRowState extends State<SidebarRow> {
                           ),
                           const SizedBox(width: 8),
                         ],
+                        if (widget.tile case final tile?) ...[
+                          tooltip(context, tildePath(chat.home), tile),
+                          const SizedBox(width: 8),
+                        ],
                         Expanded(
                           child: _renaming
                               ? RenameField(
@@ -191,7 +200,13 @@ class _SidebarRowState extends State<SidebarRow> {
                             child: Padding(
                               padding: const EdgeInsets.only(left: 6),
                               child: Text(
-                                chat.scratch ? '' : folderParts(chat.home).$1,
+                                // One with no folder says so in Pinned
+                                // while a project shows.
+                                !chat.scratch
+                                    ? folderParts(chat.home).$1
+                                    : pinnedElsewhere(chat)
+                                    ? 'No folder'
+                                    : '',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.ui(t.textMuted, size: 11.5),

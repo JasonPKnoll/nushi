@@ -89,18 +89,33 @@ class SidebarChats extends StatelessWidget {
       for (final (i, c) in chatOrder(daemon).take(9).indexed) c.id: i + 1,
     };
     // A row says its project where its group doesn't; in its project, its
-    // time is the one that project sorts by.
-    Widget row(ChatState c, Movable movable, {String? project}) => SidebarRow(
-      c,
-      key: ValueKey(c.id),
-      daemon: daemon,
-      number: held ? numbers[c.id] : null,
-      movable: movable,
-      project: project == null && shows.contains(RowPart.project),
-      time: shows.contains(RowPart.time)
-          ? chatTime(c, project == null ? sort : projectSort(project).sort)
-          : null,
-    );
+    // time is the one that project sorts by. One pinned in a project other
+    // than the one shown says which with its tile too, and its name
+    // whatever Show has.
+    Widget row(ChatState c, Movable movable, {String? project}) {
+      final elsewhere = pinnedElsewhere(c);
+      return SidebarRow(
+        c,
+        key: ValueKey(c.id),
+        daemon: daemon,
+        number: held ? numbers[c.id] : null,
+        movable: movable,
+        project:
+            elsewhere || (project == null && shows.contains(RowPart.project)),
+        tile: !elsewhere || c.scratch
+            ? null
+            : FolderTile(
+                daemon: daemon,
+                folder: c.home,
+                color: colors[c.home] ?? 0,
+                size: ProjectTile.small,
+              ),
+        time: shows.contains(RowPart.time)
+            ? chatTime(c, project == null ? sort : projectSort(project).sort)
+            : null,
+      );
+    }
+
     return ListMotionScope(
       motion: motion,
       child: ListView(

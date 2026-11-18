@@ -254,8 +254,9 @@ class PinnedSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Those of the project the sidebar is narrowed to, if it is.
-    final pinned = pinnedChats(daemon).where(inShownProject).toList();
+    // Narrowed to a project, every project's or only its own
+    // (pinnedEveryProject).
+    final pinned = pinnedChats(daemon).where(inShownPinned).toList();
     // Its header grows in with the first pin, its rows gliding there.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

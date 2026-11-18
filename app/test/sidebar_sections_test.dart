@@ -319,6 +319,7 @@ void main() {
     sidebarSort.value = SortBy.manual;
     projectRail.value = true;
     sidebarProject.value = '/Users/me/ledger-poc';
+    pinnedEveryProject.value = false; // attic's pin out of the way
     final (d, _) = await arrangedSidebar(tester);
     expect(shownProject, '/Users/me/ledger-poc');
     expect(_titles(tester).take(3), [
