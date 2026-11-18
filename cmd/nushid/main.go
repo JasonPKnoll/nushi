@@ -178,7 +178,8 @@ func run() error {
 		Viewers: remoteSvc, Processes: proctree.Tree{}, Copies: copies, CopiesOn: st.KeepTranscripts, CopyDays: st.TranscriptDays, Sleep: st})
 	shows.UseChats(chatSvc)
 	go chatSvc.EndStalePrompts() // what a daemon that stopped left pending
-	termSvc := terminals.New(startShell, filepath.Base(loginShell()), chatSvc, hub.Publish)
+	// Each terminal names its own shell (terminal.Terminal's Name).
+	termSvc := terminals.New(shellStarter(agentSvc), "", chatSvc, hub.Publish)
 	chatSvc.UseTerminals(termSvc)
 	go follow(hub, termSvc.Follow)
 	srvSvc := newServers(dir, chatSvc, agentSvc, hub.Publish)
@@ -336,10 +337,15 @@ var loginShell = sync.OnceValue(func() string {
 	return cmp.Or(os.Getenv("SHELL"), fallbackShell)
 })
 
-// startShell starts the user's login shell in a terminal, with
-// terminalEnv's environment.
-func startShell(folder string, cols, rows int, changed func()) (terminals.Shell, error) {
-	return terminal.Start([]string{loginShell(), "-l"}, folder, terminalEnv(os.Environ(), loginShell()), cols, rows, changed)
+// shellStarter starts the user's shell in a terminal (terminalShell: the
+// login shell, or Windows Terminal's default profile's), with
+// terminalEnv's environment, built on terminalBase's.
+func shellStarter(agents interface{ Environ() []string }) terminals.Start {
+	return func(folder string, cols, rows int, changed func()) (terminals.Shell, error) {
+		base := terminalBase(agents)
+		argv := terminalShell(base)
+		return terminal.Start(argv, folder, terminalEnv(base, argv[0]), cols, rows, changed)
+	}
 }
 
 // terminalEnv is a terminal's environment: the daemon's, $SHELL naming
