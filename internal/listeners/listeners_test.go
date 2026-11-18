@@ -106,14 +106,14 @@ func listenElsewhere(t *testing.T, kinds ...string) (int, []uint16) {
 	return cmd.Process.Pid, ports
 }
 
-// list is List, skipped where this OS's listeners aren't read. On the Mac
-// and Linux, which read them, an unsupported answer fails the test, so a
-// lost build tag or a sandbox that hides both of Linux's sources can't
-// pass as a skip.
+// list is List, skipped where this OS's listeners aren't read. On the
+// Mac, Linux and Windows, which read them, an unsupported answer fails the
+// test, so a lost build tag or a sandbox that hides both of Linux's
+// sources can't pass as a skip.
 func list(t *testing.T) []Listener {
 	t.Helper()
 	ls, err := List()
-	if errors.Is(err, errors.ErrUnsupported) && runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+	if errors.Is(err, errors.ErrUnsupported) && !slices.Contains([]string{"darwin", "linux", "windows"}, runtime.GOOS) {
 		t.Skipf("%s's listeners aren't read", runtime.GOOS)
 	}
 	testcheck.NoErr(t, err)
@@ -188,6 +188,9 @@ func TestListInTree(t *testing.T) {
 		t.Fatalf("on port %d: %v, want the helper's %d on 127.0.0.1", port, on, pid)
 	}
 	below, err := proctree.Tree{}.Under(os.Getpid())
+	if errors.Is(err, errors.ErrUnsupported) && runtime.GOOS == "windows" {
+		t.Skip("proctree doesn't read Windows' processes yet")
+	}
 	testcheck.NoErr(t, err)
 	if in, _ := (Procs{Root: os.Getpid(), Below: below}).Split(on); !slices.Equal(in, helpers) {
 		t.Fatalf("in this process's: %v, want %v", in, helpers)

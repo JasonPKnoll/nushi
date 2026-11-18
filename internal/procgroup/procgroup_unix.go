@@ -22,6 +22,11 @@ func Own(cmd *exec.Cmd) {
 // Kill kills the process group p leads, as Own started it.
 func Kill(p *os.Process) error { return syscall.Kill(-p.Pid, syscall.SIGKILL) }
 
+// bind is what Bound's cmd does when its context ends: kill its group.
+func bind(cmd *exec.Cmd) func() error {
+	return func() error { return Kill(cmd.Process) }
+}
+
 // Group is the process group a command Start started leads.
 type Group struct{ p *os.Process }
 

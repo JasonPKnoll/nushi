@@ -385,9 +385,9 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: |
-          go test ./internal/procgroup ./internal/filelock ./internal/logs ./internal/shellenv ./internal/batchfile
+          go test ./internal/procgroup ./internal/filelock ./internal/logs ./internal/shellenv ./internal/batchfile ./internal/terminal ./internal/proctree ./internal/listeners ./internal/footprint
           go test -run 'TestAlive|TestOpenWindows' ./internal/claudehistory
-          go test -run 'TestOwnDataFolder|TestStopEvent' ./cmd/nushid
+          go test -run 'TestOwnDataFolder|TestWTDefaultLine|TestMachineFragment|TestStopEvent' ./cmd/nushid
 
   # The Windows app built (ADR 0125), build only: CI's one compile of its C++ runner (WebView2's host, ADR 0134),
   # whose first build fetches WebView2's pinned SDK. Nothing of it runs here. Unmeasured yet: 30, as the Linux

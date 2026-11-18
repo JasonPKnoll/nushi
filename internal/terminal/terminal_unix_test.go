@@ -5,30 +5,14 @@ package terminal
 import (
 	"os"
 	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/afrase/nushi/internal/testcheck"
 )
-
-// sleeperEnv makes this test binary, run again as a child, sleep instead
-// of running tests: a child that runs whatever its first argument says,
-// even an empty one, which a multicall coreutils (uutils, Ubuntu's since
-// 25.10, or busybox) would take for no program and exit at once.
-const sleeperEnv = "NUSHI_TERMINAL_SLEEPER"
-
-func TestMain(m *testing.M) {
-	if os.Getenv(sleeperEnv) == "1" {
-		time.Sleep(time.Minute)
-		os.Exit(0)
-	}
-	m.Run()
-}
 
 // shell starts /bin/sh in a terminal and collects what it prints.
 func shell(t *testing.T) (*Terminal, *output) {
@@ -41,35 +25,6 @@ func shell(t *testing.T) (*Terminal, *output) {
 	t.Cleanup(term.Close)
 	go term.Attach(nil, func(b []byte) bool { out.add(b); return true })
 	return term, out
-}
-
-type output struct {
-	mu  sync.Mutex
-	buf strings.Builder
-}
-
-func (o *output) add(b []byte) {
-	o.mu.Lock()
-	o.buf.Write(b)
-	o.mu.Unlock()
-}
-
-// wait returns the first match of re in the output, waiting for it.
-func (o *output) wait(t *testing.T, re string) []string {
-	t.Helper()
-	r := regexp.MustCompile(re)
-	var m []string
-	if !testcheck.Eventually(func() bool {
-		o.mu.Lock()
-		defer o.mu.Unlock()
-		m = r.FindStringSubmatch(o.buf.String())
-		return m != nil
-	}) {
-		o.mu.Lock()
-		defer o.mu.Unlock()
-		t.Fatalf("no %q in %q", re, o.buf.String())
-	}
-	return m
 }
 
 func TestInputOutputAndSize(t *testing.T) {

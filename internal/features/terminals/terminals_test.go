@@ -10,7 +10,10 @@ import (
 	"github.com/afrase/nushi/internal/terminal"
 )
 
-type fakeShell struct{ closed bool }
+type fakeShell struct {
+	closed bool
+	name   string
+}
 
 func (*fakeShell) Write([]byte) error                        { return nil }
 func (*fakeShell) Resize(int, int) error                     { return nil }
@@ -19,6 +22,7 @@ func (*fakeShell) Foreground() string                        { return "" }
 func (f *fakeShell) Exit() (bool, int)                       { return f.closed, 0 }
 func (*fakeShell) Attach(<-chan struct{}, func([]byte) bool) {}
 func (f *fakeShell) Close()                                  { f.closed = true }
+func (f *fakeShell) Name() string                            { return f.name }
 
 type folders struct{}
 
@@ -204,3 +208,27 @@ func TestBusyAsSoonAsACommandRuns(t *testing.T) {
 type tempFolder struct{ dir string }
 
 func (f tempFolder) Folder(string) (string, error) { return f.dir, nil }
+
+// A restarted terminal names the shell it runs now, which on Windows can
+// be another than before (Windows Terminal's default profile changed);
+// one that doesn't say keeps the name it had.
+func TestRestartNamesTheNewShell(t *testing.T) {
+	names := []string{"pwsh", "bash", ""}
+	s := New(func(string, int, int, func()) (Shell, error) {
+		sh := &fakeShell{name: names[0]}
+		names = names[1:]
+		return sh, nil
+	}, "zsh", folders{}, func(model.Event) {})
+	m, err := s.Open("c1", "", 80, 24)
+	if err != nil || m.Shell != "pwsh" {
+		t.Fatalf("opened as %q: %v", m.Shell, err)
+	}
+	for range 2 {
+		if err := s.Restart(m.ID, 80, 24); err != nil {
+			t.Fatal(err)
+		}
+		if got := s.List("c1")[0].Shell; got != "bash" {
+			t.Errorf("restarted as %q, want bash", got)
+		}
+	}
+}
