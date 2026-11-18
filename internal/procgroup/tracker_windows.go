@@ -53,8 +53,9 @@ func inJob(h, job windows.Handle) (bool, error) {
 	if err := isProcessInJob.Find(); err != nil {
 		return false, err
 	}
-	var in int32 // a BOOL
-	if r, _, e := syscall.SyscallN(isProcessInJob.Addr(), uintptr(h), uintptr(job), uintptr(unsafe.Pointer(&in))); r == 0 {
+	// The answer, a BOOL.
+	var in int32
+	if r, _, e := syscall.SyscallN(isProcessInJob.Addr(), uintptr(h), uintptr(job), uintptr(unsafe.Pointer(&in))); r == 0 { //nolint:gosec // the call's own out-parameter
 		return false, e
 	}
 	return in != 0, nil
@@ -211,12 +212,11 @@ func (t *tracker) read() {
 // NULL overlapped; a job never posts a failed one).
 func dequeue(port windows.Handle) (msg uint32, key uintptr, pid uint32, err error) {
 	var ov uintptr
-	r, _, e := syscall.SyscallN(getQueuedCompletionStatus.Addr(), uintptr(port),
-		uintptr(unsafe.Pointer(&msg)), uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&ov)), uintptr(windows.INFINITE))
+	r, _, e := syscall.SyscallN(getQueuedCompletionStatus.Addr(), uintptr(port), uintptr(unsafe.Pointer(&msg)), uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&ov)), uintptr(windows.INFINITE)) //nolint:gosec // the call's own out-parameters
 	if r == 0 {
 		return 0, 0, 0, e
 	}
-	return msg, key, uint32(ov), nil //nolint:gosec // a job message's "overlapped" is a 32-bit process id
+	return msg, key, uint32(ov), nil // a job message's "overlapped" is a 32-bit process id
 }
 
 // created notes a new process in its parent's group, or a new group when

@@ -90,7 +90,7 @@ func TestParseTCPTableShort(t *testing.T) {
 // Go); go test -fuzz=FuzzParseTCPTable searches further.
 func FuzzParseTCPTable(f *testing.F) {
 	f.Add(table(tcpRow(mibTCPStateListen, "127.0.0.1", 7990, 0xbeef, 4120), tcpRow(5, "127.0.0.1", 7991, 0, 4120)), false)
-	f.Add(table(tcp6Row(mibTCPStateListen, "::1", 7991, 4120), tcp6Row(mibTCPStateListen, "::ffff:127.0.0.1", 8080, 77)), true)
+	f.Add(table(tcp6Row(mibTCPStateListen, "::1", 7991, 4120), tcp6Row(5, "::1", 7992, 4120), tcp6Row(mibTCPStateListen, "::ffff:127.0.0.1", 8080, 77)), true)
 	f.Add(table(), true)
 	f.Add([]byte{}, false)
 	f.Add(append(binary.LittleEndian.AppendUint32(nil, 1<<31), tcpRow(mibTCPStateListen, "127.0.0.1", 1, 0, 1)...), false)
