@@ -24,6 +24,8 @@ import (
 // group (ADR 0133), what it started included, whatever has ended between.
 // Nothing is killed by a command's own exit or by the daemon's, as on
 // Unix. Without the job (refused), a cancel is taskkill's tree (Kill).
+// The job's messages may be lost, so tracking is best-effort; what a lost
+// exit would leave held, a sweep drops (tracker_sweep_windows.go).
 
 // Job object messages (winnt.h's JOB_OBJECT_MSG_*).
 const (
@@ -68,6 +70,7 @@ type jobAssociateCompletionPort struct {
 type tracker struct {
 	self uint32
 	job  windows.Handle
+	port windows.Handle
 	mu   sync.Mutex
 	// procs are the live processes, by pid.
 	procs map[uint32]tracked
@@ -80,10 +83,21 @@ type tracker struct {
 	// killed as it comes.
 	killed map[uint64]bool
 	// doomed are processes a cancel found before the job had told of
-	// them, by pid, with their start: they're killed with their group when
-	// it does.
-	doomed map[uint32]int64
+	// them, by pid: they're killed with their group when it does.
+	doomed map[uint32]doom
 	next   uint64
+	// stale are what a sweep found exited, dropped once the port has
+	// given every message posted before it (tracker_sweep_windows.go).
+	stale    []stale
+	sweeping bool
+}
+
+// doom is a process a cancel killed before the job told of it: its start,
+// and a handle of its own on it (SYNCHRONIZE and query rights), which
+// keeps its pid its and tells a sweep when it has exited.
+type doom struct {
+	h       windows.Handle
+	started int64
 }
 
 // tracked is a process the job told of, by a handle that keeps its pid
@@ -141,10 +155,10 @@ func startTracker() *tracker {
 	}
 	// The job and its port stay open for as long as this process runs.
 	t := &tracker{
-		self: windows.GetCurrentProcessId(), job: job, procs: map[uint32]tracked{}, roots: map[uint32]tracked{},
-		size: map[uint64]int{}, killed: map[uint64]bool{}, doomed: map[uint32]int64{},
+		self: windows.GetCurrentProcessId(), job: job, port: port, procs: map[uint32]tracked{}, roots: map[uint32]tracked{},
+		size: map[uint64]int{}, killed: map[uint64]bool{}, doomed: map[uint32]doom{},
 	}
-	go t.read(port)
+	go t.read()
 	return t
 }
 
@@ -167,14 +181,18 @@ func allowBreakaway(job windows.Handle) error {
 
 // read takes the port's messages, in the order they came, until the port
 // is gone (it never is: it lives as long as this process).
-func (t *tracker) read(port windows.Handle) {
+func (t *tracker) read() {
 	for {
-		msg, pid, err := dequeue(port)
+		msg, key, pid, err := dequeue(t.port)
 		switch {
 		case errors.Is(err, windows.ERROR_ABANDONED_WAIT_0), errors.Is(err, windows.ERROR_INVALID_HANDLE):
 			return // the port was closed, or isn't one
 		case err != nil:
 			continue // a job's messages carry no I/O to fail; a lost one is skipped
+		}
+		if key == sweepKey {
+			t.swept()
+			continue
 		}
 		switch msg {
 		case jobMsgNewProcess:
@@ -186,18 +204,19 @@ func (t *tracker) read(port windows.Handle) {
 }
 
 // dequeue waits for the port's next message: its id (a job message's
-// "number of bytes") and the process id it carries (its "overlapped").
+// "number of bytes"), its key (the job's 0, or sweepKey) and the process
+// id it carries (its "overlapped").
 // When the call fails it is an error, whether or not it dequeued a packet
 // (GetQueuedCompletionStatus's documentation tells the two apart by a
 // NULL overlapped; a job never posts a failed one).
-func dequeue(port windows.Handle) (msg, pid uint32, err error) {
-	var key, ov uintptr
+func dequeue(port windows.Handle) (msg uint32, key uintptr, pid uint32, err error) {
+	var ov uintptr
 	r, _, e := syscall.SyscallN(getQueuedCompletionStatus.Addr(), uintptr(port),
 		uintptr(unsafe.Pointer(&msg)), uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&ov)), uintptr(windows.INFINITE))
 	if r == 0 {
-		return 0, 0, e
+		return 0, 0, 0, e
 	}
-	return msg, uint32(ov), nil //nolint:gosec // a job message's "overlapped" is a 32-bit process id
+	return msg, key, uint32(ov), nil //nolint:gosec // a job message's "overlapped" is a 32-bit process id
 }
 
 // created notes a new process in its parent's group, or a new group when
@@ -233,7 +252,8 @@ func (t *tracker) created(pid uint32) {
 	case okParent && ok && pp.started <= started:
 		p.group = pp.group
 	}
-	if s, ok := t.doomed[pid]; ok && s == started {
+	if d, ok := t.doomed[pid]; ok && d.started == started {
+		_ = windows.CloseHandle(d.h)
 		delete(t.doomed, pid)
 		if p.group != 0 {
 			t.killed[p.group] = true
@@ -249,13 +269,19 @@ func (t *tracker) created(pid uint32) {
 	t.procs[pid] = p
 }
 
-// exited forgets a process that has exited.
+// exited forgets a process that has exited, and a doomed one the job
+// never told of; then sweeps for exits the job didn't tell of.
 func (t *tracker) exited(pid uint32) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if p, ok := t.procs[pid]; ok {
 		t.drop(pid, p)
 	}
+	if d, ok := t.doomed[pid]; ok {
+		_ = windows.CloseHandle(d.h)
+		delete(t.doomed, pid)
+	}
+	t.sweep()
 }
 
 // drop forgets process pid, and its group once that has no process left.
@@ -294,6 +320,7 @@ func (t *tracker) killGroupOf(h windows.Handle, pid int) error {
 	started := startOf(h)
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.sweep()
 	if r, ok := t.roots[uint32(pid)]; ok && r.started == started { //nolint:gosec // a Windows pid is 32-bit
 		t.killed[r.group] = true
 		done := os.ErrProcessDone
@@ -307,7 +334,7 @@ func (t *tracker) killGroupOf(h windows.Handle, pid int) error {
 	if exited(h) { // its group, if it had one, is empty
 		return os.ErrProcessDone
 	}
-	t.doomed[uint32(pid)] = started //nolint:gosec // a Windows pid is 32-bit
+	t.doom(uint32(pid), h, started) //nolint:gosec // a Windows pid is 32-bit
 	return terminate(h)
 }
 
