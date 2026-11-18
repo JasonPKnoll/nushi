@@ -13,7 +13,8 @@ import (
 
 // Windows has no process groups, and taskkill's tree, which follows each
 // process's parent, misses one whose parent ended first. So this process
-// (the daemon) puts itself in a job of its own, with no limits, whose
+// (the daemon) puts itself in a job of its own, whose one limit lets a
+// process that asks to break away from it do so (allowBreakaway), whose
 // completion port tells of each process created below it, in the order
 // they are created (JOB_OBJECT_MSG_NEW_PROCESS), and of each exit. The
 // tracker reads each new process's parent then, while the parent's entry
@@ -39,6 +40,24 @@ const (
 // it is a uintptr, as hcsshim reads job messages.
 var getQueuedCompletionStatus = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetQueuedCompletionStatus")
 
+// isProcessInJob is kernel32's IsProcessInJob, which x/sys doesn't wrap.
+var isProcessInJob = windows.NewLazySystemDLL("kernel32.dll").NewProc("IsProcessInJob")
+
+// inJob says whether h's process (opened with query rights) is in job
+// (opened with JOB_OBJECT_QUERY; CreateJobObject's handle has every
+// right); a process in a job nested in it is in it too (Nested Jobs:
+// a child job holds a subset of its parent's processes).
+func inJob(h, job windows.Handle) (bool, error) {
+	if err := isProcessInJob.Find(); err != nil {
+		return false, err
+	}
+	var in int32 // a BOOL
+	if r, _, e := syscall.SyscallN(isProcessInJob.Addr(), uintptr(h), uintptr(job), uintptr(unsafe.Pointer(&in))); r == 0 {
+		return false, e
+	}
+	return in != 0, nil
+}
+
 // jobAssociateCompletionPort is JOBOBJECT_ASSOCIATE_COMPLETION_PORT.
 type jobAssociateCompletionPort struct {
 	CompletionKey  uintptr
@@ -48,6 +67,7 @@ type jobAssociateCompletionPort struct {
 // tracker is what the job told of: the live processes below this one.
 type tracker struct {
 	self uint32
+	job  windows.Handle
 	mu   sync.Mutex
 	// procs are the live processes, by pid.
 	procs map[uint32]tracked
@@ -109,6 +129,9 @@ func startTracker() *tracker {
 		uintptr(unsafe.Pointer(assoc)), uint32(unsafe.Sizeof(*assoc))) //nolint:gosec // the system's own struct, kept alive below
 	runtime.KeepAlive(assoc)
 	if err == nil {
+		err = allowBreakaway(job)
+	}
+	if err == nil {
 		err = windows.AssignProcessToJobObject(job, windows.CurrentProcess())
 	}
 	if err != nil {
@@ -118,11 +141,28 @@ func startTracker() *tracker {
 	}
 	// The job and its port stay open for as long as this process runs.
 	t := &tracker{
-		self: windows.GetCurrentProcessId(), procs: map[uint32]tracked{}, roots: map[uint32]tracked{},
+		self: windows.GetCurrentProcessId(), job: job, procs: map[uint32]tracked{}, roots: map[uint32]tracked{},
 		size: map[uint64]int{}, killed: map[uint64]bool{}, doomed: map[uint32]int64{},
 	}
 	go t.read(port)
 	return t
+}
+
+// allowBreakaway sets the job's one limit, JOB_OBJECT_LIMIT_BREAKAWAY_OK:
+// a process below this one that is started with CREATE_BREAKAWAY_FROM_JOB
+// leaves the job (and so the tracker's groups), as it asks, instead of
+// failing to start with access denied, as it would in a job without it
+// (CreateProcess's flags). Not JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK, which
+// would take every child out of the job and leave nothing to track.
+func allowBreakaway(job windows.Handle) error {
+	// On the heap, which doesn't move, as the call takes it as a uintptr.
+	info := &windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
+		BasicLimitInformation: windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{LimitFlags: windows.JOB_OBJECT_LIMIT_BREAKAWAY_OK},
+	}
+	_, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(info)), uint32(unsafe.Sizeof(*info))) //nolint:gosec // the system's own struct, kept alive below
+	runtime.KeepAlive(info)
+	return err
 }
 
 // read takes the port's messages, in the order they came, until the port
