@@ -31,13 +31,13 @@ Above the file, in the pane's second row, is its path. Click the path to copy it
 
 ## See which lines changed
 
-A file's code shows which lines differ from the last commit, so you can see what the agent changed without opening a diff. Beside the line numbers, a green bar marks added lines, a blue bar changed lines, and a small grey wedge the place where lines were removed. The marks follow what you type, too.
+A file's code shows which lines the chat's branch changed, committed or not, so you can see what the agent changed without opening a diff. They're the same changes the **Changes** tab's **Branch** view shows, so they stay after the agent commits. A chat working straight on the main branch (or with no branch to count from) is marked against the last commit instead. Beside the line numbers, a green bar marks added lines, a blue bar changed lines, and a small red wedge the place where lines were removed. The marks follow what you type, too.
 
-1. Point at a mark, or click it, to see what those lines were in the last commit.
+1. Point at a mark, or click it, to see what those lines were: **Before this branch**, or **Before** when it's the last commit.
 2. Click elsewhere to close it.
 3. For the full diff, right-click a file with a dot in the tree and pick **Show changes**: it opens in the chat's **Changes** tab.
 
-A file git doesn't know yet says **New file** next to its path instead. Files outside a git repository, ignored files, links and very large files have no marks, and neither do rendered views (Markdown, CSV, HTML): switch to the source with `</>` to see them. The dot in the tree still means the chat wrote the file, so after a commit a file can have a dot and no marks.
+A file the branch added, or git doesn't know yet, says **New file** next to its path instead. Files outside a git repository, ignored files, links and very large files have no marks, and neither do rendered views (Markdown, CSV, HTML): switch to the source with `</>` to see them. A file outside the chat's folder is marked against its own last commit.
 
 ## Work with several files
 

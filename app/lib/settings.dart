@@ -30,8 +30,9 @@ import 'package:nushi/tile_picture.dart';
 /// groups' order and which are collapsed, the projects it keeps (with
 /// chats or none), whether it has the project rail, the project it's
 /// narrowed to and each project's tile, each project's chats' order,
-/// whether Pinned is
-/// collapsed, the sidebar's arrangement (grouping, sort, what rows show),
+/// whether Pinned is collapsed and whether it keeps every project's
+/// pins while the sidebar is narrowed to one, the sidebar's arrangement
+/// (grouping, sort, what rows show),
 /// each project's own sort, and sections, the models picked last, each
 /// repository's merge method, each chat's pinned artifacts, and the Mac's
 /// notifications and Dock badge, the appearance and the color theme,
@@ -305,6 +306,13 @@ final Pref<bool> sidebarHidden = _plain('sidebarHidden', false);
 
 /// Whether the sidebar's Pinned section is collapsed.
 final Pref<bool> pinnedCollapsed = _plain('pinnedCollapsed', false);
+
+/// Whether Pinned shows the chats pinned in every project while the
+/// sidebar is narrowed to one in the project rail (`shownProject`), each
+/// of another project marked with its tile and name; off, only the shown
+/// project's (Settings › Appearance's Pinned from every project). On at
+/// first: a pin is there to be seen whatever is picked.
+final Pref<bool> pinnedEveryProject = _plain('pinnedEveryProject', true);
 
 /// The sidebar's arrangement, from its Arrange menu (`arrangement.dart`):
 /// what it groups its chats by, how it sorts them and which way (the

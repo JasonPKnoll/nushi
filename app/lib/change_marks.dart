@@ -9,7 +9,8 @@ import 'package:nushi/theme/theme.dart';
 
 // The change marks in a file's source gutter (ADR 0131), as an editor
 // draws them: a bar beside added and changed lines, a wedge where lines
-// went, and their card of what the last commit had there.
+// went, and their card of what was there before the chat's branch (or the
+// last commit, with no branch base).
 
 /// The room a change mark takes between a line's number and its text:
 /// [markGap] after the number, the bar [markBar] wide, then the rest of
@@ -94,21 +95,24 @@ class _ChangeMarkState extends State<ChangeMark> {
   }
 
   @override
-  Widget build(BuildContext context) => HoverCard(
-    showOnTap: true,
-    above: 300,
-    around: _around,
-    card: (_) => ChangeCard(marks: widget.cell.marks),
-    child: MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: CustomPaint(
-        painter: widget.painted
-            ? _MarkPainter(widget.cell, widget.barX, NushiTheme.of(context).t)
-            : null,
-        child: const SizedBox.expand(),
+  Widget build(BuildContext context) {
+    final branch = MarksAgainst.branchOf(context);
+    return HoverCard(
+      showOnTap: true,
+      above: 300,
+      around: _around,
+      card: (_) => ChangeCard(marks: widget.cell.marks, branch: branch),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: CustomPaint(
+          painter: widget.painted
+              ? _MarkPainter(widget.cell, widget.barX, NushiTheme.of(context).t)
+              : null,
+          child: const SizedBox.expand(),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// Paints [cell]'s mark in [box], a line's number cell: its bar [x] in,
@@ -160,13 +164,32 @@ class _MarkPainter extends CustomPainter {
       old.cell != cell || old.x != x || old.t != t;
 }
 
-/// A change mark's card: what the last commit had at its lines, read-only
-/// (not a diff): "Before" over a changed run's old lines, "N lines
-/// removed" over a removed run's, "New lines" for an added run.
+/// What a file's change marks below it count from (ADR 0131): the text
+/// before the chat's branch ([branch]), or the last commit's.
+class MarksAgainst extends InheritedWidget {
+  const new({required this.branch, required super.child, super.key});
+
+  final bool branch;
+
+  /// Whether the marks at [context] count from before the branch; false
+  /// with none above.
+  static bool branchOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<MarksAgainst>()?.branch ??
+      false;
+
+  @override
+  bool updateShouldNotify(MarksAgainst old) => old.branch != branch;
+}
+
+/// A change mark's card: what the base had at its lines, read-only (not a
+/// diff): "Before this branch" ([branch]) or "Before" (the last commit)
+/// over a changed run's old lines, "N lines removed" over a removed run's,
+/// "New lines" for an added run.
 class ChangeCard extends StatelessWidget {
-  const new({required this.marks, super.key});
+  const new({required this.marks, super.key, this.branch = false});
 
   final List<LineMark> marks;
+  final bool branch;
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +198,7 @@ class ChangeCard extends StatelessWidget {
     final code = theme.code(t.text, size: 12);
     String title(LineMark m) => switch (m.kind) {
       MarkKind.added => m.count == 1 ? 'New line' : 'New lines',
-      MarkKind.changed => 'Before',
+      MarkKind.changed => branch ? 'Before this branch' : 'Before',
       MarkKind.removed =>
         m.old.length == 1 ? '1 line removed' : '${m.old.length} lines removed',
     };
@@ -223,7 +246,9 @@ class ChangeCard extends StatelessWidget {
                   ),
                   if (m.kind == MarkKind.added)
                     Text(
-                      'Not in the last commit',
+                      branch
+                          ? 'Added on this branch'
+                          : 'Not in the last commit',
                       style: theme.ui(t.textMuted, size: 12),
                     )
                   else

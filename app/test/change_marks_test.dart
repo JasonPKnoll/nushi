@@ -19,7 +19,8 @@ import 'fake_daemon.dart' show FakeDaemon, loadFonts;
 import 'file_edit_helpers.dart';
 import 'harness.dart';
 
-// A file's source with change marks against the last commit (ADR 0131):
+// A file's source with change marks against the chat's branch base or the
+// last commit (ADR 0131):
 // a bar beside added and changed lines, a wedge where lines went, and the
 // card of the old lines on hover or a click; in the read-only source and
 // the editor.
@@ -66,13 +67,23 @@ Widget _source({
   String text = changeShown,
   String path = 'main.go',
   bool wrap = true,
+  bool branch = false,
   Tokens tokens = Tokens.dark,
 }) => themed(
   tokens: tokens,
-  SizedBox(
-    width: 560,
-    height: 380,
-    child: SourceView(text, path: path, base: base, wrap: wrap, padding: _pad),
+  MarksAgainst(
+    branch: branch,
+    child: SizedBox(
+      width: 560,
+      height: 380,
+      child: SourceView(
+        text,
+        path: path,
+        base: base,
+        wrap: wrap,
+        padding: _pad,
+      ),
+    ),
   ),
 );
 
@@ -196,6 +207,28 @@ void main() {
     await tester.pump();
     expect(find.text('New lines'), findsOneWidget);
     expect(find.text('Not in the last commit'), findsOneWidget);
+  });
+
+  testWidgets("against the chat's branch base, the cards say so", (
+    tester,
+  ) async {
+    await tester.pumpWidget(_source(branch: true));
+    await tester.tap(find.byType(ChangeMark).first);
+    await tester.pump();
+    expect(find.text('Before this branch'), findsOneWidget);
+    expect(find.text('Before'), findsNothing);
+    await tester.tapAt(const Offset(400, 300));
+    await tester.pump();
+    // A removal's title reads the same either way.
+    await tester.tap(find.byType(ChangeMark).at(3));
+    await tester.pump();
+    expect(find.text('2 lines removed'), findsOneWidget);
+    await tester.tapAt(const Offset(400, 300));
+    await tester.pump();
+    await tester.tap(find.byType(ChangeMark).last);
+    await tester.pump();
+    expect(find.text('New lines'), findsOneWidget);
+    expect(find.text('Added on this branch'), findsOneWidget);
   });
 
   testWidgets("near the window's foot, the card opens over its line", (
@@ -383,6 +416,7 @@ void main() {
                 RepaintBoundary(
                   key: Key('card'),
                   child: ChangeCard(
+                    branch: true,
                     marks: [
                       LineMark(MarkKind.removed, 0, 0, ['func old() {}', '']),
                       LineMark(MarkKind.changed, 0, 2, [

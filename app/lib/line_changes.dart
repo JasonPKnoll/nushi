@@ -4,23 +4,25 @@ import 'dart:convert';
 import 'package:diff_view/diff_view.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:nushi/changes_span.dart';
 import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/diff_box.dart' show maxDiffLines, offThread;
 import 'package:nushi/gen/nushi/v1/nushi.pb.dart';
 import 'package:nushi/preview.dart' show FileWatch;
 
-// A file preview's change marks (ADR 0131): which of its lines differ from
-// the last commit, worked out in the app from HEAD's text (GetDiff with a
-// path) and the text it shows, so they follow unsaved edits too.
+// A file preview's change marks (ADR 0131): which of its lines the chat's
+// branch changed (else, with no branch base, since the last commit), worked
+// out in the app from the base's text (GetDiff with a path) and the text it
+// shows, so they follow unsaved edits too.
 
 /// What a change mark says of its lines.
 enum MarkKind { added, changed, removed }
 
-/// A run of lines that differ from the last commit: [count] lines from
-/// [first] (from 0) of the text shown, added or changed; or, removed,
+/// A run of lines that differ from the base (`LineBase`): [count] lines
+/// from [first] (from 0) of the text shown, added or changed; or, removed,
 /// none, the lines having stood before line [first]. [old] is what the
-/// last commit had there (none for added lines).
+/// base had there (none for added lines).
 @immutable
 class LineMark {
   const new(this.kind, this.first, this.count, [this.old = const []]);
@@ -56,7 +58,7 @@ List<String> _lines(String text) {
   return [for (final l in lines) noCr(l)];
 }
 
-/// The marks of [shown] against [base], the last commit's text: none when
+/// The marks of [shown] against [base], the text before: none when
 /// they're the same, line endings and a leading BOM aside, or either has
 /// more than [maxDiffLines] lines (as a diff isn't drawn then).
 List<LineMark> lineMarks(String base, String shown) {
@@ -140,16 +142,25 @@ List<MarkCell?> markCells(List<LineMark> marks, int lines) {
   return cells;
 }
 
-/// A shown file's last commit's text, what its change marks are drawn
-/// against ([value]; null draws none), asked of the daemon (GetDiff with
-/// the file's path, API [oneFileDiffApi]) as the file changes on disk,
-/// the chat's turn ends, it commits or its folder changes; and whether the
-/// file is new to git ([isNew]: untracked or added), which shows beside
-/// its path instead. The file's own folder is asked, so a file in another
-/// root or a nested repository is compared against its own repository.
+/// A shown file's text before its chat's work, what its change marks are
+/// drawn against ([value]; null draws none): as the chat's branch left its
+/// base ([branch]), committed work and all, else in the last commit (ADR
+/// 0131). The base is the one the Changes tab's Branch view counts from
+/// (`ChangeSpan.branchBase`); there is none when the chat works on that
+/// branch itself or has no base, or the file is outside the chat's folder
+/// (another root, so another repository's branches). Asked of the daemon
+/// (GetDiff with the file's path and the base, API [oneFileDiffApi]) as
+/// the file changes on disk, the chat's turn ends, it commits or its
+/// folder or worktree changes; the base itself is found again when the
+/// turn ends or the folder changes, as the branch checked out may have.
+/// Also whether the file is new to git against it ([isNew]: untracked, or
+/// added since), which shows beside its path instead. The file's own
+/// folder is asked, so a file in a nested repository is compared against
+/// its own repository.
 class LineBase extends ChangeNotifier implements ValueListenable<String?> {
   new(this.daemon, this.chat, this.watch) {
     _folder = chat.folder;
+    _worktree = chat.worktree?.base ?? '';
     _commits = chat.commits;
     _wasBusy = chat.busy;
     chat.addListener(_chatChanged);
@@ -163,18 +174,26 @@ class LineBase extends ChangeNotifier implements ValueListenable<String?> {
 
   String? _base;
   bool _isNew = false;
+  bool _branch = false;
 
   @override
   String? get value => _base;
 
-  /// Whether git doesn't know the file yet (untracked, or added to the
-  /// index): every line would be marked, so none is.
+  /// Whether the file is new against [value]'s point (untracked, added to
+  /// the index, or added on the branch): every line would be marked, so
+  /// none is.
   bool get isNew => _isNew;
+
+  /// Whether [value] is the text from before the chat's branch, not the
+  /// last commit's: a card says "Before this branch".
+  bool get branch => _branch;
 
   String? _sha;
   late String _folder;
+  late String _worktree;
   late int _commits;
   late bool _wasBusy;
+  Future<String>? _branchBase; // the base found, until it may have changed
   int _asked = 0; // only the latest question's answer lands
   bool _disposed = false;
 
@@ -189,14 +208,32 @@ class LineBase extends ChangeNotifier implements ValueListenable<String?> {
   void _chatChanged() {
     final ended = _wasBusy && !chat.busy;
     _wasBusy = chat.busy;
-    if (ended || _folder != chat.folder || _commits != chat.commits) {
+    final worktree = chat.worktree?.base ?? '';
+    final moved = _folder != chat.folder || _worktree != worktree;
+    if (ended || moved || _commits != chat.commits) {
+      if (ended || moved) _branchBase = null;
       _folder = chat.folder;
+      _worktree = worktree;
       _commits = chat.commits;
       unawaited(ask());
     }
   }
 
-  /// Asks again what the file was in the last commit.
+  /// The branch the chat's Branch view counts from: '' for none, or when
+  /// HEAD is on it. A failure is found again next time.
+  Future<String> _findBase() async {
+    try {
+      final b = await ChangeSpan.branchBase(daemon, chat);
+      final span = ChangeSpan(chat.folder, Scope.branch, b.base, b.status);
+      return b.status.git && !span.onBase ? b.base : '';
+    } on Object {
+      _branchBase = null;
+      return '';
+    }
+  }
+
+  /// Asks again what the file was before the branch, or in the last
+  /// commit.
   Future<void> ask() async {
     final asked = ++_asked;
     final f = watch.file;
@@ -207,21 +244,39 @@ class LineBase extends ChangeNotifier implements ValueListenable<String?> {
         daemon.daemonApi < oneFileDiffApi) {
       return _set(asked, null, isNew: false);
     }
-    // Unchanged since the last commit, its text then is this.
+    // Unchanged since the base, its text then is this.
     final now = utf8.decode(f.data, allowMalformed: true);
     final abs = f.path.isNotEmpty
         ? f.path
         : absoluteIn(chat.folder, watch.path);
     final slash = abs.lastIndexOf('/');
     if (slash < 0) return _set(asked, null, isNew: false);
+    final inChat = abs.startsWith('${chat.folder}/');
+    final base = inChat ? await (_branchBase ??= _findBase()) : '';
+    if (_disposed || asked != _asked) return;
+    Future<GetDiffResponse> diff(String base) => daemon.client.getDiff(
+      GetDiffRequest(
+        folder: slash == 0 ? '/' : abs.substring(0, slash),
+        path: abs.substring(slash + 1),
+        base: base,
+      ),
+    );
     try {
-      final r = await daemon.client.getDiff(
-        GetDiffRequest(
-          folder: slash == 0 ? '/' : abs.substring(0, slash),
-          path: abs.substring(slash + 1),
-        ),
-      );
-      if (r.files.isEmpty) return _set(asked, now, isNew: false);
+      var against = base;
+      GetDiffResponse r;
+      try {
+        r = await diff(against);
+      } on Object {
+        // Not a branch of the file's own repository (a nested one): from
+        // its last commit instead.
+        if (against.isEmpty) rethrow;
+        against = '';
+        r = await diff(against);
+      }
+      final branch = against.isNotEmpty;
+      if (r.files.isEmpty) {
+        return _set(asked, now, isNew: false, branch: branch);
+      }
       final c = r.files.first;
       final known =
           c.skipped.isEmpty &&
@@ -232,6 +287,7 @@ class LineBase extends ChangeNotifier implements ValueListenable<String?> {
         isNew:
             c.skipped.isEmpty &&
             (c.status == 'untracked' || c.status == 'added'),
+        branch: branch,
       );
     } on Object {
       // Not in a repository, refused, the daemon gone: no marks.
@@ -239,11 +295,17 @@ class LineBase extends ChangeNotifier implements ValueListenable<String?> {
     }
   }
 
-  void _set(int asked, String? base, {required bool isNew}) {
+  void _set(
+    int asked,
+    String? base, {
+    required bool isNew,
+    bool branch = false,
+  }) {
     if (_disposed || asked != _asked) return;
-    if (base == _base && isNew == _isNew) return;
+    if (base == _base && isNew == _isNew && branch == _branch) return;
     _base = base;
     _isNew = isNew;
+    _branch = branch;
     notifyListeners();
   }
 
