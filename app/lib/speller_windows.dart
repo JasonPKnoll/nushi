@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:io';
 
 import 'package:nushi/speller.dart';
 
@@ -15,8 +16,10 @@ class WindowsSpeller implements Speller {
 
   /// The checker for the user's language ([language] of the factory's),
   /// or null where there's no such API or dictionary: then there's no
-  /// spell check, as a platform without one.
+  /// spell check, as a platform without one. Off Windows (a test of
+  /// Windows's set on another machine) there's no ole32 to load: none.
   static WindowsSpeller? open({String? locale}) {
+    if (!Platform.isWindows) return null;
     if (!_ole32.providesSymbol('CoCreateInstance') ||
         !_kernel32.providesSymbol('GetUserDefaultLocaleName')) {
       return null;
