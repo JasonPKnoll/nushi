@@ -47,9 +47,10 @@ void main() {
   });
 
   test('a restart stops the daemon of the data folder, by the pid it '
-      'said, and starts the packaged one once it has gone', () async {
+      'says just then, and starts the packaged one once it has gone', () async {
     fakeInstall.daemon = '/opt/nushi/lib/nushid';
     var phase = 'old';
+    var pid = 4242;
     final fake = FakeDaemon([])
       ..answer = (input) => switch (input) {
         PingRequest() when phase == 'gone' => throw ConnectException(
@@ -59,13 +60,16 @@ void main() {
         PingRequest() => PingResponse(
           apiVersion: apiVersion,
           build: phase,
-          pid: 4242,
+          pid: pid,
         ),
         _ => null,
       };
     final d = Daemon(transport: fake);
     addTearDown(d.dispose);
     await _connected(d);
+    // It restarted itself since the last ping: the pid that ping gave
+    // names no daemon now.
+    pid = 5151;
     Future<void>.delayed(
       const Duration(milliseconds: 100),
       () => phase = 'gone',
@@ -76,7 +80,7 @@ void main() {
     );
     await d.restartDaemon();
     expect(fakeInstall.stopped, [dataDir]);
-    expect(fakeInstall.stoppedPids, [4242]);
+    expect(fakeInstall.stoppedPids, [5151]);
     expect(fakeInstall.launched, [dataDir]);
   });
 

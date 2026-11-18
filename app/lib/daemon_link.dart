@@ -184,6 +184,9 @@ extension DaemonLink on Daemon {
       attrs: {'build': _build, 'bundled': ?bundled},
     );
     final before = _build;
+    // The daemon may have restarted itself since the last ping (into the
+    // bundled one, when idle): its pid now, not that ping's.
+    await ping();
     await native.install.stop(dataDir, pid: daemonPid);
     // The first ping that fails starts the bundled daemon.
     _launcher.launched = DateTime(0);
