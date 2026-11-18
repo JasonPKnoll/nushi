@@ -9,10 +9,9 @@ import (
 )
 
 // Bound has cmd, made by exec.CommandContext, start in a group of its own
-// (Own), killed whole when its context ends (Kill; on Windows its job,
-// bind); Wait then gives what it left running a second to let go of its
-// stdout and stderr. Set cmd.Stdin, or take its StdinPipe, before Bound:
-// on Windows, Bound reads the command's input to it (bind).
+// (Own), killed whole when its context ends (Kill; on Windows the group
+// its tracker keeps, bind); Wait then gives what it left running a second
+// to let go of its stdout and stderr.
 func Bound(cmd *exec.Cmd) {
 	Own(cmd)
 	cmd.Cancel = bind(cmd)

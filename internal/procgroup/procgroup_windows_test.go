@@ -144,7 +144,8 @@ func TestTerminateAfterTheExitIsDone(t *testing.T) {
 // NUSHI_PROCGROUP_HELPER says: "orphan" starts a ping, writes its pid and
 // exits, leaving it; "parent" runs an orphan helper, writes "orphaned"
 // once it has exited, then waits 100 s; "echo" copies its input to its
-// stderr (its stdout ends with the test's PASS).
+// stderr (its stdout ends with the test's PASS); "stdin-kind" writes its
+// input's file type there.
 func TestHelperProcess(t *testing.T) {
 	switch os.Getenv("NUSHI_PROCGROUP_HELPER") {
 	case "orphan":
@@ -159,6 +160,9 @@ func TestHelperProcess(t *testing.T) {
 		time.Sleep(100 * time.Second)
 	case "echo":
 		_, _ = io.Copy(os.Stderr, os.Stdin)
+	case "stdin-kind":
+		kind, _ := windows.GetFileType(windows.Handle(os.Stdin.Fd()))
+		_, _ = fmt.Fprintln(os.Stderr, kind)
 	default:
 		t.Skip("run by the other tests")
 	}
@@ -192,9 +196,23 @@ func orphanPing(t *testing.T, r *bufio.Reader) windows.Handle {
 // parent ended first, which taskkill's tree doesn't find: the command's
 // job does.
 func TestBoundKillsAnOrphan(t *testing.T) {
+	for _, piped := range []bool{false, true} {
+		t.Run(map[bool]string{false: "no input", true: "StdinPipe first"}[piped], func(t *testing.T) {
+			killsAnOrphan(t, piped)
+		})
+	}
+}
+
+func killsAnOrphan(t *testing.T, piped bool) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cmd := helper(ctx, "parent")
+	if piped { // git cat-file --batch's way: its input a pipe Bound comes after
+		in, err := cmd.StdinPipe()
+		testcheck.NoErr(t, err)
+		defer func() { _ = in.Close() }()
+	}
 	out, err := cmd.StdoutPipe()
 	testcheck.NoErr(t, err)
 	Bound(cmd)
@@ -235,37 +253,75 @@ func TestBoundLeavesWhatAnExitLeft(t *testing.T) {
 	}
 }
 
-// A bound command reads the input it was given, and none (at its end at
-// once) when it was given none; one whose StdinPipe was taken before
-// Bound reads from that.
-func TestBoundInput(t *testing.T) {
-	echo := func(cmd *exec.Cmd) string { // what the echo helper read
+// Bound comes before or after a command's input is set, or its
+// StdinPipe taken: the command reads what it was given either way, and
+// NUL, a character device, when it was given nothing.
+func TestBoundInputInAnyOrder(t *testing.T) {
+	stderr := func(cmd *exec.Cmd) string { // what the helper wrote there
 		t.Helper()
-		var read bytes.Buffer
-		cmd.Stderr = &read
+		var b bytes.Buffer
+		cmd.Stderr = &b
 		testcheck.NoErr(t, cmd.Run())
-		return read.String()
+		return strings.TrimSpace(b.String())
 	}
-	cmd := helper(context.Background(), "echo")
-	cmd.Stdin = strings.NewReader("given")
+	piped := func(cmd *exec.Cmd) {
+		in, err := cmd.StdinPipe()
+		testcheck.NoErr(t, err)
+		go func() {
+			_, _ = io.WriteString(in, "piped")
+			_ = in.Close()
+		}()
+	}
+	for _, c := range []struct {
+		name  string
+		input func(*exec.Cmd)
+		want  string
+	}{
+		{"a reader", func(cmd *exec.Cmd) { cmd.Stdin = strings.NewReader("given") }, "given"},
+		{"StdinPipe", piped, "piped"},
+	} {
+		for _, after := range []bool{false, true} {
+			cmd := helper(context.Background(), "echo")
+			if after {
+				Bound(cmd)
+				c.input(cmd)
+			} else {
+				c.input(cmd)
+				Bound(cmd)
+			}
+			if got := stderr(cmd); got != c.want {
+				t.Errorf("%s, Bound after %v: read %q", c.name, !after, got)
+			}
+		}
+	}
+	cmd := helper(context.Background(), "stdin-kind")
 	Bound(cmd)
-	if got := echo(cmd); got != "given" {
-		t.Errorf("read %q", got)
+	if got := stderr(cmd); got != strconv.Itoa(windows.FILE_TYPE_CHAR) {
+		t.Errorf("given nothing, its input's file type is %s, not NUL's", got)
 	}
-	cmd = helper(context.Background(), "echo")
-	Bound(cmd)
-	if got := echo(cmd); got != "" {
-		t.Errorf("given none: read %q", got)
-	}
-	cmd = helper(context.Background(), "echo")
-	in, err := cmd.StdinPipe()
+}
+
+// A cancel that comes once the command has exited, before Wait has
+// taken that, still ends what it left running: its group outlives it,
+// as a Unix group does its leader.
+func TestBoundCancelAfterTheExit(t *testing.T) {
+	cmd := helper(context.Background(), "orphan")
+	out, err := cmd.StdoutPipe()
 	testcheck.NoErr(t, err)
 	Bound(cmd)
-	go func() {
-		_, _ = io.WriteString(in, "piped")
-		_ = in.Close()
-	}()
-	if got := echo(cmd); got != "piped" {
-		t.Errorf("piped: read %q", got)
+	testcheck.NoErr(t, cmd.Start())
+	ping := orphanPing(t, bufio.NewReader(out))
+	testcheck.NoErr(t, cmd.Process.WithHandle(func(h uintptr) {
+		if !gone(windows.Handle(h), 10*time.Second) {
+			t.Fatal("the command didn't exit")
+		}
+	}))
+	if gone(ping, 0) {
+		t.Fatal("the ping ended with the command")
 	}
+	testcheck.NoErr(t, cmd.Cancel())
+	if !gone(ping, 5*time.Second) {
+		t.Error("the ping outlived the cancel")
+	}
+	_ = cmd.Wait()
 }
