@@ -105,8 +105,8 @@ void main() {
     d.dispose();
   });
 
-  testWidgets('a pin of another project opens its chat, and the sidebar '
-      'goes to that project, as for a chat opened elsewhere', (tester) async {
+  testWidgets('a pin of another project opens its chat and the sidebar '
+      'stays on the project picked; off, it goes to the pin’s', (tester) async {
     sidebarProject.value = _ledger;
     final (d, _) = await arrangedSidebar(tester, chats: _chats());
     d.select('a');
@@ -114,24 +114,24 @@ void main() {
     stepChat(d, -1); // the row above: attic's pin
     await tester.pumpAndSettle();
     expect(d.selectedId, 'p');
-    expect(sidebarProject.value, '/Users/me/attic');
-    expect(_mark(tester, 'Keep this', 'attic'), (null, false));
-
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is RailTile && w.tooltip.startsWith('ledger-poc\n'),
-      ),
-    );
-    await tester.pumpAndSettle();
+    expect(sidebarProject.value, _ledger, reason: 'a look in, not a move');
     expect(_mark(tester, 'Keep this', 'attic').$1, '/Users/me/attic');
-    // A tile picked with the chat open stays picked; a click on the pin
-    // after another chat goes to its project again.
+    // Back to the project's own chat, then the pin by a click: the same.
     await tester.tap(_row('Wire the ledger'));
     await tester.pumpAndSettle();
-    expect(sidebarProject.value, _ledger);
     await tester.tap(_row('Keep this'));
     await tester.pumpAndSettle();
     expect(d.selectedId, 'p');
+    expect(sidebarProject.value, _ledger);
+
+    // Off, Pinned is the picked project's only, and the open chat's
+    // project is followed as any other's is.
+    d.select('a');
+    await tester.pumpAndSettle();
+    pinnedEveryProject.value = false;
+    await tester.pumpAndSettle();
+    d.select('p');
+    await tester.pumpAndSettle();
     expect(sidebarProject.value, '/Users/me/attic');
     d.dispose();
   });

@@ -61,7 +61,7 @@ The project rail is a column of larger tiles at the sidebar's left, one for each
 3. Click a project's tile. The sidebar shows only that project's chats.
 4. Click **All projects**, the tile at the top, to see every project again.
 
-Your pinned chats stay at the top whichever project you pick, so you can always see them. A pinned chat from another project shows that project's tile before its title and its name after it. To see only the picked project's pinned chats, turn off **Pinned from every project** in **Settings**, **Appearance**.
+Your pinned chats stay at the top whichever project you pick, so you can always see them. A pinned chat from another project shows that project's tile before its title and its name after it. Opening one doesn't change the project you picked, so you can look in on it and stay where you were. To see only the picked project's pinned chats, turn off **Pinned from every project** in **Settings**, **Appearance**.
 
 To change the projects' order, drag a tile up or down the rail. The sidebar's list takes the same order, as dragging a project's header there changes the rail.
 

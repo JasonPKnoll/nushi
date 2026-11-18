@@ -193,7 +193,10 @@ class _SidebarState extends State<Sidebar> {
   /// that one opens or starts (from the palette, a notification, New
   /// chat), so the open chat's row is never left out of it; to all of
   /// them for a chat with no folder. A tile picked while a chat is open
-  /// stays picked: only a change of chat moves it.
+  /// stays picked: only a change of chat moves it. A pinned chat's row is
+  /// in Pinned whichever project is picked ([pinnedEveryProject]), so
+  /// opening one moves nothing: a look in on a pin, from the project
+  /// being worked in.
   void _follow() {
     final daemon = widget.daemon;
     final opened = daemon.selectedId;
@@ -201,7 +204,10 @@ class _SidebarState extends State<Sidebar> {
     if (opened == _opened && started == _started) return;
     final to = switch ((started, daemon.selected)) {
       (final folder?, _) when started != _started => folder,
-      (_, final chat?) when opened != _opened && !chat.archived =>
+      (_, final chat?)
+          when opened != _opened &&
+              !chat.archived &&
+              !(pinnedEveryProject.value && chat.pin > 0) =>
         chat.scratch ? '' : chat.home,
       _ => null,
     };
