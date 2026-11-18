@@ -136,7 +136,8 @@ const _biBitfields = 3;
 
 /// [dib]'s pixels as straight RGBA rows from the top, with its width and
 /// height: a 24-bit or 32-bit bitmap, uncompressed or masked, either way
-/// up. Null for any other kind, or one too short for its size. A 32-bit
+/// up, past any color table it carries. Null for any other kind, or one
+/// too short for its size. A 32-bit
 /// bitmap whose alpha is 0 everywhere is opaque: apps that draw without
 /// alpha leave it so (a screenshot's `CF_DIB` among them).
 (int, int, Uint8List)? dibPixels(Uint8List dib) {
@@ -147,6 +148,7 @@ const _biBitfields = 3;
   final rawHeight = head.getInt32(8, Endian.little);
   final bits = head.getUint16(14, Endian.little);
   final compression = head.getUint32(16, Endian.little);
+  final used = head.getUint32(32, Endian.little);
   if (headerSize < 40 || width <= 0 || rawHeight == 0) return null;
   if (bits != 24 && bits != 32) return null;
   final height = rawHeight.abs();
@@ -167,6 +169,9 @@ const _biBitfields = 3;
   } else if (compression != _biRgb) {
     return null;
   }
+  // A color table of biClrUsed entries may come before the pixels, even
+  // of a bitmap that doesn't need one.
+  offset += used * 4;
   final stride = (width * bits + 31) ~/ 32 * 4;
   if (dib.length < offset + stride * height) return null;
   final rgba = Uint8List(width * height * 4);

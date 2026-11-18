@@ -13,6 +13,7 @@ Uint8List _dib({
   required int bits,
   required List<int> pixels,
   int compression = 0,
+  int colorsUsed = 0,
   List<int> extra = const [],
 }) {
   final header = ByteData(40)
@@ -21,7 +22,8 @@ Uint8List _dib({
     ..setInt32(8, height, Endian.little)
     ..setUint16(12, 1, Endian.little)
     ..setUint16(14, bits, Endian.little)
-    ..setUint32(16, compression, Endian.little);
+    ..setUint32(16, compression, Endian.little)
+    ..setUint32(32, colorsUsed, Endian.little);
   return Uint8List.fromList([
     ...header.buffer.asUint8List(),
     ...extra,
@@ -64,6 +66,19 @@ void main() {
       pixels: [0, 255, 0, 128, 10, 20, 30, 0],
     );
     expect(dibPixels(clear)!.$3, [0, 255, 0, 128, 30, 20, 10, 0]);
+  });
+
+  test("a 24-bit bitmap's color table (biClrUsed) is skipped, not read "
+      'as pixels', () {
+    final dib = _dib(
+      width: 1,
+      height: 1,
+      bits: 24,
+      colorsUsed: 2,
+      extra: [9, 9, 9, 0, 8, 8, 8, 0],
+      pixels: [3, 2, 1, 0],
+    );
+    expect(dibPixels(dib)!.$3, [1, 2, 3, 255]);
   });
 
   test("BI_BITFIELDS's masks after the header say where each channel "
