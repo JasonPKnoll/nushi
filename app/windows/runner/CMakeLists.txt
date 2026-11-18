@@ -36,7 +36,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 
-# WebView2's SDK (ADR 0135): its headers and static loader, from NuGet's
+# WebView2's SDK (ADR 0134): its headers and static loader, from NuGet's
 # package of the version pinned here, checked by its SHA-256 before it's
 # unpacked into the build folder. The runtime is Windows's own (Edge's).
 set(WEBVIEW2_VERSION "1.0.4258.31")

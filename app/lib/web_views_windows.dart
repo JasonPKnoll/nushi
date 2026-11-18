@@ -8,7 +8,7 @@ import 'package:nushi/web_page.dart';
 import 'package:nushi/web_page_windows.dart';
 import 'package:nushi/web_views.dart';
 
-/// Windows's web views (ADR 0125, 0135): a file's preview and a Mermaid
+/// Windows's web views (ADR 0125, 0134): a file's preview and a Mermaid
 /// file's diagram show in WebView2s of the runner's
 /// (`web_page_windows.dart`, `diagram_page_windows.dart`); a browser tab
 /// is still a placeholder (`outside_page.dart`) whose button opens the
@@ -19,7 +19,7 @@ import 'package:nushi/web_views.dart';
 class WindowsWebViews implements WebViews {
   const new();
 
-  /// Not yet: browser tabs open outside, so a link does too (ADR 0135).
+  /// Not yet: browser tabs open outside, so a link does too (ADR 0134).
   @override
   bool get embedded => false;
 

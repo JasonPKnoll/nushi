@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:nushi/speller.dart';
 
-/// Windows's spell checker (ADR 0135): the Spell Checking API's
+/// Windows's spell checker (ADR 0134): the Spell Checking API's
 /// `ISpellChecker` (`spellcheck.h`), through COM by FFI, the one Windows's
 /// own text boxes check with, in the user's language, over its
 /// dictionaries and the user's own. Ignore lasts the session; Learn adds

@@ -360,7 +360,7 @@ jobs:
 
   windows:
     # The Windows-only tests run on Windows itself (ADR 0124): the processes' job objects and handles, the data
-    # folder's DACL, the app's stop event (ADR 0135), batch-file shims, locks, logs, the shell's environment and
+    # folder's DACL, the app's stop event (ADR 0134), batch-file shims, locks, logs, the shell's environment and
     # Claude's history there; every package's tests build there too, but the rest assume Unix. The daemon is built as
     # the app runs it. Unmeasured yet: 20 until it has run.
     name: Go on Windows
@@ -389,7 +389,7 @@ jobs:
           go test -run 'TestAlive|TestOpenWindows' ./internal/claudehistory
           go test -run 'TestOwnDataFolder|TestStopEvent' ./cmd/nushid
 
-  # The Windows app built (ADR 0125), build only: CI's one compile of its C++ runner (WebView2's host, ADR 0135),
+  # The Windows app built (ADR 0125), build only: CI's one compile of its C++ runner (WebView2's host, ADR 0134),
   # whose first build fetches WebView2's pinned SDK. Nothing of it runs here. Unmeasured yet: 30, as the Linux
   # package's cold build.
   windows-app:

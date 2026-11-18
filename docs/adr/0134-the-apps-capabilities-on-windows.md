@@ -1,4 +1,4 @@
-# 0135. The app's capabilities on Windows
+# 0134. The app's capabilities on Windows
 
 Status: accepted, 2026-11-17. Builds on [0125](0125-the-app-runs-on-windows.md) (the app on Windows), whose stand-ins it replaces one capability at a time; amends it.
 

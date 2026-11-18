@@ -9,7 +9,7 @@ import 'package:nushi/theme/tokens.dart';
 import 'package:nushi/web_page.dart';
 import 'package:nushi/web_view_windows.dart';
 
-// A file's preview on Windows (ADR 0068, 0135): a WebView2 of the runner's
+// A file's preview on Windows (ADR 0068, 0134): a WebView2 of the runner's
 // (`web_view_windows.dart`).
 
 /// A WebView2 serving the page's root folder (the chat's, or the file's

@@ -13,7 +13,7 @@ import 'package:nushi/speller_windows.dart';
 import 'package:nushi/web_views_windows.dart';
 import 'package:nushi/window_drag_windows.dart';
 
-/// Windows's implementation of each native capability (ADR 0125, 0135):
+/// Windows's implementation of each native capability (ADR 0125, 0134):
 /// Explorer, the shell's associations, the clipboard and the spell checker
 /// (none without a dictionary for the user's language) through FFI, no
 /// runner channel of its own yet; notifications, Start at login and web

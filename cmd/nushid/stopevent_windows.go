@@ -22,7 +22,7 @@ func (stopEventSignal) Signal()        {}
 func stopEventName(pid int) string { return fmt.Sprintf(`Local\nushid-%d-stop`, pid) }
 
 // watchStopEvent makes the daemon's stop event and sends on stop once
-// it's set (ADR 0135). Windows has no SIGTERM to send a process with no
+// it's set (ADR 0134). Windows has no SIGTERM to send a process with no
 // console window, and a Windows Unix socket doesn't name the process at
 // its other end, so the app stops its daemon by setting this event, named
 // by the pid the daemon's Ping says. Only the user's own processes can set

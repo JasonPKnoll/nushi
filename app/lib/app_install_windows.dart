@@ -12,7 +12,7 @@ import 'package:nushi/app_log.dart';
 /// itself (ADR 0124). The daemon starts on its own, with the app's
 /// environment and no login shell (Windows has none to start it
 /// through), and logs to its folder itself; it stops by its stop event
-/// (ADR 0135).
+/// (ADR 0134).
 class WindowsAppInstall implements AppInstall {
   /// A test passes the [executable] the app runs as, its [environment],
   /// and what sets a named event in [setEvent].
@@ -102,7 +102,7 @@ class WindowsAppInstall implements AppInstall {
   }
 
   /// By the daemon's stop event, named by the [pid] its Ping said (ADR
-  /// 0135): Windows doesn't name a Unix socket's other end, and a process
+  /// 0134): Windows doesn't name a Unix socket's other end, and a process
   /// with no console window has no SIGTERM. The daemon stops as it does
   /// on one (its agents and terminals closed first). One too old to say
   /// its pid, or one gone, isn't stopped, and the restart that asked says
