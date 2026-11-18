@@ -3,6 +3,7 @@ package procgroup
 import (
 	"errors"
 	"os"
+	"runtime"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -101,9 +102,12 @@ func startTracker() *tracker {
 		_ = windows.CloseHandle(job)
 		return nil
 	}
-	assoc := &jobAssociateCompletionPort{CompletionPort: port} // on the heap, which doesn't move
+	// On the heap, which doesn't move, as the call takes it as a uintptr;
+	// kept alive through the call, which a uintptr doesn't do.
+	assoc := &jobAssociateCompletionPort{CompletionPort: port}
 	_, err = windows.SetInformationJobObject(job, windows.JobObjectAssociateCompletionPortInformation,
-		uintptr(unsafe.Pointer(assoc)), uint32(unsafe.Sizeof(*assoc))) //nolint:gosec // the system's own struct
+		uintptr(unsafe.Pointer(assoc)), uint32(unsafe.Sizeof(*assoc))) //nolint:gosec // the system's own struct, kept alive below
+	runtime.KeepAlive(assoc)
 	if err == nil {
 		err = windows.AssignProcessToJobObject(job, windows.CurrentProcess())
 	}
