@@ -73,7 +73,7 @@ func TestInputOutputAndSize(t *testing.T) {
 	out.wait(t, `42`)
 	testcheck.NoErr(t, term.Resize(100, 30))
 	testcheck.NoErr(t, term.Write([]byte("mode con\r")))
-	out.wait(t, `Columns:\s+100`)
+	out.wait(t, `:\s+100\b`) // "Columns:" in English; the label is the system language's
 	if err := term.Resize(0, 30); err == nil {
 		t.Error("a size of no columns was taken")
 	}
@@ -100,7 +100,7 @@ func TestExitCodeAndReplay(t *testing.T) {
 // Terminate is Ctrl+C to it.
 func TestProgramAndTerminate(t *testing.T) {
 	ignored := ignoresCtrlC()
-	term, out := shell(t)
+	term, _ := shell(t)
 	if ignoresCtrlC() != ignored {
 		t.Errorf("this process ignores Ctrl+C: %v, was %v", ignoresCtrlC(), ignored)
 	}
@@ -112,7 +112,8 @@ func TestProgramAndTerminate(t *testing.T) {
 		t.Errorf("foreground %q", got)
 	}
 	testcheck.NoErr(t, term.Terminate())
-	out.wait(t, `Control-C`)
+	// ping runs 30 s, so its going within Eventually's 5 is Ctrl+C's doing
+	// (what it prints then is in the system's language).
 	if !testcheck.Eventually(func() bool { return term.Program() == "" }) {
 		t.Errorf("program %q after Ctrl+C, want the shell's", term.Program())
 	}
