@@ -149,7 +149,9 @@ void WebViews::Handle(const flutter::MethodCall<EncodableValue>& call,
     view.web->ExecuteScript(
         Wide(*js).c_str(),
         Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
-            [shared](HRESULT hr, LPCWSTR json) -> HRESULT {
+            [shared, alive = alive_](HRESULT hr, LPCWSTR json) -> HRESULT {
+              // Gone with the window: its messenger is too.
+              if (!*alive) return S_OK;
               if (FAILED(hr) || json == nullptr) {
                 shared->Error("script", "The script didn't run");
               } else {
