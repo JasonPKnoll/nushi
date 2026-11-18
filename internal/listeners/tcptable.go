@@ -42,15 +42,18 @@ func parseTCPTable(b []byte, v6 bool) ([]ownedSocket, error) {
 	if len(b) < 4 {
 		return nil, errShortTable
 	}
-	n := int(binary.LittleEndian.Uint32(b))
+	count := binary.LittleEndian.Uint32(b)
 	rowLen := tcpRowLen
 	if v6 {
 		rowLen = tcp6RowLen
 	}
 	rows := b[4:]
-	if n > len(rows)/rowLen {
+	// Compared before it is an int, which on 32-bit Windows a count of
+	// 2^31 or more would wrap below 0.
+	if uint64(count) > uint64(len(rows)/rowLen) {
 		return nil, errShortTable
 	}
+	n := int(count)
 	out := make([]ownedSocket, 0, n)
 	for i := range n {
 		r := rows[i*rowLen : (i+1)*rowLen]

@@ -71,6 +71,9 @@ func TestParseTCPTableShort(t *testing.T) {
 		"empty":          nil,
 		"a row short":    table(tcpRow(mibTCPStateListen, "127.0.0.1", 1, 0, 1))[:4+tcpRowLen-1],
 		"count too high": append(binary.LittleEndian.AppendUint32(nil, 2), tcpRow(mibTCPStateListen, "127.0.0.1", 1, 0, 1)...),
+		// Below 0 as a 32-bit int, which once slipped past the check there.
+		"count of 2^31":   append(binary.LittleEndian.AppendUint32(nil, 1<<31), tcpRow(mibTCPStateListen, "127.0.0.1", 1, 0, 1)...),
+		"count of 2^32-1": append(binary.LittleEndian.AppendUint32(nil, 1<<32-1), tcpRow(mibTCPStateListen, "127.0.0.1", 1, 0, 1)...),
 	} {
 		if _, err := parseTCPTable(b, false); !errors.Is(err, errShortTable) {
 			t.Errorf("%s: %v", name, err)
@@ -79,6 +82,40 @@ func TestParseTCPTableShort(t *testing.T) {
 	if socks, err := parseTCPTable(table(), true); err != nil || len(socks) != 0 {
 		t.Errorf("no rows: %v, %v", socks, err)
 	}
+}
+
+// FuzzParseTCPTable feeds the parser any bytes, as either table: it never
+// panics, and what it reads is at most the rows the bytes hold, each
+// listening on a port. It runs as a test on every OS (the parser is plain
+// Go); go test -fuzz=FuzzParseTCPTable searches further.
+func FuzzParseTCPTable(f *testing.F) {
+	f.Add(table(tcpRow(mibTCPStateListen, "127.0.0.1", 7990, 0xbeef, 4120), tcpRow(5, "127.0.0.1", 7991, 0, 4120)), false)
+	f.Add(table(tcp6Row(mibTCPStateListen, "::1", 7991, 4120), tcp6Row(mibTCPStateListen, "::ffff:127.0.0.1", 8080, 77)), true)
+	f.Add(table(), true)
+	f.Add([]byte{}, false)
+	f.Add(append(binary.LittleEndian.AppendUint32(nil, 1<<31), tcpRow(mibTCPStateListen, "127.0.0.1", 1, 0, 1)...), false)
+	f.Add(append(binary.LittleEndian.AppendUint32(nil, 1<<32-1), tcp6Row(mibTCPStateListen, "::1", 1, 1)...), true)
+	f.Fuzz(func(t *testing.T, b []byte, v6 bool) {
+		socks, err := parseTCPTable(b, v6)
+		if err != nil {
+			if !errors.Is(err, errShortTable) {
+				t.Fatalf("an error not errShortTable: %v", err)
+			}
+			return
+		}
+		rowLen := tcpRowLen
+		if v6 {
+			rowLen = tcp6RowLen
+		}
+		if rows := (len(b) - 4) / rowLen; len(socks) > rows || uint64(len(socks)) > uint64(binary.LittleEndian.Uint32(b)) {
+			t.Fatalf("%d sockets from %d bytes", len(socks), len(b))
+		}
+		for _, s := range socks {
+			if s.Addr.Port() == 0 || !s.Addr.IsValid() {
+				t.Fatalf("a socket with no port: %v", s)
+			}
+		}
+	})
 }
 
 // TestTableListeners takes the rows Windows 11 listed on 2026-11-17 for
