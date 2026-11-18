@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -130,4 +131,12 @@ void main() {
     image.dispose();
     codec.dispose();
   });
+
+  test("Windows's clipboard is read on an isolate of its own, whatever it "
+      'holds (read, never changed)', () async {
+    const clipboard = WindowsClipboardFiles();
+    expect(await clipboard.files(), isA<List<String>>());
+    final png = await clipboard.image();
+    if (png != null) expect(png.sublist(1, 4), 'PNG'.codeUnits);
+  }, skip: !Platform.isWindows);
 }

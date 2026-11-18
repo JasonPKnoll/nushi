@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -12,44 +13,34 @@ import 'package:nushi/clipboard_files.dart';
 /// (`CF_DIB`, which a screenshot is and Windows makes of any other
 /// bitmap), drawn as PNG by the engine. A clipboard another app holds
 /// open, or one that can't be read, gives nothing, as an empty one does.
+///
+/// It's read on an isolate of its own, never the window's: a format an app
+/// renders only when asked (Office, a browser, a remote desktop's window)
+/// keeps `GetClipboardData` waiting on that app, for good if it hangs. A
+/// read that takes longer than [_wait] gives nothing; its isolate ends when
+/// the call returns.
 class WindowsClipboardFiles implements ClipboardFiles {
   const new();
 
   @override
-  Future<List<String>> files() async {
-    if (!_user32.providesSymbol('OpenClipboard') ||
-        !_shell32.providesSymbol('DragQueryFileW')) {
-      return const [];
-    }
-    return _opened<List<String>>(() {
-          if (_isAvailable(_cfHdrop) == 0) return const <String>[];
-          final drop = _getData(_cfHdrop);
-          if (drop == nullptr) return const <String>[];
-          final count = _dragQueryFile(drop, _all, nullptr, 0);
-          return [for (var i = 0; i < count; i++) ?_dropped(drop, i)];
-        }) ??
-        const [];
-  }
+  Future<List<String>> files() async =>
+      await _off(_readFiles) ?? const <String>[];
 
   @override
   Future<Uint8List?> image() async {
-    if (!_user32.providesSymbol('OpenClipboard')) return null;
-    final copied = _opened<(Uint8List, bool)?>(() {
-      if (_isAvailable(_cfUnicodeText) != 0) return null;
-      final png = _registerFormat(_wide('PNG').address);
-      if (png != 0 && _isAvailable(png) != 0) {
-        if (_global(png) case final bytes?) return (bytes, true);
-      }
-      if (_isAvailable(_cfDib) != 0) {
-        if (_global(_cfDib) case final bytes?) return (bytes, false);
-      }
-      return null;
-    });
+    final copied = await _off(_readImage);
     if (copied == null) return null;
-    final (bytes, isPng) = copied;
-    if (isPng) return bytes;
     try {
-      return await dibAsPng(bytes);
+      return switch (copied) {
+        (final png?, _, _) => png,
+        (_, (final width, final height, final rgba)?, _) => await rgbaAsPng(
+          width,
+          height,
+          rgba,
+        ),
+        (_, _, final dib?) => await dibAsPng(dib),
+        _ => null,
+      };
     } on Object catch (e) {
       appLog.warn("the clipboard's picture wasn't read", {
         'error': e.runtimeType.toString(),
@@ -57,6 +48,63 @@ class WindowsClipboardFiles implements ClipboardFiles {
       return null;
     }
   }
+}
+
+/// How long a paste waits for the clipboard before it gives nothing.
+const _wait = Duration(seconds: 5);
+
+/// What [read] gives on an isolate of its own, or null when it fails or
+/// takes longer than [_wait].
+Future<T?> _off<T extends Object>(T? Function() read) async {
+  try {
+    return await Isolate.run(read).timeout(_wait, onTimeout: () => null);
+  } on Object catch (e) {
+    appLog.warn("the clipboard wasn't read", {
+      'error': e.runtimeType.toString(),
+    });
+    return null;
+  }
+}
+
+/// The clipboard's copied files, on the isolate that reads it.
+List<String>? _readFiles() {
+  if (!_user32.providesSymbol('OpenClipboard') ||
+      !_shell32.providesSymbol('DragQueryFileW')) {
+    return null;
+  }
+  return _opened(() {
+    if (_isAvailable(_cfHdrop) == 0) return const <String>[];
+    final drop = _getData(_cfHdrop);
+    if (drop == nullptr) return const <String>[];
+    final count = _dragQueryFile(drop, _all, nullptr, 0);
+    return [for (var i = 0; i < count; i++) ?_dropped(drop, i)];
+  });
+}
+
+/// The clipboard's picture, on the isolate that reads it: a PNG as it is,
+/// a bitmap's pixels read here ([dibPixels]), or any other bitmap for the
+/// engine to read; null without one, or while it holds text.
+(Uint8List?, (int, int, Uint8List)?, Uint8List?)? _readImage() {
+  if (!_user32.providesSymbol('OpenClipboard')) return null;
+  final copied = _opened<(Uint8List, bool)?>(() {
+    if (_isAvailable(_cfUnicodeText) != 0) return null;
+    final png = _registerFormat(_wide('PNG').address);
+    if (png != 0 && _isAvailable(png) != 0) {
+      if (_global(png) case final bytes?) return (bytes, true);
+    }
+    if (_isAvailable(_cfDib) != 0) {
+      if (_global(_cfDib) case final bytes?) return (bytes, false);
+    }
+    return null;
+  });
+  return switch (copied) {
+    null => null,
+    (final png, true) => (png, null, null),
+    (final dib, false) => switch (dibPixels(dib)) {
+      final pixels? => (null, pixels, null),
+      null => (null, null, dib),
+    },
+  };
 }
 
 /// What [read] gives from the clipboard, opened for it and closed after,
@@ -102,21 +150,29 @@ Uint16List _wide(String text) => Uint16List.fromList([...text.codeUnits, 0]);
 /// palette, then its pixels), as PNG: its 24- and 32-bit pixels read here
 /// ([dibPixels]), any other kind as a BMP file the engine reads.
 Future<Uint8List?> dibAsPng(Uint8List dib) async {
-  final ui.Codec codec;
   if (dibPixels(dib) case (final width, final height, final rgba)) {
-    final buffer = await ui.ImmutableBuffer.fromUint8List(rgba);
-    final descriptor = ui.ImageDescriptor.raw(
-      buffer,
-      width: width,
-      height: height,
-      pixelFormat: ui.PixelFormat.rgba8888,
-    );
-    codec = await descriptor.instantiateCodec();
-  } else if (dibAsBmp(dib) case final bmp?) {
-    codec = await ui.instantiateImageCodec(bmp);
-  } else {
-    return null;
+    return await rgbaAsPng(width, height, rgba);
   }
+  if (dibAsBmp(dib) case final bmp?) {
+    return await _asPng(await ui.instantiateImageCodec(bmp));
+  }
+  return null;
+}
+
+/// [rgba], straight RGBA rows of [width] by [height], as PNG.
+Future<Uint8List?> rgbaAsPng(int width, int height, Uint8List rgba) async {
+  final buffer = await ui.ImmutableBuffer.fromUint8List(rgba);
+  final descriptor = ui.ImageDescriptor.raw(
+    buffer,
+    width: width,
+    height: height,
+    pixelFormat: ui.PixelFormat.rgba8888,
+  );
+  return await _asPng(await descriptor.instantiateCodec());
+}
+
+/// [codec]'s first frame as PNG, the codec disposed after.
+Future<Uint8List?> _asPng(ui.Codec codec) async {
   try {
     final image = (await codec.getNextFrame()).image;
     try {
