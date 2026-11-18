@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 	"unsafe"
@@ -41,6 +42,7 @@ type sys struct {
 	conIn         *os.File // written: what the program reads
 	conOut        *os.File // read: what the program writes
 	began         time.Time
+	killed        atomic.Bool // hangUp killed the program, so its code is -1 as a signal's is on Unix
 }
 
 // ctrlC is what typing Ctrl+C sends: ConPTY makes it the console's
@@ -265,8 +267,8 @@ func (t *Terminal) closeConsole() {
 // pseudo-console is closed then: its output pipe doesn't end before.
 func (t *Terminal) waitProgram() int {
 	code := -1
-	if st, err := t.proc.Wait(); err == nil {
-		code = st.ExitCode()
+	if st, err := t.proc.Wait(); err == nil && !t.killed.Load() {
+		code = st.ExitCode() // TerminateProcess's 1 for a program killed outright
 	}
 	t.closeConsole()
 	return code
@@ -332,6 +334,7 @@ func (t *Terminal) hangUp() {
 	select {
 	case <-t.done:
 	case <-time.After(grace):
+		t.killed.Store(true)
 		_ = t.proc.Kill()
 		<-t.done
 	}

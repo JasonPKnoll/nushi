@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -25,7 +26,18 @@ import (
 // does.
 const detachEnv = "NUSHI_TERMINAL_DETACH"
 
+// ignoreCloseEnv makes this test binary, run again in a terminal, ignore
+// the console's close (CTRL_CLOSE_EVENT, which Go makes SIGTERM) and
+// sleep: a shell Close must kill after the grace.
+const ignoreCloseEnv = "NUSHI_TERMINAL_IGNORE_CLOSE"
+
 func init() { //nolint:gochecknoinits // the binary run again as a child turns into it before any test, as TestMain's sleeper does; TestMain is Unix's too
+	if os.Getenv(ignoreCloseEnv) == "1" {
+		signal.Notify(make(chan os.Signal, 1), syscall.SIGTERM)
+		_, _ = fmt.Fprintln(os.Stdout, "ignoring-close")
+		time.Sleep(time.Minute)
+		os.Exit(0)
+	}
 	if os.Getenv(detachEnv) != "1" {
 		return
 	}
@@ -248,5 +260,23 @@ func TestFailedStartReturns(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("Start didn't return")
+	}
+}
+
+// A program that outlives Close's grace is killed, and its exit code is
+// -1, as a program killed by a signal has on Unix, not
+// TerminateProcess's 1.
+func TestCloseKillsWhatIgnoresIt(t *testing.T) {
+	exe, err := os.Executable()
+	testcheck.NoErr(t, err)
+	out := &output{}
+	term, err := Start([]string{exe}, t.TempDir(), append(os.Environ(), ignoreCloseEnv+"=1"), 80, 24, func() {})
+	testcheck.NoErr(t, err)
+	t.Cleanup(term.Close)
+	go term.Attach(nil, func(b []byte) bool { out.add(b); return true })
+	out.wait(t, `ignoring-close`)
+	term.Close()
+	if exited, code := term.Exit(); !exited || code != -1 {
+		t.Errorf("exit %v %d, want true -1", exited, code)
 	}
 }

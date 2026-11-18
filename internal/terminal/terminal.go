@@ -37,7 +37,7 @@ type Terminal struct {
 	output  []byte // the last output, about scrollback bytes of it
 	subs    map[*sub]struct{}
 	program string // the foreground program's command line, if not the shell
-	code    int    // the exit code, once done (-1: killed by a signal)
+	code    int    // the exit code, once done (-1: killed by a signal, or by Close on Windows)
 }
 
 type sub struct {
