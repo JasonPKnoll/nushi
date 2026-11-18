@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nushi/mermaid_windows.dart';
 import 'package:nushi/web_page_windows.dart';
+import 'package:nushi/web_view_windows.dart';
 
 void main() {
   test("a page is served from the chat's folder when it's inside, else "
@@ -24,9 +25,18 @@ void main() {
 
   test('each root is its own host, under the reserved .example', () {
     final one = pageHost(r'C:\Work\app');
-    expect(one, matches(RegExp(r'^p[0-9a-f]{8}\.nushi\.example$')));
+    expect(one, matches(RegExp(r'^p[0-9a-f]{16}\.nushi\.example$')));
     expect(pageHost(r'c:\work\APP'), one);
     expect(pageHost(r'C:\Work\other'), isNot(one));
+  });
+
+  test("the web views' folder is beside the data folder, never in it, a "
+      'separator at its end aside', () {
+    const beside = r'C:\nd.WebView2';
+    expect(webViewFolder(r'C:\nd'), beside);
+    expect(webViewFolder(r'C:\nd\'), beside);
+    expect(webViewFolder(r'C:\nd\\'), beside);
+    expect(webViewFolder('C:/nd/'), 'C:/nd.WebView2');
   });
 
   test("a page's address names it under its root, each name encoded, and "

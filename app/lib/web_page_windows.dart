@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:nushi/daemon.dart' show dataDir;
 import 'package:nushi/outside_page.dart';
@@ -92,12 +94,10 @@ String servedRoot(String path, String root) {
 /// two folders don't share an origin (their storage, while the web view
 /// lasts). `.example` is reserved: no real site has it.
 String pageHost(String root) {
-  // FNV-1a, 32 bits, over the root's UTF-16, case aside.
-  var hash = 0x811c9dc5;
-  for (final unit in root.toLowerCase().codeUnits) {
-    hash = ((hash ^ unit) * 0x01000193) & 0xffffffff;
-  }
-  return 'p${hash.toRadixString(16).padLeft(8, '0')}.nushi.example';
+  // SHA-256's first 64 bits over the root, case aside: two roots can't
+  // be made to share a host (a 32-bit hash's collision is easy to find).
+  final hash = sha256.convert(utf8.encode(root.toLowerCase()));
+  return 'p${'$hash'.substring(0, 16)}.nushi.example';
 }
 
 /// What the default browser opens for [to], an address a page served

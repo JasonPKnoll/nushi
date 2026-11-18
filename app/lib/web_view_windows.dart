@@ -299,8 +299,11 @@ bool _paints(RenderBox node) => switch (node) {
 /// folder (`%LOCALAPPDATA%\Nushi.WebView2`), not in it. Chromium gives its
 /// cache folders access entries of their own, and the daemon won't start
 /// on a data folder with such an entry (ADR 0124); nor is the app's
-/// folder writable once installed.
-String webViewFolder(String dataFolder) => '$dataFolder.WebView2';
+/// folder writable once installed. A data folder named with a separator
+/// at its end (`NUSHI_DATA=C:\nd\`) is the same folder: its trailing
+/// separators go, or the web views' folder would be inside it.
+String webViewFolder(String dataFolder) =>
+    '${dataFolder.replaceFirst(RegExp(r'[\\/]+$'), '')}.WebView2';
 
 /// The app's bundled mermaid assets (`assets/mermaid/`), as Flutter puts
 /// them beside `nushi.exe`.
