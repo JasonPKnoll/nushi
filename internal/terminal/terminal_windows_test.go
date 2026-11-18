@@ -109,14 +109,15 @@ func TestProgramAndTerminate(t *testing.T) {
 	}
 }
 
-// What the shell started in the background ends with Close too: it's in
-// the terminal's job.
+// What the shell started in the background, still attached to the
+// terminal's console, ends with Close too: closing the pseudo-console sends
+// it CTRL_CLOSE_EVENT, as a hangup reaches a Unix job.
 func TestCloseKillsChildren(t *testing.T) {
 	term, out := shell(t)
 	exe, err := os.Executable()
 	testcheck.NoErr(t, err)
-	// A child in the background, which outlives its shell unless the job
-	// ends it.
+	// A child in the background, on the console: Close ends it, not the
+	// shell's exit.
 	testcheck.NoErr(t, term.Write([]byte("set "+sleeperEnv+"=1& start /b \"\" \""+exe+"\"\r")))
 	pid, _ := strconv.Atoi(out.wait(t, `sleeper=(\d+)\r\n`)[1])
 	if ps, _ := (proctree.Tree{}).Under(term.Pid()); !slices.ContainsFunc(ps, func(p model.Process) bool { return p.Pid == pid }) {

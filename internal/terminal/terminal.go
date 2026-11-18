@@ -1,8 +1,7 @@
 // Package terminal runs a program (a shell) in a pseudo-terminal and keeps
 // its recent output, so a client can attach, leave and attach again. On
 // Unix the pseudo-terminal is a pty device (terminal_unix.go); on Windows
-// it is ConPTY's pseudo-console, with the program's tree in a job object
-// (terminal_windows.go, ADR 0132).
+// it is ConPTY's pseudo-console (terminal_windows.go, ADR 0132).
 package terminal
 
 import (
@@ -169,7 +168,8 @@ func commandLine(pid int) string {
 }
 
 // Pid is the program's process id: on Unix it leads the terminal's session
-// and its own process group; on Windows its job holds what it starts.
+// and its own process group; Windows has neither, and what it starts is
+// found by its parent ids (proctree).
 func (t *Terminal) Pid() int { return t.proc.Pid }
 
 // Name is the shell's name, as a terminal's tab shows it (ShellName).
@@ -253,6 +253,8 @@ func (t *Terminal) Attach(stop <-chan struct{}, fn func([]byte) bool) {
 // later ones wait for it: once the master is closed the device is free, and
 // the next terminal opened on this Mac (another test's shell, a Terminal.app
 // tab) may be given it, so listing what runs on it then would find theirs.
-// On Windows the pseudo-console is closed (CTRL_CLOSE_EVENT to what is
-// attached to it), and what still runs after the grace is ended with its job.
+// On Windows the pseudo-console is closed: what is attached to it gets
+// CTRL_CLOSE_EVENT and is ended, what left it (a detached program, a GUI
+// app's window) lives on, and the program itself is killed should it still
+// run after the grace.
 func (t *Terminal) Close() { t.closing.Do(t.hangUp) }
