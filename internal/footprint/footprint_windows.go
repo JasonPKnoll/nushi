@@ -1,6 +1,7 @@
 package footprint
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"unsafe"
@@ -35,7 +36,7 @@ type processMemoryCountersEx struct {
 // counts none of it twice. 0 when it can't be read: gone, or one the
 // user can't open (a service's, a protected process).
 func Of(pid int) uint64 {
-	if pid <= 0 || uint64(pid) > math.MaxUint32 {
+	if pid <= 0 || uint64(pid) > math.MaxUint32 || getProcessMemoryInfo.Find() != nil { // Call would panic
 		return 0
 	}
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
@@ -59,6 +60,9 @@ func Of(pid int) uint64 {
 // Starts are read only as a walk down from a process asks (Tree,
 // Children), each once, not every process's at each snapshot.
 func Snapshot() (Processes, error) {
+	if err := getProcessMemoryInfo.Find(); err != nil { // no memory to read: the app stops asking
+		return Processes{}, fmt.Errorf("reading memory: %w: %w", errors.ErrUnsupported, err)
+	}
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return Processes{}, fmt.Errorf("listing processes: %w", err)

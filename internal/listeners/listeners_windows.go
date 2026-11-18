@@ -44,6 +44,9 @@ func List() ([]Listener, error) {
 // growing the buffer while the table outgrows it (a few times at most: it
 // can grow between the calls).
 func tcpTable(af uint32) ([]byte, error) {
+	if err := getExtendedTCPTable.Find(); err != nil { // Call would panic
+		return nil, fmt.Errorf("GetExtendedTcpTable: %w", err)
+	}
 	size := uint32(4096)
 	for range 4 {
 		b := make([]byte, size)

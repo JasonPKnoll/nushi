@@ -1,11 +1,29 @@
 package footprint
 
 import (
+	"errors"
 	"os"
 	"runtime"
 	"slices"
 	"testing"
+
+	"golang.org/x/sys/windows"
 )
+
+// Without GetProcessMemoryInfo (a system that lacks it, as here a name
+// psapi doesn't have), Of reads 0 and Snapshot says memory isn't read
+// here, where calling it would panic.
+func TestNoMemoryInfo(t *testing.T) {
+	had := getProcessMemoryInfo
+	t.Cleanup(func() { getProcessMemoryInfo = had })
+	getProcessMemoryInfo = windows.NewLazySystemDLL("psapi.dll").NewProc("NushiNoSuchFunction")
+	if n := Of(os.Getpid()); n != 0 {
+		t.Errorf("Of = %d", n)
+	}
+	if _, err := Snapshot(); !errors.Is(err, errors.ErrUnsupported) {
+		t.Errorf("Snapshot: %v", err)
+	}
+}
 
 // Of counts memory this process takes for itself: 64 MiB more once it
 // has written that much.

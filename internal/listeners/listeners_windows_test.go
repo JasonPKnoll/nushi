@@ -8,11 +8,24 @@ import (
 	"strconv"
 	"testing"
 
+	"golang.org/x/sys/windows"
+
 	"github.com/afrase/nushi/internal/testcheck"
 )
 
 // These tests check what is Windows' own; the rest are in
 // listeners_test.go and tcptable_test.go.
+
+// Without GetExtendedTcpTable (a system that lacks it, as here a name
+// iphlpapi doesn't have), List fails, where calling it would panic.
+func TestListWithoutTheTable(t *testing.T) {
+	had := getExtendedTCPTable
+	t.Cleanup(func() { getExtendedTCPTable = had })
+	getExtendedTCPTable = windows.NewLazySystemDLL("iphlpapi.dll").NewProc("NushiNoSuchFunction")
+	if _, err := List(); err == nil {
+		t.Error("List didn't fail")
+	}
+}
 
 // TestListReadsMany lists every listener of a process holding more than
 // the table's first buffer has room for (4096 bytes: 170 IPv4 rows).
