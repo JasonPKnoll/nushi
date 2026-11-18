@@ -65,6 +65,9 @@ class WebViews {
   bool environment_asked_ = false;
   std::vector<Ready> waiting_;
   std::map<int64_t, std::shared_ptr<View>> views_;
+  // False once this is gone: WebView2's callbacks hold it, not |this|, as
+  // the environment can finish being made after the window has closed.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 #endif  // RUNNER_WEB_VIEWS_H_

@@ -75,6 +75,7 @@ WebViews::WebViews(flutter::BinaryMessenger* messenger, HWND parent)
 }
 
 WebViews::~WebViews() {
+  *alive_ = false;
   channel_->SetMethodCallHandler(nullptr);
   for (auto& [id, view] : views_) {
     view->closed = true;
@@ -238,7 +239,9 @@ void WebViews::WithEnvironment(const std::wstring& folder, Ready ready) {
   HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
       nullptr, folder.c_str(), options.Get(),
       Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-          [this](HRESULT hr, ICoreWebView2Environment* env) -> HRESULT {
+          [this, alive = alive_](HRESULT hr,
+                                 ICoreWebView2Environment* env) -> HRESULT {
+            if (!*alive) return S_OK;
             environment_ = env;
             environment_error_ = FAILED(hr) ? hr : (env ? S_OK : E_FAIL);
             auto waiting = std::move(waiting_);
@@ -264,8 +267,12 @@ void WebViews::Watch(int64_t id, ICoreWebView2* web) {
   EventRegistrationToken token;
   web->add_NavigationStarting(
       Callback<ICoreWebView2NavigationStartingEventHandler>(
-          [this, id](ICoreWebView2*,
-                     ICoreWebView2NavigationStartingEventArgs* args) {
+          [this, id, alive = alive_](
+              ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args) {
+            if (!*alive) {
+              args->put_Cancel(TRUE);
+              return S_OK;
+            }
             std::wstring url = Take([&] {
               LPWSTR s = nullptr;
               args->get_Uri(&s);
@@ -286,9 +293,10 @@ void WebViews::Watch(int64_t id, ICoreWebView2* web) {
       &token);
   web->add_NewWindowRequested(
       Callback<ICoreWebView2NewWindowRequestedEventHandler>(
-          [this, id](ICoreWebView2*,
-                     ICoreWebView2NewWindowRequestedEventArgs* args) {
+          [this, id, alive = alive_](
+              ICoreWebView2*, ICoreWebView2NewWindowRequestedEventArgs* args) {
             args->put_Handled(TRUE);  // no window of its own
+            if (!*alive) return S_OK;
             BOOL user = FALSE;
             args->get_IsUserInitiated(&user);
             LPWSTR s = nullptr;
@@ -305,8 +313,10 @@ void WebViews::Watch(int64_t id, ICoreWebView2* web) {
       &token);
   web->add_NavigationCompleted(
       Callback<ICoreWebView2NavigationCompletedEventHandler>(
-          [this, id](ICoreWebView2* sender,
-                     ICoreWebView2NavigationCompletedEventArgs* args) {
+          [this, id, alive = alive_](
+              ICoreWebView2* sender,
+              ICoreWebView2NavigationCompletedEventArgs* args) {
+            if (!*alive) return S_OK;
             BOOL ok = FALSE;
             args->get_IsSuccess(&ok);
             LPWSTR s = nullptr;
