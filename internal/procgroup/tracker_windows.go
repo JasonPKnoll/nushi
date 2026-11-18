@@ -202,13 +202,19 @@ func dequeue(port windows.Handle) (msg, pid uint32, err error) {
 
 // created notes a new process in its parent's group, or a new group when
 // its parent is this process, and kills it when that group was killed. One
-// that has already gone, and can't be opened, isn't noted.
+// that has already gone, and can't be opened, isn't noted, nor is one the
+// pid names now that isn't in the job: the process told of has gone and
+// its pid is another's, on which no terminate-capable handle is held.
 func (t *tracker) created(pid uint32) {
 	if pid == t.self {
 		return
 	}
 	h, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
+		return
+	}
+	if in, err := inJob(h, t.job); err != nil || !in {
+		_ = windows.CloseHandle(h)
 		return
 	}
 	started := startOf(h)

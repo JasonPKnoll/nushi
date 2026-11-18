@@ -44,3 +44,24 @@ func TestTrackerAllowsBreakaway(t *testing.T) {
 		}
 	}
 }
+
+// A pid told of that names a process outside the job (the one told of
+// has gone, and its pid is another's) isn't tracked.
+func TestTrackerSkipsAPidOutsideTheJob(t *testing.T) {
+	tr := theTrackerOrFail(t)
+	cmd := exec.Command("ping", "-n", "30", "127.0.0.1")
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_BREAKAWAY_FROM_JOB}
+	testcheck.NoErr(t, cmd.Start())
+	defer func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
+	pid := uint32(cmd.Process.Pid) //nolint:gosec // a Windows pid is 32-bit
+	tr.created(pid)
+	tr.mu.Lock()
+	_, tracked := tr.procs[pid]
+	tr.mu.Unlock()
+	if tracked {
+		t.Error("a process outside the job was tracked")
+	}
+}
