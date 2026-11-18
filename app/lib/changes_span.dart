@@ -75,22 +75,9 @@ class ChangeSpan {
   static Future<ChangeSpan> of(Daemon daemon, ChatState chat) async {
     final client = daemon.client;
     final folder = chat.folder;
-    var wtBase = chat.worktree?.base ?? '';
-    GetFolderStatusResponse status;
-    try {
-      status = await client.getFolderStatus(
-        GetFolderStatusRequest(folder: folder, base: wtBase),
-      );
-    } on Object {
-      if (wtBase.isEmpty) rethrow;
-      // Its base branch is gone (merged and deleted, say): from the commit
-      // it started from, else (an older worktree) the default branch.
-      wtBase = chat.worktree!.baseCommit;
-      status = await client.getFolderStatus(
-        GetFolderStatusRequest(folder: folder, base: wtBase),
-      );
-    }
-    final base = wtBase.isNotEmpty ? wtBase : status.defaultBase;
+    final found = await branchBase(daemon, chat);
+    final base = found.base;
+    var status = found.status;
     final scopes = ChangeSpan(folder, Scope.uncommitted, base, status).scopes;
     final picked = Scope.values.where((s) => s.name == chat.scope).firstOrNull;
     final scope = scopes.contains(picked)
@@ -99,7 +86,7 @@ class ChangeSpan {
         ? Scope.branch
         : Scope.uncommitted;
     final countFrom = scope == Scope.branch ? base : '';
-    if (status.git && countFrom != wtBase) {
+    if (status.git && countFrom != found.counted) {
       status = await client.getFolderStatus(
         GetFolderStatusRequest(folder: folder, base: countFrom),
       );
@@ -110,6 +97,34 @@ class ChangeSpan {
       ListCommitsRequest(folder: folder, base: span.onBase ? '' : base),
     );
     return ChangeSpan(folder, scope, base, status, commits: commits.commits);
+  }
+
+  /// The branch [chat]'s Branch view counts from, as [of] finds it: its
+  /// worktree's base, else (that branch gone, merged and deleted say) the
+  /// commit the worktree started from, else (an older worktree, or none)
+  /// the repository's default branch; '' if there's none. With the
+  /// folder's status counted from `counted`, the worktree's base asked
+  /// ('' for none). A file's change marks count from the same base (ADR
+  /// 0131), so they and Branch never disagree.
+  static Future<({String base, String counted, GetFolderStatusResponse status})>
+  branchBase(Daemon daemon, ChatState chat) async {
+    final client = daemon.client;
+    final folder = chat.folder;
+    var counted = chat.worktree?.base ?? '';
+    GetFolderStatusResponse status;
+    try {
+      status = await client.getFolderStatus(
+        GetFolderStatusRequest(folder: folder, base: counted),
+      );
+    } on Object {
+      if (counted.isEmpty) rethrow;
+      counted = chat.worktree!.baseCommit;
+      status = await client.getFolderStatus(
+        GetFolderStatusRequest(folder: folder, base: counted),
+      );
+    }
+    final base = counted.isNotEmpty ? counted : status.defaultBase;
+    return (base: base, counted: counted, status: status);
   }
 
   /// Reads related worktree [w] of [chat], only ever for a click: what shows
