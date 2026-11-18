@@ -9,7 +9,7 @@ import (
 
 // Windows has no login shell, so a terminal opens the shell the user
 // chose where Windows does: Windows Terminal's default profile, as a new
-// tab there would (ADR 0130). This file reads its settings, JSON with
+// tab there would (ADR 0132). This file reads its settings, JSON with
 // comments, on any OS, so CI's Linux job tests it; termshell_windows.go
 // finds the files and starts what it names.
 

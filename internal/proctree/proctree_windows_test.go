@@ -114,3 +114,32 @@ func TestArgsOfNoProcess(t *testing.T) {
 		t.Errorf("Args(0) = %q", got)
 	}
 }
+
+// Windows has no SIGTERM, so Stop ends a process at once rather than
+// waiting out a grace for an ask it couldn't send.
+func TestStopWaitsNoGraceOnWindows(t *testing.T) {
+	defer func(g time.Duration) { Grace = g }(Grace)
+	Grace = time.Minute
+	p, err := (Tree{}).Get(sleeper(t).Process.Pid)
+	testcheck.NoErr(t, err)
+	began := time.Now()
+	(Tree{}).Stop([]model.Process{p})
+	if took := time.Since(began); took > 10*time.Second {
+		t.Errorf("Stop took %v", took)
+	}
+	if !testcheck.Eventually(func() bool { _, err := (Tree{}).Get(p.Pid); return err != nil }) {
+		t.Error("the process still runs")
+	}
+}
+
+// Children lists what a process started, and nothing below that.
+func TestChildren(t *testing.T) {
+	cmd := sleeper(t)
+	if !testcheck.Eventually(func() bool {
+		kids, err := (Tree{}).Children(os.Getpid())
+		testcheck.NoErr(t, err)
+		return slices.ContainsFunc(kids, func(p model.Process) bool { return p.Pid == cmd.Process.Pid && !p.Started.IsZero() && p.Args == nil })
+	}) {
+		t.Error("the child isn't listed, with its start and no command line")
+	}
+}

@@ -5,8 +5,9 @@
 // kern.proc.all and a command line is kern.procargs2, readable for the
 // user's own processes (proctree_darwin.go); on Linux both come from
 // /proc, each process's stat and cmdline (proctree_linux.go, through
-// procfs); on Windows a Toolhelp snapshot and NtQueryInformationProcess,
-// with no process groups, and a process ended only outright
+// procfs); on Windows the system's process list and
+// NtQueryInformationProcess, with no process groups, and a process ended
+// only outright
 // (proctree_windows.go, signal_windows.go, ADR 0132). Another OS reads no
 // processes (proctree_other.go, ADR 0097).
 package proctree
@@ -64,6 +65,23 @@ func (Tree) Under(root int) ([]model.Process, error) {
 	out := under(ps, root)
 	for i := range out {
 		out[i].Args = Args(out[i].Pid)
+	}
+	return out, nil
+}
+
+// Children lists the processes root started, without their command
+// lines: cheaper than Under, for a terminal's look at what runs on it
+// every half second.
+func (Tree) Children(root int) ([]model.Process, error) {
+	ps, err := all()
+	if err != nil {
+		return nil, err
+	}
+	var out []model.Process
+	for _, p := range ps {
+		if p.ppid == root && p.Pid != root {
+			out = append(out, p.Process)
+		}
 	}
 	return out, nil
 }
@@ -138,16 +156,22 @@ func (Tree) Args(pid int) []string { return Args(pid) }
 // what a dev server left behind once its terminal is gone, a child that
 // setsid out of it, or the leftovers of a daemon that crashed (ADR 0098).
 // Each gets SIGTERM (its whole group when it leads one), and what is
-// still the same after Grace gets SIGKILL. It returns once they ended or
-// were killed.
+// still the same after Grace gets SIGKILL; on Windows, which has no
+// SIGTERM, each is ended at once. It returns once they ended or were
+// killed.
 func (Tree) Stop(ps []model.Process) {
-	if live := same(ps); len(live) > 0 {
-		signal(live, false)
+	live := same(ps)
+	if len(live) == 0 {
+		return
+	}
+	// Where none can be asked to end (Windows has no SIGTERM), there is no
+	// grace to wait out.
+	if signal(live, false) {
 		for end := time.Now().Add(Grace); time.Now().Before(end) && len(live) > 0; live = same(live) {
 			time.Sleep(50 * time.Millisecond)
 		}
-		signal(live, true)
 	}
+	signal(live, true)
 }
 
 // same is those of ps still running with the start time they had, as
@@ -168,12 +192,17 @@ func same(ps []model.Process) []model.Process {
 }
 
 // signal sends each of ps SIGTERM, or SIGKILL with hard, and the group of
-// one that leads it too.
-func signal(ps []model.Process, hard bool) {
+// one that leads it too. It says whether any could be sent: false where
+// the OS has no such signal (errors.ErrUnsupported, Windows's SIGTERM).
+func signal(ps []model.Process, hard bool) bool {
+	sent := false
 	for _, p := range ps {
-		if p.Pgid == p.Pid {
-			_ = signalGroup(p.Pid, hard)
+		if p.Pgid == p.Pid && !errors.Is(signalGroup(p.Pid, hard), errors.ErrUnsupported) {
+			sent = true
 		}
-		_ = signalOne(p.Pid, hard)
+		if !errors.Is(signalOne(p.Pid, hard), errors.ErrUnsupported) {
+			sent = true
+		}
 	}
+	return sent
 }

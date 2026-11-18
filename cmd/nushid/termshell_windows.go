@@ -16,7 +16,7 @@ import (
 const maxWTSettings = 4 << 20
 
 // terminalShell is the program a terminal starts and its arguments:
-// Windows Terminal's default profile's (wtprofile.go, ADR 0130), else
+// Windows Terminal's default profile's (wtprofile.go, ADR 0132), else
 // PowerShell 7 where it's installed, else Windows PowerShell, which every
 // Windows has. It is read again for each terminal, so a change there
 // counts from the next.

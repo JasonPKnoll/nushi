@@ -9,31 +9,63 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// On Windows (ADR 0132) who started whom is a Toolhelp snapshot's; a
-// process's start time is GetProcessTimes's and its command line the
-// system's own copy (NtQueryInformationProcess), both readable for the
-// user's own processes. Windows has no process groups: Pgid is 0, so
-// StopGroup stops none (signal_windows.go).
+// On Windows (ADR 0132) who started whom, and when, is the system's
+// process list, read whole in one call (NtQuerySystemInformation's
+// SystemProcessInformation): no process is opened to list it, so it is
+// cheap enough to read twice a second and tells the start of every
+// process, another user's included. A command line is the system's own
+// copy (NtQueryInformationProcess), readable for the user's own
+// processes. Windows has no process groups: Pgid is 0, so StopGroup stops
+// none (signal_windows.go).
 
-// all is every process, with its parent and, where it can be read, its
-// start time. Windows keeps a process's parent id after the parent has
-// ended, and may give the id to another: a parent that started after its
-// child isn't its parent, and the child is left with none.
+// all is every process, with its parent and its start time. Windows keeps
+// a process's parent id after the parent has ended, and may give the id
+// to another: a parent that started after its child isn't its parent, and
+// the child is left with none.
 func all() ([]proc, error) {
-	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	buf, err := processList()
 	if err != nil {
 		return nil, fmt.Errorf("listing processes: %w", err)
 	}
-	defer windows.CloseHandle(snap) //nolint:errcheck // read only
 	var ps []proc
-	e := windows.ProcessEntry32{Size: uint32(unsafe.Sizeof(windows.ProcessEntry32{}))}
-	for err = windows.Process32First(snap, &e); err == nil; err = windows.Process32Next(snap, &e) {
-		ps = append(ps, proc{Pid: int(e.ProcessID), Started: started(e.ProcessID), ppid: int(e.ParentProcessID)})
-	}
-	if !errors.Is(err, windows.ERROR_NO_MORE_FILES) {
-		return nil, fmt.Errorf("listing processes: %w", err)
+	for off := uintptr(0); ; {
+		e := (*windows.SYSTEM_PROCESS_INFORMATION)(unsafe.Add(unsafe.Pointer(&buf[0]), off)) //nolint:gosec // an entry the system wrote at this offset
+		ps = append(ps, proc{Pid: int(e.UniqueProcessID), Started: fileTime(e.CreateTime), ppid: int(e.InheritedFromUniqueProcessID)})
+		if e.NextEntryOffset == 0 {
+			break
+		}
+		off += uintptr(e.NextEntryOffset)
 	}
 	return parented(ps), nil
+}
+
+// processList is SystemProcessInformation's entries, in a buffer grown
+// while the list outgrows it (it can grow between the calls).
+func processList() ([]uint64, error) {
+	size := uint32(512 << 10)
+	for range 5 {
+		buf := make([]uint64, size/8+1)                                                                              // aligned for the entries' 64-bit fields
+		n := uint32(len(buf) * 8)                                                                                    //nolint:gosec // a few megabytes at most
+		err := windows.NtQuerySystemInformation(windows.SystemProcessInformation, unsafe.Pointer(&buf[0]), n, &size) //nolint:gosec // the system fills buf, n bytes
+		if err == nil {
+			return buf, nil
+		}
+		if !errors.Is(err, windows.STATUS_INFO_LENGTH_MISMATCH) {
+			return nil, err
+		}
+		size += 64 << 10 // room for processes started meanwhile
+	}
+	return nil, errors.New("the process list kept growing")
+}
+
+// fileTime is a FILETIME count (100 ns since 1601) as a time, the zero
+// time for none (the idle process's).
+func fileTime(t int64) time.Time {
+	if t == 0 {
+		return time.Time{}
+	}
+	ft := windows.Filetime{LowDateTime: uint32(t), HighDateTime: uint32(t >> 32)} //nolint:gosec // its two halves
+	return time.Unix(0, ft.Nanoseconds())
 }
 
 // parented drops each parent id that names a process started after its
@@ -49,21 +81,6 @@ func parented(ps []proc) []proc {
 		}
 	}
 	return ps
-}
-
-// started is when process pid started, or the zero time when it can't be
-// read (it ended, or it isn't the user's).
-func started(pid uint32) time.Time {
-	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-	if err != nil {
-		return time.Time{}
-	}
-	defer windows.CloseHandle(h) //nolint:errcheck // read only
-	var created, exited, kernel, user windows.Filetime
-	if windows.GetProcessTimes(h, &created, &exited, &kernel, &user) != nil {
-		return time.Time{}
-	}
-	return time.Unix(0, created.Nanoseconds())
 }
 
 // Args reads a process's command line as Windows split it for the
