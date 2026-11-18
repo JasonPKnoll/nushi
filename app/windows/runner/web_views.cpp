@@ -7,8 +7,6 @@
 #include <optional>
 #include <utility>
 
-#include "utils.h"
-
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
 
@@ -28,9 +26,16 @@ std::wstring Wide(const std::string& s) {
   return out;
 }
 
-// |s| as UTF-8.
+// |s| as UTF-8, all of it: the runner's Utf8FromUtf16 stops at 32767
+// characters, and a script's result (a diagram's PNG) is often longer.
 std::string Narrow(const std::wstring& s) {
-  return s.empty() ? std::string() : Utf8FromUtf16(s.c_str());
+  if (s.empty()) return std::string();
+  int n = WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()),
+                              nullptr, 0, nullptr, nullptr);
+  std::string out(n, '\0');
+  WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()),
+                      out.data(), n, nullptr, nullptr);
+  return out;
 }
 
 // A string WebView2 allocated, taken and freed.

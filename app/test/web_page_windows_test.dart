@@ -52,6 +52,8 @@ void main() {
     });
     expect(drawn.png, png);
     expect((drawn.width, drawn.height), (320.0, 120.5));
+    final blank = drawnFrom({'png': '', 'width': 320, 'height': 120});
+    expect((blank.png, blank.error), (null, 'Not drawn'));
     final broken = drawnFrom({'error': 'Parse error on line 2'});
     expect(
       (broken.png, broken.error, broken.retry),

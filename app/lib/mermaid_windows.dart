@@ -146,9 +146,10 @@ class _Renderer {
 }
 
 /// What mermaid.html's `png` answered, as a [DrawnDiagram]: its PNG (base64)
-/// and size, or why it isn't drawn.
+/// and size, or why it isn't drawn (an empty PNG, a canvas too big to
+/// draw, is none).
 DrawnDiagram drawnFrom(Map<String, Object?> r) {
-  if (r['png'] case final String png) {
+  if (r['png'] case final String png when png.isNotEmpty) {
     return DrawnDiagram(
       png: base64Decode(png),
       width: (r['width']! as num).toDouble(),

@@ -133,5 +133,24 @@ void main() {
     );
     expect((broken.png, broken.retry), (null, false));
     expect(broken.error, isNotEmpty);
+    // A chain taller than a canvas may be (32767 pixels): drawn smaller,
+    // not blank.
+    final tall = await diagrams.draw(
+      [
+        'flowchart TB',
+        for (var i = 0; i < 450; i++) '  n$i --> n${i + 1}',
+      ].join('\n'),
+      dark: false,
+      width: 600,
+      background: const ui.Color(0xFFFFFFFF),
+      foreground: const ui.Color(0xFF000000),
+    );
+    expect(tall.error, '');
+    expect(tall.height, greaterThan(32767));
+    final tallImage = (await (await ui.instantiateImageCodec(
+      tall.png!,
+    )).getNextFrame()).image;
+    expect(tallImage.height, lessThanOrEqualTo(16384));
+    expect(tallImage.height, greaterThan(1000));
   }, skip: _skip != false);
 }
