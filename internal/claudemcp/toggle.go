@@ -1,7 +1,6 @@
 package claudemcp
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -39,6 +38,7 @@ func (Claude) Toggle(ctx context.Context, folder, name string, on bool) error {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "claude", toggleArgs...)
 	cmd.Dir = folder
+	procgroup.Bound(cmd)
 	type request struct {
 		Type    string         `json:"type"`
 		ID      string         `json:"request_id"`
@@ -55,15 +55,21 @@ func (Claude) Toggle(ctx context.Context, folder, name string, on bool) error {
 		}
 		in = append(append(in, line...), '\n')
 	}
-	cmd.Stdin = bytes.NewReader(in) // Claude answers both, then ends at the end of its input
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	procgroup.Bound(cmd) // after its input: on Windows, Bound reads it
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("running claude: %w", err)
 	}
+	go func() {
+		_, _ = stdin.Write(in) // Claude answers both, then ends at the end of its input
+		_ = stdin.Close()
+	}()
 	said := answer(stdout, "toggle")
 	_, _ = io.Copy(io.Discard, stdout)
 	waitErr := cmd.Wait()

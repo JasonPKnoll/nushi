@@ -57,20 +57,13 @@ func finish(cmd *exec.Cmd, what string) error {
 // command is git in dir as run runs it, with the settings named in blank
 // set empty, killed with what it started when ctx ends.
 func command(ctx context.Context, dir string, blank []string, args ...string) *exec.Cmd {
-	cmd := unbound(ctx, dir, blank, args...)
-	procgroup.Bound(cmd)
-	return cmd
-}
-
-// unbound is command before procgroup.Bound, for a caller to give its
-// input first: on Windows, Bound reads it.
-func unbound(ctx context.Context, dir string, blank []string, args ...string) *exec.Cmd {
 	global := []string{"-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "log.showSignature=false", "-C", dir}
 	cmd := exec.CommandContext(ctx, "git", append(global, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "GIT_NO_LAZY_FETCH=1", "GIT_CONFIG_COUNT="+strconv.Itoa(len(blank)))
 	for i, name := range blank {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_CONFIG_KEY_%d=%s", i, name), fmt.Sprintf("GIT_CONFIG_VALUE_%d=", i))
 	}
+	procgroup.Bound(cmd)
 	return cmd
 }
 
