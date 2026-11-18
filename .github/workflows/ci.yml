@@ -385,7 +385,7 @@ jobs:
         run: |
           go test ./internal/procgroup ./internal/filelock ./internal/logs ./internal/shellenv ./internal/batchfile ./internal/terminal ./internal/proctree
           go test -run 'TestAlive|TestOpenWindows' ./internal/claudehistory
-          go test -run 'TestOwnDataFolder|TestWTDefaultLine' ./cmd/nushid
+          go test -run 'TestOwnDataFolder|TestWTDefaultLine|TestMachineFragment' ./cmd/nushid
 
   linux-app:
     name: App tests (Linux, ${{ matrix.shard }}/${{ strategy.job-total }})

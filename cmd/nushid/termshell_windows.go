@@ -1,6 +1,9 @@
 package main
 
 import (
+	"errors"
+	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,15 +63,24 @@ func wtSettings() []byte {
 }
 
 // wtFragments is the fragment files other apps wrote for Windows
-// Terminal, by their source (the folder each is in: Git, Microsoft.WSL),
-// for everyone and for this user.
+// Terminal, by their source (the folder each is in: Git, Microsoft.WSL):
+// this user's (%LOCALAPPDATA%) first, then everyone's (%ProgramData%), the
+// order Windows Terminal reads them in, so the first that names a profile
+// is the one Windows Terminal ranks highest. Any account may add a file
+// under %ProgramData%, so one there is read only when an administrator,
+// the system or this user owns it and its folder and no one else can
+// change either (readMachineFragment).
 func wtFragments() map[string][][]byte {
 	out := map[string][][]byte{}
-	for _, root := range []string{os.Getenv("ProgramData"), os.Getenv("LOCALAPPDATA")} {
-		if root == "" {
+	user := currentUserSID()
+	for _, root := range []struct {
+		dir     string
+		machine bool
+	}{{os.Getenv("LOCALAPPDATA"), false}, {os.Getenv("ProgramData"), true}} {
+		if root.dir == "" || root.machine && user == "" {
 			continue
 		}
-		dir := filepath.Join(root, "Microsoft", "Windows Terminal", "Fragments")
+		dir := filepath.Join(root.dir, "Microsoft", "Windows Terminal", "Fragments")
 		sources, _ := os.ReadDir(dir)
 		for _, s := range sources {
 			if !s.IsDir() {
@@ -76,9 +88,18 @@ func wtFragments() map[string][][]byte {
 			}
 			files, _ := filepath.Glob(filepath.Join(dir, s.Name(), "*.json"))
 			for _, f := range files {
-				if b, err := regularfile.Read(f, maxWTSettings); err == nil {
-					out[s.Name()] = append(out[s.Name()], b)
+				read := func() ([]byte, error) { return regularfile.Read(f, maxWTSettings) }
+				if root.machine {
+					read = func() ([]byte, error) { return readMachineFragment(f, user) }
 				}
+				b, err := read()
+				if err != nil {
+					if root.machine && !errors.Is(err, fs.ErrNotExist) {
+						slog.Warn("a Windows Terminal fragment was skipped", "path", f, "err", err)
+					}
+					continue
+				}
+				out[s.Name()] = append(out[s.Name()], b)
 			}
 		}
 	}
