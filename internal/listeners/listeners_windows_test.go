@@ -31,7 +31,7 @@ func TestListReadsMany(t *testing.T) {
 // listener takes what the two do: each family's connections, to that
 // process, as dials to both show.
 func TestListMergesAProcesssTwoWildcards(t *testing.T) {
-	v4, err := net.Listen("tcp4", "0.0.0.0:0")
+	v4, err := net.Listen("tcp4", "0.0.0.0:0") //nolint:gosec // the wildcard is what's tested, closed at the test's end
 	testcheck.NoErr(t, err)
 	defer func() { _ = v4.Close() }()
 	port := v4.Addr().(*net.TCPAddr).Port
