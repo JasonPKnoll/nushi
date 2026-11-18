@@ -132,8 +132,8 @@ final class WebView2 {
 
 /// Where a [WebView2] goes: a box that fills what it's given, and after
 /// each frame puts the web view over itself, or hides it while its
-/// subtree's tickers are off (an offstage route, a hidden tab) or once it's
-/// gone.
+/// subtree's tickers are off (an offstage route, a hidden tab), while
+/// something an overlay draws over it covers any of it, or once it's gone.
 class _Place extends LeafRenderObjectWidget {
   const new(this.web);
 
@@ -144,20 +144,38 @@ class _Place extends LeafRenderObjectWidget {
     web,
     ratio: View.of(context).devicePixelRatio,
     shown: TickerMode.valuesOf(context).enabled,
+    overlays: _overlays(context),
   );
 
   @override
   void updateRenderObject(BuildContext context, _RenderPlace place) => place
     ..ratio = View.of(context).devicePixelRatio
-    ..shown = TickerMode.valuesOf(context).enabled;
+    ..shown = TickerMode.valuesOf(context).enabled
+    ..overlays = _overlays(context);
+
+  /// The overlays [context] is in, the nearest first.
+  static List<OverlayState> _overlays(BuildContext context) => [
+    for (
+      var o = context.findAncestorStateOfType<OverlayState>();
+      o != null;
+      o = o.context.findAncestorStateOfType<OverlayState>()
+    )
+      o,
+  ];
 }
 
 class _RenderPlace extends RenderBox {
-  new(this.web, {required this.ratio, required this.shown});
+  new(
+    this.web, {
+    required this.ratio,
+    required this.shown,
+    required this.overlays,
+  });
 
   final WebView2 web;
   double ratio;
   bool shown;
+  List<OverlayState> overlays;
   bool _watching = false;
 
   @override
@@ -193,10 +211,88 @@ class _RenderPlace extends RenderBox {
 
   void _check() {
     if (!hasSize || !shown || size.isEmpty) return web._place(null);
-    final at = localToGlobal(Offset.zero) * ratio;
-    web._place(at & size * ratio);
+    final at = localToGlobal(Offset.zero);
+    if (_covered(at & size)) return web._place(null);
+    web._place(at * ratio & size * ratio);
+  }
+
+  /// Whether anything an overlay paints over this one overlaps [box]
+  /// (global): a later route (a dialog, the palette, a popup menu), an
+  /// overlay portal's child (a menu, a tooltip) or a toast. Flutter draws
+  /// under the web view's window, so the web view hides while one is up.
+  bool _covered(Rect box) {
+    for (final overlay in overlays) {
+      if (!overlay.mounted) continue;
+      final theater = overlay.context.findRenderObject();
+      RenderObject? mine = this;
+      while (mine != null && mine.parent != theater) {
+        mine = mine.parent;
+      }
+      if (theater == null || mine == null) continue;
+      var above = false;
+      var covered = false;
+      // The onstage entries in paint order, each followed by its overlay
+      // portals' children.
+      theater.visitChildrenForSemantics((entry) {
+        if (covered) return;
+        if (identical(entry, mine)) {
+          above = true;
+        } else if (above && _paintsOver(entry, box)) {
+          covered = true;
+        }
+      });
+      if (covered) return true;
+    }
+    return false;
   }
 }
+
+/// Whether a box [node] paints, or one under it, overlaps [box] (global),
+/// past what isn't painted (an offstage child, one at zero opacity, an
+/// indexed stack's others: what semantics passes over too, but for
+/// semantics excluded).
+bool _paintsOver(RenderObject node, Rect box) {
+  if (node is RenderBox &&
+      _paints(node) &&
+      node.attached &&
+      node.hasSize &&
+      !node.size.isEmpty &&
+      MatrixUtils.transformRect(
+        node.getTransformTo(null),
+        Offset.zero & node.size,
+      ).overlaps(box)) {
+    return true;
+  }
+  var found = false;
+  void visit(RenderObject child) {
+    if (!found && _paintsOver(child, box)) found = true;
+  }
+
+  if (node is RenderExcludeSemantics) {
+    node.visitChildren(visit);
+  } else {
+    node.visitChildrenForSemantics(visit);
+  }
+  return found;
+}
+
+/// Whether [node] paints something of its own over its rectangle: text, a
+/// picture, a fill, a shadowed shape, a painter, or a box with no children
+/// (the app's drawn icons). Not a box that only sizes or places its child,
+/// which an overlay's entry fills the window with (an empty toast layer's
+/// `SizedBox.shrink`, a popup menu's clear barrier).
+bool _paints(RenderBox node) => switch (node) {
+  RenderParagraph() || RenderEditable() || RenderImage() => true,
+  RenderDecoratedBox() ||
+  RenderPhysicalModel() ||
+  RenderPhysicalShape() => true,
+  RenderCustomPaint(:final painter, :final foregroundPainter) =>
+    painter != null || foregroundPainter != null,
+  RenderObjectWithChildMixin() || ContainerRenderObjectMixin() =>
+    // ColoredBox's (a dialog's barrier) is private to the widgets library.
+    node.runtimeType.toString() == '_RenderColoredBox',
+  _ => true,
+};
 
 /// The folder where the web views keep their data: beside Nushi's data
 /// folder (`%LOCALAPPDATA%\Nushi.WebView2`), not in it. Chromium gives its
