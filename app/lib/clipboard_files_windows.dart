@@ -308,7 +308,16 @@ const _all = 0xffffffff;
 final DynamicLibrary _user32 = DynamicLibrary.open('user32.dll');
 final DynamicLibrary _shell32 = DynamicLibrary.open('shell32.dll');
 
-@Native<Int32 Function(Pointer<Void>)>(symbol: 'OpenClipboard', isLeaf: true)
+// Not leaf calls, the three that can wait on another process: a leaf call
+// never reaches a safepoint, so one that blocks holds up garbage
+// collection for the whole isolate group, the window's isolate included,
+// and reading on an isolate of its own would protect nothing.
+// GetClipboardData sends a format rendered only when asked to its owner
+// and waits on it; OpenClipboard takes the clipboard's lock; GlobalLock is
+// on that data, kept off the leaf path too. The rest return at once, and
+// those given a typed list's address must be leaf calls.
+
+@Native<Int32 Function(Pointer<Void>)>(symbol: 'OpenClipboard')
 external int _openClipboard(Pointer<Void> owner);
 
 @Native<Int32 Function()>(symbol: 'CloseClipboard', isLeaf: true)
@@ -320,10 +329,7 @@ external int _closeClipboard();
 )
 external int _isAvailable(int format);
 
-@Native<Pointer<Void> Function(Uint32)>(
-  symbol: 'GetClipboardData',
-  isLeaf: true,
-)
+@Native<Pointer<Void> Function(Uint32)>(symbol: 'GetClipboardData')
 external Pointer<Void> _getData(int format);
 
 @Native<Uint32 Function(Pointer<Uint16>)>(
@@ -332,10 +338,7 @@ external Pointer<Void> _getData(int format);
 )
 external int _registerFormat(Pointer<Uint16> name);
 
-@Native<Pointer<Void> Function(Pointer<Void>)>(
-  symbol: 'GlobalLock',
-  isLeaf: true,
-)
+@Native<Pointer<Void> Function(Pointer<Void>)>(symbol: 'GlobalLock')
 external Pointer<Void> _globalLock(Pointer<Void> memory);
 
 @Native<Int32 Function(Pointer<Void>)>(symbol: 'GlobalUnlock', isLeaf: true)
