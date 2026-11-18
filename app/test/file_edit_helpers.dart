@@ -58,7 +58,8 @@ String sumOf(List<int> b) => sha256.convert(b).toString();
 /// The Mac app on that chat ([more] chats beside it), [files] on its
 /// fake disk, [open] in the preview; the tree lists [folder] at the
 /// chat's folder (empty without it); GetDiff answers [fileDiffs] for one
-/// file (`FakeDaemon.fileDiffs`); the chat's transcript is [items].
+/// file (`FakeDaemon.fileDiffs`); the chat's transcript is [items];
+/// [answer] goes first for anything else (`FakeDaemon.answer`).
 Future<(Daemon, FakeDaemon)> openEditor(
   WidgetTester tester,
   Map<String, List<int>?> files, {
@@ -69,21 +70,24 @@ Future<(Daemon, FakeDaemon)> openEditor(
   List<FolderEntry> folder = const [],
   Map<String, Object> fileDiffs = const {},
   List<Item>? items,
+  Object? Function(Object input)? answer,
 }) async {
   viewport(tester, Size(width, 900), brightness: brightness);
   showDetails.value = false;
   paneWidths.value = {};
   final fake = FakeDaemon([editChat, ...more])
-    ..answer = ((input) => switch (input) {
-      GetChatRequest(chatId: 'c') => GetChatResponse(
-        chat: editChat,
-        items: items ?? editItems,
-      ),
-      GetChatRequest(:final chatId) => GetChatResponse(
-        chat: more.firstWhere((c) => c.id == chatId),
-      ),
-      _ => null,
-    });
+    ..answer = ((input) =>
+        answer?.call(input) ??
+        switch (input) {
+          GetChatRequest(chatId: 'c') => GetChatResponse(
+            chat: editChat,
+            items: items ?? editItems,
+          ),
+          GetChatRequest(:final chatId) => GetChatResponse(
+            chat: more.firstWhere((c) => c.id == chatId),
+          ),
+          _ => null,
+        });
   if (folder.isNotEmpty) {
     fake.streams = (input) {
       if (input is! WatchChatFolderRequest) return null;

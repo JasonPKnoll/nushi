@@ -43,12 +43,35 @@ final _folder = [
   FolderEntry(name: 'README.md', kind: 'file'),
 ];
 
+/// The chat's folder on a branch of its own, off main: the marks count
+/// from where it left main (`FakeDaemon.fileDiffs` answers either way).
+Object? _onBranch(Object input) => switch (input) {
+  GetFolderStatusRequest() => GetFolderStatusResponse(
+    git: true,
+    branch: 'nushi/parser',
+    defaultBase: 'main',
+  ),
+  _ => null,
+};
+
+/// The chat's folder on main itself: the marks count from the last
+/// commit.
+Object? _onMain(Object input) => switch (input) {
+  GetFolderStatusRequest() => GetFolderStatusResponse(
+    git: true,
+    branch: 'main',
+    defaultBase: 'main',
+  ),
+  _ => null,
+};
+
 Future<(Daemon, FakeDaemon)> _open(
   WidgetTester tester, {
   List<String> open = const ['main.go'],
   double width = 1700,
   Brightness brightness = Brightness.light,
   String base = changeBase,
+  Object? Function(Object input)? answer = _onBranch,
 }) => openEditor(
   tester,
   {
@@ -61,6 +84,7 @@ Future<(Daemon, FakeDaemon)> _open(
   brightness: brightness,
   items: _items,
   folder: _folder,
+  answer: answer,
   fileDiffs: {
     '/Users/me/nushi/main.go': FileChange(
       path: 'main.go',
@@ -126,6 +150,52 @@ void main() {
       ),
       findsNWidgets(7),
     );
+    await endEditor(tester, d);
+  }, variant: onMac);
+
+  testWidgets("on the chat's branch, the marks count from main and stay "
+      'after a commit; the card says so', (tester) async {
+    var committed = false;
+    final (d, fake) = await _open(
+      tester,
+      answer: (input) => switch (input) {
+        // Committed, HEAD has the text: only the branch's base differs.
+        GetDiffRequest(:final base) when committed && base.isEmpty =>
+          GetDiffResponse(),
+        _ => _onBranch(input),
+      },
+    );
+    await tester.pumpAndSettle();
+    List<GetDiffRequest> asked() => [
+      for (final r in fake.calls.whereType<GetDiffRequest>())
+        if (r.path == 'main.go') r,
+    ];
+    expect(asked().last.base, 'main');
+    expect(find.byType(ChangeMark), findsNWidgets(7));
+
+    committed = true;
+    chatC(d).committed();
+    await tester.pumpAndSettle();
+    expect(asked().last.base, 'main');
+    expect(find.byType(ChangeMark), findsNWidgets(7));
+    await tester.tap(find.byType(ChangeMark).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Before this branch'), findsOneWidget);
+    await endEditor(tester, d);
+  }, variant: onMac);
+
+  testWidgets('on main itself, from the last commit, and the card says '
+      'Before', (tester) async {
+    final (d, fake) = await _open(tester, answer: _onMain);
+    await tester.pumpAndSettle();
+    final asked = fake.calls.whereType<GetDiffRequest>().where(
+      (r) => r.path == 'main.go',
+    );
+    expect(asked.last.base, isEmpty);
+    await tester.tap(find.byType(ChangeMark).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Before'), findsOneWidget);
+    expect(find.text('Before this branch'), findsNothing);
     await endEditor(tester, d);
   }, variant: onMac);
 
