@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'package:nushi/run_state.dart';
 import 'package:nushi/theme/tokens.dart';
 
 /// The runner's web views (`windows/runner/web_views.cpp`, ADR 0135).
@@ -34,7 +35,7 @@ final class WebView2 {
   }
 
   static var _next = 1;
-  static final _views = <int, WebView2>{};
+  static final Map<int, WebView2> _views = runMap();
   static var _listening = false;
 
   /// Its number, the runner's name for it.
