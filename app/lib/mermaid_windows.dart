@@ -9,13 +9,25 @@ import 'package:nushi/web_view_windows.dart';
 /// How long a diagram waits on the hidden web view, its queue included.
 Duration diagramWait = const Duration(minutes: 1);
 
+/// How long one diagram may take in the hidden web view, as the Mac's
+/// (`Diagrams.swift`'s `jobTimeout`).
+const diagramJobWait = Duration(seconds: 10);
+
+/// What a diagram that took longer than [diagramJobWait] is.
+const _tooLong = DrawnDiagram(
+  error: 'The diagram took too long to draw',
+  retry: true,
+);
+
 /// Windows's diagrams: mermaid.js in one hidden WebView2 of the runner's,
 /// made when the first is asked for, drawing one at a time. Its web view
 /// takes no snapshot of itself, so the page draws the diagram onto a
 /// canvas as PNG (mermaid.html's `png`; labels as SVG text, which a canvas
-/// takes). Each gets 10 s, so a slow one doesn't hold the rest; a call
-/// that waits past [diagramWait] fails, to be drawn again when next asked
-/// for, as the Mac's.
+/// takes). Each gets [diagramJobWait], every call into the page included,
+/// as on the Mac: a slower one fails, and its web view is closed and a new
+/// one made for the next, so one whose script never answers doesn't hold
+/// the rest. A call that waits past [diagramWait] fails, to be drawn again
+/// when next asked for, as the Mac's.
 class WindowsDiagrams implements Diagrams {
   const new();
 
@@ -75,10 +87,15 @@ class _Renderer {
   Future<WebView2?> _ready() async {
     final loaded = _loaded ??= _load();
     if (await loaded) return _web;
+    _drop();
+    return null;
+  }
+
+  /// Closes the web view, for a new one to be made for the next diagram.
+  void _drop() {
     _web?.close();
     _web = null;
     _loaded = null;
-    return null;
   }
 
   Future<bool> _load() async {
@@ -111,37 +128,54 @@ class _Renderer {
         retry: true,
       );
     }
-    final scale = opts['scale']! as double;
     try {
-      // Laid out at the width asked, hidden: the page fits the diagram to
-      // it.
-      await web.bounds(
-        Rect.fromLTWH(0, 0, width * scale, 400 * scale),
-        visible: false,
-      );
-      final job = ++_jobs;
-      await web.script(
-        '(window.__nushi ??= {}, png(${jsonEncode(source)}, '
-        '${jsonEncode(opts)}).then((r) => __nushi[$job] = r, '
-        '(e) => __nushi[$job] = { error: String((e && e.message) || e) }), '
-        'void 0)',
-      );
-      for (var i = 0; i < 200; i++) {
-        // design: a poll of the page's promise, not motion
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        final r = await web.script(
-          '(() => { const r = window.__nushi?.[$job] ?? null; '
-          'if (r) delete __nushi[$job]; return r; })()',
-        );
-        if (r is Map) return drawnFrom(r.cast<String, Object?>());
-      }
-      return const DrawnDiagram(
-        error: 'The diagram took too long to draw',
-        retry: true,
-      );
+      return await _drawIn(
+        web,
+        source,
+        opts: opts,
+        width: width,
+      ).timeout(diagramJobWait);
+    } on TimeoutException {
+      // The page is still busy with it, or its script never answers: a new
+      // web view for the next, and this one's calls end with it.
+      if (_web == web) _drop();
+      return _tooLong;
     } on Object catch (e) {
       return DrawnDiagram(error: '$e', retry: true);
     }
+  }
+
+  Future<DrawnDiagram> _drawIn(
+    WebView2 web,
+    String source, {
+    required Map<String, Object?> opts,
+    required double width,
+  }) async {
+    final scale = opts['scale']! as double;
+    // Laid out at the width asked, hidden: the page fits the diagram to
+    // it.
+    await web.bounds(
+      Rect.fromLTWH(0, 0, width * scale, 400 * scale),
+      visible: false,
+    );
+    final job = ++_jobs;
+    await web.script(
+      '(window.__nushi ??= {}, png(${jsonEncode(source)}, '
+      '${jsonEncode(opts)}).then((r) => __nushi[$job] = r, '
+      '(e) => __nushi[$job] = { error: String((e && e.message) || e) }), '
+      'void 0)',
+    );
+    // Until [draw]'s timeout, which closes the web view.
+    while (_web == web) {
+      // design: a poll of the page's promise, not motion
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final r = await web.script(
+        '(() => { const r = window.__nushi?.[$job] ?? null; '
+        'if (r) delete __nushi[$job]; return r; })()',
+      );
+      if (r is Map) return drawnFrom(r.cast<String, Object?>());
+    }
+    return _tooLong;
   }
 }
 
