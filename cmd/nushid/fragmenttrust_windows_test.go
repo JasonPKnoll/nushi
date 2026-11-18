@@ -80,7 +80,7 @@ func TestMachineFragmentRead(t *testing.T) {
 
 	// root2's Microsoft is a junction to root's.
 	root2 := t.TempDir()
-	out, err := exec.Command(filepath.Join(os.Getenv("SystemRoot"), "System32", "cmd.exe"), "/c", "mklink", "/J", //nolint:gosec,noctx // the system's cmd.exe making a junction between the test's own folders
+	out, err := exec.Command(filepath.Join(os.Getenv("SystemRoot"), "System32", "cmd.exe"), "/c", "mklink", "/J",
 		filepath.Join(root2, "Microsoft"), filepath.Join(root, "Microsoft")).CombinedOutput()
 	if err != nil {
 		t.Fatalf("making a junction: %v, %s", err, out)
