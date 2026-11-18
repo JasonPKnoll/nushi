@@ -67,17 +67,23 @@ func wtSettings() []byte {
 // this user's (%LOCALAPPDATA%) first, then everyone's (%ProgramData%), the
 // order Windows Terminal reads them in, so the first that names a profile
 // is the one Windows Terminal ranks highest. Any account may add a file
-// under %ProgramData%, so one there is read only when an administrator,
-// the system or this user owns it and its folder and no one else can
-// change either (readMachineFragment).
+// under %ProgramData%, so one there is read only when the system or an
+// administrator owns it and every folder on its way, and no one else
+// could have put it there or can change it (readMachineFragment).
 func wtFragments() map[string][][]byte {
+	return fragmentsUnder(os.Getenv("LOCALAPPDATA"), os.Getenv("ProgramData"), machineOwners)
+}
+
+// fragmentsUnder is wtFragments with this user's folder local, everyone's
+// machine, and trusted the accounts a fragment under machine may belong
+// to.
+func fragmentsUnder(local, machine string, trusted []string) map[string][][]byte {
 	out := map[string][][]byte{}
-	user := currentUserSID()
 	for _, root := range []struct {
 		dir     string
 		machine bool
-	}{{os.Getenv("LOCALAPPDATA"), false}, {os.Getenv("ProgramData"), true}} {
-		if root.dir == "" || root.machine && user == "" {
+	}{{local, false}, {machine, true}} {
+		if root.dir == "" {
 			continue
 		}
 		dir := filepath.Join(root.dir, "Microsoft", "Windows Terminal", "Fragments")
@@ -90,7 +96,9 @@ func wtFragments() map[string][][]byte {
 			for _, f := range files {
 				read := func() ([]byte, error) { return regularfile.Read(f, maxWTSettings) }
 				if root.machine {
-					read = func() ([]byte, error) { return readMachineFragment(f, user) }
+					read = func() ([]byte, error) {
+						return readMachineFragment(root.dir, s.Name(), filepath.Base(f), trusted)
+					}
 				}
 				b, err := read()
 				if err != nil {

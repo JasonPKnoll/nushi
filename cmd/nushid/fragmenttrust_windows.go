@@ -3,7 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -11,40 +13,118 @@ import (
 	"github.com/afrase/nushi/internal/regularfile"
 )
 
-// readMachineFragment reads the fragment at path, under %ProgramData%,
-// when machineFragmentTrusted takes it for user (a SID). The file is
-// opened once, a link or junction as itself (and so refused), and its
-// security is read from that handle, so the file checked is the file
-// read; its folder's is read opened as itself (securityOf).
-func readMachineFragment(path, user string) ([]byte, error) {
+// fragmentWay is the folders from %ProgramData% down to a fragment's
+// source's folder, which follows them.
+var fragmentWay = []string{"Microsoft", "Windows Terminal", "Fragments"}
+
+// readMachineFragment reads the fragment name in source's folder under
+// root (%ProgramData%) when machineFragmentTrusted takes it, with trusted
+// the accounts it may belong to (machineOwners). Every folder on the way
+// is opened as itself (a link or junction is opened, not followed) and
+// held, not shared for delete, so none can be renamed or swapped until
+// the file is read; the file is opened once, a link refused, and its
+// links, security and resolved path are read from that handle, the text
+// read from it too.
+func readMachineFragment(root, source, name string, trusted []string) ([]byte, error) {
+	var facts fragmentFacts
+	var held []windows.Handle
+	defer func() {
+		for _, h := range held {
+			_ = windows.CloseHandle(h)
+		}
+	}()
+	dir := root
+	for i, part := range append(append([]string{""}, fragmentWay...), source) {
+		if part != "" {
+			dir = filepath.Join(dir, part)
+		}
+		h, err := openAsItself(dir, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE)
+		if err != nil {
+			return nil, fmt.Errorf("opening %s: %w", dir, err)
+		}
+		held = append(held, h)
+		d, err := folderFactsOf(h)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", dir, err)
+		}
+		if i == 0 {
+			facts.Root = d
+			final, err := finalPath(h)
+			if err != nil {
+				return nil, fmt.Errorf("resolving %s: %w", dir, err)
+			}
+			facts.Expected = strings.TrimSuffix(final, `\`) // a drive's root ends in one
+			continue
+		}
+		facts.Folders = append(facts.Folders, d)
+		facts.Expected += `\` + part
+	}
+	path := filepath.Join(dir, name)
+	facts.Expected += `\` + name
 	f, fi, err := regularfile.Open(path, false)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close() //nolint:errcheck // read-only
+	h := windows.Handle(f.Fd())
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(h, &info); err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	facts.Links = info.NumberOfLinks
+	facts.Reparse = info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0
 	// os.Open asks for GENERIC_READ, which holds READ_CONTROL.
-	sd, err := windows.GetSecurityInfo(windows.Handle(f.Fd()), windows.SE_FILE_OBJECT,
+	sd, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT,
 		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
 	if err != nil {
 		return nil, fmt.Errorf("reading the security of %s: %w", path, err)
 	}
-	file, err := securityFacts(sd)
-	if err != nil {
+	if facts.File, err = securityFacts(sd); err != nil {
 		return nil, fmt.Errorf("reading the security of %s: %w", path, err)
 	}
-	dir := filepath.Dir(path)
-	dirSD, err := securityOf(dir)
-	if err != nil {
-		return nil, fmt.Errorf("reading the security of %s: %w", dir, err)
+	if facts.Final, err = finalPath(h); err != nil {
+		return nil, fmt.Errorf("resolving %s: %w", path, err)
 	}
-	folder, err := securityFacts(dirSD)
-	if err != nil {
-		return nil, fmt.Errorf("reading the security of %s: %w", dir, err)
-	}
-	if !machineFragmentTrusted(file, folder, user) {
-		return nil, errors.New("another account could have written or could change " + path)
+	if !machineFragmentTrusted(facts, trusted) {
+		return nil, errors.New("another account could have put it there or could change it")
 	}
 	return regularfile.ReadAll(f, fi, maxWTSettings)
+}
+
+// folderFactsOf is the folder open at h as the trust check weighs it; an
+// error when it is neither a folder nor a link or junction.
+func folderFactsOf(h windows.Handle) (folderFacts, error) {
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(h, &info); err != nil {
+		return folderFacts{}, err
+	}
+	reparse := info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0
+	if !reparse && info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 {
+		return folderFacts{}, errors.New("not a folder")
+	}
+	sd, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
+	if err != nil {
+		return folderFacts{}, err
+	}
+	sec, err := securityFacts(sd)
+	return folderFacts{Reparse: reparse, Sec: sec}, err
+}
+
+// finalPath is the path the system resolved the open file or folder at h
+// to (GetFinalPathNameByHandle, normalised, with its drive letter: the
+// `\\?\` form).
+func finalPath(h windows.Handle) (string, error) {
+	const normalisedDOS = 0 // FILE_NAME_NORMALIZED | VOLUME_NAME_DOS
+	buf := make([]uint16, windows.MAX_LONG_PATH)
+	n, err := windows.GetFinalPathNameByHandle(h, &buf[0], uint32(len(buf)), normalisedDOS) //nolint:gosec // MAX_LONG_PATH fits
+	if err != nil {
+		return "", err
+	}
+	if int(n) >= len(buf) { // the size it needs, longer than any path
+		return "", os.ErrInvalid
+	}
+	return windows.UTF16ToString(buf[:n]), nil
 }
 
 // securityFacts is sd's owner and DACL as the trust check weighs them.
@@ -92,14 +172,4 @@ func aceFacts(a *windows.ACCESS_ALLOWED_ACE) ace {
 	}
 	out.SID = (*windows.SID)(unsafe.Pointer(&a.SidStart)).String() //nolint:gosec // the ACE's SID starts there, as the system lays it out
 	return out
-}
-
-// currentUserSID is the SID of the account the daemon runs as, "" when
-// it can't be read (and then no %ProgramData% fragment is read).
-func currentUserSID() string {
-	u, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		return ""
-	}
-	return u.User.Sid.String()
 }
