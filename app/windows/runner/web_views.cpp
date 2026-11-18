@@ -206,9 +206,15 @@ void WebViews::Make(int64_t id, const std::wstring& folder, int64_t background,
             shared->Error("make", "The web view wasn't made");
             return S_OK;
           }
+          if (FAILED(controller->get_CoreWebView2(&view->web)) ||
+              !view->web) {
+            controller->Close();
+            views_.erase(id);
+            shared->Error("make", "The web view wasn't made");
+            return S_OK;
+          }
           view->controller = controller;
           controller->put_IsVisible(FALSE);
-          controller->get_CoreWebView2(&view->web);
           ComPtr<ICoreWebView2Controller2> controller2;
           if (SUCCEEDED(view->controller.As(&controller2))) {
             auto argb = static_cast<uint32_t>(background);
