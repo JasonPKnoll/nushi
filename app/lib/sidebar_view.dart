@@ -46,6 +46,17 @@ bool inShownProject(ChatState c) => switch (shownProject) {
   final p => !c.scratch && c.home == p,
 };
 
+/// Whether the pinned chat [c] shows in Pinned: with Pinned keeping every
+/// project's pins ([pinnedEveryProject]), all do; else only those of the
+/// project the sidebar is narrowed to ([inShownProject]).
+bool inShownPinned(ChatState c) =>
+    pinnedEveryProject.value || inShownProject(c);
+
+/// Whether the pinned chat [c] is of a project other than the one the
+/// sidebar is narrowed to, which its row in Pinned says.
+bool pinnedElsewhere(ChatState c) =>
+    shownProject != null && c.pin > 0 && !inShownProject(c);
+
 /// The sidebar's groups: each folder's chats (a chat in a worktree under
 /// its repository; scratch chats under ''), the folder with the newest
 /// chat first, the newest chat first in each. Archived chats aren't in
@@ -136,11 +147,11 @@ Iterable<ChatState> shownChats(
     ? chats.where((c) => c.id == selectedId)
     : chats;
 
-/// The pinned chats the sidebar shows: those of the project it's
-/// narrowed to ([inShownProject]), or with Pinned collapsed
+/// The pinned chats the sidebar shows: every project's, or only those of
+/// the project it's narrowed to ([inShownPinned]); or with Pinned collapsed
 /// ([pinnedCollapsed]), only the selected one, if it's one of them.
 Iterable<ChatState> shownPinned(Daemon daemon) {
-  final pinned = pinnedChats(daemon).where(inShownProject);
+  final pinned = pinnedChats(daemon).where(inShownPinned);
   return pinnedCollapsed.value
       ? pinned.where((c) => c.id == daemon.selectedId)
       : pinned;
@@ -186,7 +197,8 @@ class SidebarView {
 /// [starting], the folder a chat is starting in.
 ///
 /// Narrowed to a project ([shownProject]: its tile picked in the project
-/// rail), it's that project's chats only: its pinned ones, the sections
+/// rail), it's that project's chats only: its pinned ones (every
+/// project's, with [pinnedEveryProject] on), the sections
 /// that have a chat of it with those chats, and its own group. The
 /// sections with none of it and the chats with no folder are left out.
 SidebarView arrangeSidebar(Daemon daemon, {String? starting}) {
@@ -231,7 +243,7 @@ SidebarView arrangeSidebar(Daemon daemon, {String? starting}) {
         }
       : <String, List<ChatState>>{};
   final projects = only == null ? all : {only: all[only] ?? <ChatState>[]};
-  final pinned = pinnedChats(daemon).where(inShownProject).toList();
+  final pinned = pinnedChats(daemon).where(inShownPinned).toList();
   final groups = group == GroupBy.project
       ? const <ChatGroup>[]
       : groupChats(

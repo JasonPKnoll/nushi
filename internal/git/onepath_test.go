@@ -134,3 +134,93 @@ func TestChangesOfOnePathAutocrlf(t *testing.T) {
 		t.Errorf("autocrlf: %+v, %v", got, err)
 	}
 }
+
+// TestChangesOfOnePathOnABranch is a file preview's question with the
+// chat's branch base (ADR 0131): one file's change since the branch left
+// main, committed or not, as the Changes tab's Branch view counts it.
+func TestChangesOfOnePathOnABranch(t *testing.T) {
+	ctx := t.Context()
+	repo := t.TempDir()
+	sub := filepath.Join(repo, "sub")
+	testcheck.Git(t, repo, "init", "-q", "-b", "main")
+	write(t, filepath.Join(sub, "a.txt"), "one\n")
+	write(t, filepath.Join(sub, "b.txt"), "b\n")
+	write(t, filepath.Join(sub, "old.txt"), "keep\n")
+	write(t, filepath.Join(sub, "same.txt"), "same\n")
+	testcheck.Git(t, repo, "add", ".")
+	testcheck.Git(t, repo, "commit", "-q", "-m", "init")
+	one := func(base, path string) []model.FileChange {
+		t.Helper()
+		got, err := Changes(ctx, sub, Span{Base: base, Path: path})
+		if err != nil {
+			t.Fatalf("%s from %q: %v", path, base, err)
+		}
+		return got
+	}
+	commit := func(msg string) {
+		t.Helper()
+		testcheck.Git(t, repo, "add", "-A")
+		testcheck.Git(t, repo, "commit", "-q", "-m", msg)
+	}
+
+	testcheck.Git(t, repo, "checkout", "-q", "-b", "chat")
+	// Changed and committed on the branch: HEAD has it, the base not.
+	write(t, filepath.Join(sub, "a.txt"), "one\ntwo\n")
+	commit("two")
+	want := []model.FileChange{{Path: "a.txt", Status: "modified", Old: "one\n", New: "one\ntwo\n", Added: 1}}
+	if got := one("main", "a.txt"); !reflect.DeepEqual(got, want) {
+		t.Errorf("committed on the branch =\n%+v\nwant\n%+v", got, want)
+	}
+	if got := one("", "a.txt"); len(got) != 0 {
+		t.Errorf("from the last commit, a committed change is none: %+v", got)
+	}
+	// Then changed again, uncommitted: both together.
+	write(t, filepath.Join(sub, "a.txt"), "one\ntwo\nthree\n")
+	want = []model.FileChange{{Path: "a.txt", Status: "modified", Old: "one\n", New: "one\ntwo\nthree\n", Added: 2}}
+	if got := one("main", "a.txt"); !reflect.DeepEqual(got, want) {
+		t.Errorf("committed, then changed =\n%+v\nwant\n%+v", got, want)
+	}
+
+	// Added on the branch, committed or not: new against the base.
+	write(t, filepath.Join(sub, "added.txt"), "added\n")
+	testcheck.Git(t, repo, "add", "sub/added.txt")
+	testcheck.Git(t, repo, "commit", "-q", "-m", "added")
+	if got := one("main", "added.txt"); len(got) != 1 || got[0].Status != "added" || got[0].Skipped != "" {
+		t.Errorf("added on the branch: %+v", got)
+	}
+	write(t, filepath.Join(sub, "loose.txt"), "loose\n")
+	if got := one("main", "loose.txt"); len(got) != 1 || got[0].Status != "untracked" || got[0].Skipped != "" {
+		t.Errorf("untracked on the branch: %+v", got)
+	}
+
+	// Renamed on the branch, then changed: against its old path's text.
+	testcheck.Git(t, repo, "mv", "sub/old.txt", "sub/moved.txt")
+	testcheck.Git(t, repo, "commit", "-q", "-m", "moved")
+	write(t, filepath.Join(sub, "moved.txt"), "keep\nmore\n")
+	want = []model.FileChange{{Path: "moved.txt", OldPath: "old.txt", Status: "renamed", Old: "keep\n", New: "keep\nmore\n", Added: 1}}
+	if got := one("main", "moved.txt"); !reflect.DeepEqual(got, want) {
+		t.Errorf("renamed on the branch =\n%+v\nwant\n%+v", got, want)
+	}
+
+	// Main moves on, changing a file the branch left alone: counted from
+	// where the branch left main, it is unchanged.
+	commit("wip")
+	testcheck.Git(t, repo, "checkout", "-q", "main")
+	write(t, filepath.Join(sub, "same.txt"), "main moved\n")
+	commit("main moves")
+	testcheck.Git(t, repo, "checkout", "-q", "chat")
+	if got := one("main", "same.txt"); len(got) != 0 {
+		t.Errorf("changed only on main since: %+v", got)
+	}
+
+	// On the base branch itself, the base is HEAD: what's uncommitted.
+	testcheck.Git(t, repo, "checkout", "-q", "main")
+	write(t, filepath.Join(sub, "b.txt"), "b changed\n")
+	want = []model.FileChange{{Path: "b.txt", Status: "modified", Old: "b\n", New: "b changed\n", Added: 1, Removed: 1}}
+	if got := one("main", "b.txt"); !reflect.DeepEqual(got, want) {
+		t.Errorf("on main =\n%+v\nwant\n%+v", got, want)
+	}
+	if _, err := Changes(ctx, sub, Span{Base: "gone", Path: "b.txt"}); err == nil {
+		t.Error("a base that isn't a branch answered")
+	}
+}

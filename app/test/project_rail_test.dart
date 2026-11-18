@@ -72,8 +72,13 @@ String? _picked(WidgetTester tester) => tester
 
 void main() {
   setUpAll(loadFonts);
-  // The rail is off at first (Settings › Appearance): on, for its tests.
-  setUp(() => projectRail.value = true);
+  // The rail is off at first (Settings › Appearance): on, for its tests;
+  // Pinned only the shown project's, as these narrow the sidebar's
+  // chats (every project's pins: `sidebar_pins_every_test.dart`).
+  setUp(() {
+    projectRail.value = true;
+    pinnedEveryProject.value = false;
+  });
 
   testWidgets('the rail has All projects, the projects in the sidebar’s '
       'order, kept empty ones too, and Add project…', (tester) async {
@@ -573,6 +578,8 @@ void main() {
     ('light', Tokens.light),
   ]) {
     testWidgets('the sidebar with its rail, $name', (tester) async {
+      // Narrowed to ledger-poc, attic's pin stays, marked as attic's.
+      pinnedEveryProject.value = true;
       sidebarProjects.value = {'/Users/me/zeta'};
       projectTiles.value = {cappy: const TileLook(mark: 'CR', color: 'teal')};
       final (d, _) = await arrangedSidebar(

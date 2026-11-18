@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:nushi/change_marks.dart' show MarksAgainst;
 import 'package:nushi/chat.dart';
 import 'package:nushi/daemon.dart';
 import 'package:nushi/diagram_page.dart';
@@ -239,28 +240,31 @@ class _FileViewState extends State<FileView> {
                     scrollPastEnd,
                     shown.lines,
                   ]),
-                  builder: (context, _) => PreviewBody(
-                    watch: shown.watch,
-                    source: shown.source.value,
-                    tabSize: tabSize.value,
-                    guides: indentGuides.value,
-                    pastEnd: scrollPastEnd.value,
-                    base: shown.lines.value,
-                    onReveal: shown.reveal,
-                    editor: _editor,
-                    readOnly: shown.readOnly,
-                    page: switch ((shown.page, shown.diagram)) {
-                      (final page?, _) => (watch) => WebPage(
-                        host: page,
-                        watch: watch,
-                        roots: [chat.folder, ?chat.worktree?.path],
-                      ),
-                      (_, final diagram?) => (watch) => DiagramView(
-                        host: diagram,
-                        watch: watch,
-                      ),
-                      _ => null,
-                    },
+                  builder: (context, _) => MarksAgainst(
+                    branch: shown.lines.branch,
+                    child: PreviewBody(
+                      watch: shown.watch,
+                      source: shown.source.value,
+                      tabSize: tabSize.value,
+                      guides: indentGuides.value,
+                      pastEnd: scrollPastEnd.value,
+                      base: shown.lines.value,
+                      onReveal: shown.reveal,
+                      editor: _editor,
+                      readOnly: shown.readOnly,
+                      page: switch ((shown.page, shown.diagram)) {
+                        (final page?, _) => (watch) => WebPage(
+                          host: page,
+                          watch: watch,
+                          roots: [chat.folder, ?chat.worktree?.path],
+                        ),
+                        (_, final diagram?) => (watch) => DiagramView(
+                          host: diagram,
+                          watch: watch,
+                        ),
+                        _ => null,
+                      },
+                    ),
                   ),
                 ),
               ),

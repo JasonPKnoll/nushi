@@ -13,7 +13,8 @@ import 'file_edit_helpers.dart' show sumOf;
 import 'harness.dart';
 
 // A file preview's change marks (ADR 0131): which lines differ from the
-// last commit, and the last commit's text, asked of the daemon.
+// chat's branch base (else the last commit), and its text, asked of the
+// daemon.
 
 const _base = 'one\ntwo\nthree\nfour\nfive\n';
 
@@ -101,8 +102,11 @@ void main() {
       Object? change,
       int api = oneFileDiffApi,
       Object? Function(Object input)? answer,
+      Worktree? worktree,
     }) async {
-      fake = FakeDaemon([chat('c', 'claude', 'Fix')])..answer = answer;
+      final made = chat('c', 'claude', 'Fix');
+      if (worktree != null) made.worktree = worktree;
+      fake = FakeDaemon([made])..answer = answer;
       fake.files[path] = utf8.encode(text);
       if (change != null) fake.fileDiffs['/Users/me/nushi/$path'] = change;
       d = (await fake.connect(tester))..daemonApi = api;
@@ -256,6 +260,221 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       expect(lines.value, 'v2\n');
       await end(tester);
+    });
+
+    group("from the chat's branch base, as the Branch view counts", () {
+      /// GetFolderStatus as [status] answers it (by the base asked; a
+      /// thrown error fails it), and GetDiff with a base as [diff] does.
+      Object? Function(Object) git(
+        GetFolderStatusResponse Function(String base) status, {
+        Object? Function(GetDiffRequest)? diff,
+      }) =>
+          (input) => switch (input) {
+            GetFolderStatusRequest(:final base) => status(base),
+            final GetDiffRequest r when r.base.isNotEmpty => diff?.call(r),
+            _ => null,
+          };
+      GetFolderStatusResponse onBranch(String _) => GetFolderStatusResponse(
+        git: true,
+        branch: 'nushi/fix',
+        defaultBase: 'main',
+      );
+      final change = GetDiffResponse(
+        files: [FileChange(path: 'a.go', status: 'modified', oldText: 'old\n')],
+      );
+
+      testWidgets("a worktree's base", (tester) async {
+        await start(
+          tester,
+          path: 'a.go',
+          worktree: Worktree(base: 'dev', baseCommit: 'abc123'),
+          answer: git(onBranch, diff: (_) => change),
+        );
+        expect(_asked(fake).single.base, 'dev');
+        expect(lines.value, 'old\n');
+        expect(lines.branch, isTrue);
+        await end(tester);
+      });
+
+      testWidgets('its base branch gone, the commit it started from', (
+        tester,
+      ) async {
+        await start(
+          tester,
+          path: 'a.go',
+          worktree: Worktree(base: 'dev', baseCommit: 'abc123'),
+          answer: git(
+            (base) => base == 'dev'
+                ? throw ConnectException(Code.failedPrecondition, 'gone')
+                : onBranch(base),
+            diff: (_) => change,
+          ),
+        );
+        expect(_asked(fake).single.base, 'abc123');
+        expect(lines.branch, isTrue);
+        await end(tester);
+      });
+
+      testWidgets('no worktree: the default branch', (tester) async {
+        await start(
+          tester,
+          path: 'a.go',
+          answer: git(onBranch, diff: (_) => change),
+        );
+        expect(_asked(fake).single.base, 'main');
+        expect(lines.branch, isTrue);
+        await end(tester);
+      });
+
+      for (final (what, status) in [
+        (
+          'on the default branch itself',
+          GetFolderStatusResponse(
+            git: true,
+            branch: 'main',
+            defaultBase: 'main',
+          ),
+        ),
+        (
+          'on its remote copy',
+          GetFolderStatusResponse(
+            git: true,
+            branch: 'main',
+            defaultBase: 'origin/main',
+          ),
+        ),
+        ('no base found', GetFolderStatusResponse(git: true, branch: 'x')),
+        ('not a repository', GetFolderStatusResponse()),
+      ]) {
+        testWidgets('$what: the last commit', (tester) async {
+          await start(
+            tester,
+            path: 'a.go',
+            answer: git((_) => status),
+            change: FileChange(
+              path: 'a.go',
+              status: 'modified',
+              oldText: 'old\n',
+            ),
+          );
+          expect(_asked(fake).single.base, isEmpty);
+          expect(lines.value, 'old\n');
+          expect(lines.branch, isFalse);
+          await end(tester);
+        });
+      }
+
+      testWidgets("a file outside the chat's folder: its last commit", (
+        tester,
+      ) async {
+        const path = '/elsewhere/lib/b.dart';
+        await start(tester, path: path, answer: git(onBranch));
+        final data = utf8.encode('b\n');
+        fake.sendWatch(
+          path,
+          WatchChatFileResponse(path: path, data: data, sha256: sumOf(data)),
+        );
+        await tester.pumpAndSettle();
+        expect(_asked(fake).last.base, isEmpty);
+        expect(lines.branch, isFalse);
+        await end(tester);
+      });
+
+      testWidgets("a base its file's repository lacks: its last commit", (
+        tester,
+      ) async {
+        final bases = <String>[];
+        await start(
+          tester,
+          path: 'a.go',
+          answer: (input) {
+            if (input is GetDiffRequest) bases.add(input.base);
+            return git(
+              onBranch,
+              diff: (_) =>
+                  throw ConnectException(Code.failedPrecondition, 'no main'),
+            )(input);
+          },
+          change: FileChange(path: 'a.go', status: 'modified', oldText: 'x\n'),
+        );
+        expect(bases, ['main', '']);
+        expect(lines.value, 'x\n');
+        expect(lines.branch, isFalse);
+        await end(tester);
+      });
+
+      testWidgets('added on the branch: new, no marks', (tester) async {
+        await start(
+          tester,
+          path: 'a.go',
+          answer: git(
+            onBranch,
+            diff: (_) => GetDiffResponse(
+              files: [FileChange(path: 'a.go', status: 'added')],
+            ),
+          ),
+        );
+        expect(lines.value, isNull);
+        expect(lines.isNew, isTrue);
+        await end(tester);
+      });
+
+      testWidgets('the marks stay after a commit; the base is found again '
+          'when a turn ends or the chat moves, not as the file changes', (
+        tester,
+      ) async {
+        await start(
+          tester,
+          path: 'a.go',
+          text: 'new\n',
+          answer: git(onBranch, diff: (_) => change),
+        );
+        int statuses() => fake.calls.whereType<GetFolderStatusRequest>().length;
+        expect(statuses(), 1);
+        expect(lines.value, 'old\n');
+
+        // Committed: HEAD has the text, the branch's base still not.
+        c.committed();
+        await tester.pumpAndSettle();
+        expect(_asked(fake), hasLength(2));
+        expect(_asked(fake).last.base, 'main');
+        expect(lines.value, 'old\n');
+        fake.putFile('a.go', utf8.encode('newer\n'));
+        await tester.pumpAndSettle();
+        expect(_asked(fake), hasLength(3));
+        expect(statuses(), 1);
+
+        // The turn ends on main itself (the agent checked it out).
+        fake.answer = git(
+          (_) => GetFolderStatusResponse(
+            git: true,
+            branch: 'main',
+            defaultBase: 'main',
+          ),
+        );
+        c
+          ..busy = true
+          ..notifyListeners();
+        await tester.pump();
+        c
+          ..busy = false
+          ..notifyListeners();
+        await tester.pumpAndSettle();
+        expect(statuses(), 2);
+        expect(_asked(fake).last.base, isEmpty);
+        expect(lines.branch, isFalse);
+
+        // Moved into a worktree off dev.
+        fake.answer = git(onBranch, diff: (_) => change);
+        c
+          ..worktree = Worktree(base: 'dev')
+          ..notifyListeners();
+        await tester.pumpAndSettle();
+        expect(statuses(), 3);
+        expect(_asked(fake).last.base, 'dev');
+        expect(lines.branch, isTrue);
+        await end(tester);
+      });
     });
 
     testWidgets('an older daemon is never asked', (tester) async {

@@ -113,6 +113,19 @@ class _Appearance extends StatelessWidget {
             ),
           ),
         ),
+        ValueListenableBuilder(
+          valueListenable: pinnedEveryProject,
+          builder: (context, every, _) => SettingsRow(
+            'Pinned from every project',
+            description:
+                'With a project picked in the rail, Pinned still shows the '
+                'chats pinned in the others.',
+            control: SettingsSwitch(
+              value: every,
+              onChanged: (v) => pinnedEveryProject.value = v,
+            ),
+          ),
+        ),
       ],
     ),
   );
