@@ -17,7 +17,7 @@ import (
 // is still there (a parent can't exit before the child it creates is told
 // of), and puts the process in its parent's group; each child of this
 // process starts a group of its own. A bound command's cancel kills its
-// group (ADR 0131), what it started included, whatever has ended between.
+// group (ADR 0133), what it started included, whatever has ended between.
 // Nothing is killed by a command's own exit or by the daemon's, as on
 // Unix. Without the job (refused), a cancel is taskkill's tree (Kill).
 
