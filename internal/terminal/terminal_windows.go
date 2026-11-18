@@ -77,9 +77,13 @@ func Start(argv []string, dir string, env []string, cols, rows int, changed func
 		changed: changed, done: make(chan struct{}), subs: map[*sub]struct{}{}}
 	t.out, t.in = t.conOut, t.conIn
 	if err := t.spawn(app, line, dir, env); err != nil {
-		t.closeConsole()
+		// The pipes first: ClosePseudoConsole may wait until its last
+		// frame is read from the output pipe, and nothing reads it yet,
+		// so it could wait for ever; with the pipe broken it doesn't
+		// (ClosePseudoConsole's documentation).
 		_ = t.conIn.Close()
 		_ = t.conOut.Close()
+		t.closeConsole()
 		return nil, err
 	}
 	read := make(chan struct{})

@@ -227,3 +227,26 @@ func TestStartLineFindsOnTheTerminalsPath(t *testing.T) {
 		t.Errorf("found %q, want %q", app, probe)
 	}
 }
+
+// A program that can't start (its folder is gone) fails Start, which
+// returns rather than wait on a pseudo-console nobody reads.
+func TestFailedStartReturns(t *testing.T) {
+	cmdExe := filepath.Join(os.Getenv("SystemRoot"), "System32", "cmd.exe")
+	gone := filepath.Join(t.TempDir(), "gone")
+	errc := make(chan error, 1)
+	go func() {
+		term, err := Start([]string{cmdExe}, gone, os.Environ(), 80, 24, func() {})
+		if err == nil {
+			term.Close()
+		}
+		errc <- err
+	}()
+	select {
+	case err := <-errc:
+		if err == nil {
+			t.Error("a program started in a folder that isn't there")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Start didn't return")
+	}
+}
