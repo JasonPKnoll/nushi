@@ -64,3 +64,11 @@ func TestSumKB(t *testing.T) {
 		}
 	}
 }
+
+// A tree whose parent ids loop (ids given again) is walked once.
+func TestTreeOfALoop(t *testing.T) {
+	p := Processes{children: map[int][]int{os.Getpid(): {1 << 30}, 1 << 30: {os.Getpid()}}}
+	if got, want := p.Tree(os.Getpid()), Of(os.Getpid()); got > want+want/2 {
+		t.Errorf("tree %d, this process %d", got, want)
+	}
+}

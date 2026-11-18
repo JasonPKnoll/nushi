@@ -35,11 +35,11 @@ func Of(pid int) uint64 {
 func Snapshot() (Processes, error) {
 	ss := procfs.All()
 	if len(ss) == 0 {
-		return nil, errors.New("listing processes: /proc can't be read")
+		return Processes{}, errors.New("listing processes: /proc can't be read")
 	}
-	p := Processes{}
+	p := Processes{children: map[int][]int{}}
 	for _, s := range ss {
-		p[s.Ppid] = append(p[s.Ppid], s.Pid)
+		p.children[s.Ppid] = append(p.children[s.Ppid], s.Pid)
 	}
 	return p, nil
 }

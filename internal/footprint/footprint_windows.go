@@ -54,46 +54,62 @@ func Of(pid int) uint64 {
 // Snapshot lists the running processes, from Toolhelp's snapshot. A
 // Windows process keeps the pid of the parent that started it after that
 // parent has ended, and the pid can be given to another process, which
-// isn't its parent: so a process is only taken for its parent's child
-// when it started after the parent did, and one whose start can't be read
-// (a service's, a protected process) for no one's. That also keeps a tree
-// from looping back on itself.
+// isn't its parent: so a process isn't taken for its parent's child when
+// the parent started after it (parented, proctree's rule on Windows).
+// Starts are read only as a walk down from a process asks (Tree,
+// Children), each once, not every process's at each snapshot.
 func Snapshot() (Processes, error) {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
-		return nil, fmt.Errorf("listing processes: %w", err)
+		return Processes{}, fmt.Errorf("listing processes: %w", err)
 	}
 	defer windows.CloseHandle(snap) //nolint:errcheck // a snapshot
-	type entry struct{ pid, ppid uint32 }
-	var all []entry
+	p := Processes{children: map[int][]int{}}
 	e := windows.ProcessEntry32{Size: uint32(unsafe.Sizeof(windows.ProcessEntry32{}))}
+	n := 0
 	for err = windows.Process32First(snap, &e); err == nil; err = windows.Process32Next(snap, &e) {
-		all = append(all, entry{e.ProcessID, e.ParentProcessID})
+		p.children[int(e.ParentProcessID)] = append(p.children[int(e.ParentProcessID)], int(e.ProcessID))
+		n++
 	}
-	if len(all) == 0 {
-		return nil, fmt.Errorf("listing processes: %w", err)
+	if n == 0 {
+		return Processes{}, fmt.Errorf("listing processes: %w", err)
 	}
-	started := make(map[uint32]int64, len(all))
-	for _, p := range all {
-		if t, ok := startTime(p.pid); ok {
-			started[p.pid] = t
+	type start struct {
+		t  int64
+		ok bool
+	}
+	starts := map[int]start{}
+	startOf := func(pid int) (int64, bool) {
+		s, read := starts[pid]
+		if !read {
+			s.t, s.ok = startTime(pid)
+			starts[pid] = s
 		}
+		return s.t, s.ok
 	}
-	p := Processes{}
-	for _, c := range all {
-		child, okChild := started[c.pid]
-		parent, okParent := started[c.ppid]
-		if okChild && okParent && child >= parent && c.pid != c.ppid {
-			p[int(c.ppid)] = append(p[int(c.ppid)], int(c.pid))
-		}
+	p.isChild = func(parent, child int) bool {
+		ps, okParent := startOf(parent)
+		cs, okChild := startOf(child)
+		return parented(ps, okParent, cs, okChild)
 	}
 	return p, nil
 }
 
+// parented says whether a process that started at child is the child of
+// the one its parent id names, which started at parent: unless both are
+// known and the parent started after it (its id used again), as
+// proctree's parented has it.
+func parented(parent int64, okParent bool, child int64, okChild bool) bool {
+	return !okParent || !okChild || parent <= child
+}
+
 // startTime is when process pid started, in nanoseconds since 1970;
 // false when it can't be opened.
-func startTime(pid uint32) (int64, bool) {
-	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+func startTime(pid int) (int64, bool) {
+	if pid <= 0 || uint64(pid) > math.MaxUint32 {
+		return 0, false
+	}
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 	if err != nil {
 		return 0, false
 	}

@@ -13,5 +13,5 @@ func Of(int) uint64 { return 0 }
 
 // Snapshot fails: this OS's processes aren't read.
 func Snapshot() (Processes, error) {
-	return nil, fmt.Errorf("reading processes' memory on %s: %w", runtime.GOOS, errors.ErrUnsupported)
+	return Processes{}, fmt.Errorf("reading processes' memory on %s: %w", runtime.GOOS, errors.ErrUnsupported)
 }

@@ -3,6 +3,7 @@ package footprint
 import (
 	"os"
 	"runtime"
+	"slices"
 	"testing"
 )
 
@@ -31,14 +32,34 @@ func TestOfUnreadable(t *testing.T) {
 	}
 }
 
-// The System process is no one's child here: its start can't be read,
-// nor can its parent's (pid 0, the idle process, its own parent).
-func TestSnapshotLeavesOutUnreadable(t *testing.T) {
+// This process is among its parent's children, the start of each read
+// as the walk asked.
+func TestSnapshotFindsThisProcess(t *testing.T) {
 	p, err := Snapshot()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p[0]) != 0 || len(p[os.Getppid()]) == 0 {
-		t.Errorf("idle's children %v; this test's parent's %v", p[0], p[os.Getppid()])
+	if !slices.Contains(p.Children(os.Getppid()), os.Getpid()) {
+		t.Errorf("this test's parent's children: %v", p.Children(os.Getppid()))
+	}
+}
+
+// A parent id names the child's parent unless that process is known to
+// have started after the child: its id was given again.
+func TestParented(t *testing.T) {
+	for _, c := range []struct {
+		parent, child     int64
+		okParent, okChild bool
+		want              bool
+	}{
+		{100, 200, true, true, true},
+		{200, 200, true, true, true},
+		{300, 200, true, true, false},
+		{300, 200, false, true, true}, // a start that can't be read keeps it, as proctree does
+		{300, 200, true, false, true},
+	} {
+		if got := parented(c.parent, c.okParent, c.child, c.okChild); got != c.want {
+			t.Errorf("%+v: %v", c, got)
+		}
 	}
 }
