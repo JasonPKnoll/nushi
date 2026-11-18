@@ -87,6 +87,24 @@ func TestStopEndsTheSameProcessOnly(t *testing.T) {
 	}
 }
 
+// The hard end checks the start time on the handle it ends the process
+// through, so a pid used again after Stop listed it is never ended: the
+// process list's start time and GetProcessTimes' agree to the tick.
+func TestSignalOneEndsOnlyTheProcessThatStartedThen(t *testing.T) {
+	p, err := (Tree{}).Get(sleeper(t).Process.Pid)
+	testcheck.NoErr(t, err)
+	if err := signalOne(p.Pid, p.Started.Add(-100*time.Nanosecond), true); err == nil {
+		t.Error("a process with another start time was ended")
+	}
+	if _, err := (Tree{}).Get(p.Pid); err != nil {
+		t.Fatal("a process with another start time is gone")
+	}
+	testcheck.NoErr(t, signalOne(p.Pid, p.Started, true))
+	if !testcheck.Eventually(func() bool { _, err := (Tree{}).Get(p.Pid); return err != nil }) {
+		t.Error("the process still runs")
+	}
+}
+
 func TestStopGroupStopsNoneOnWindows(t *testing.T) {
 	cmd := sleeper(t)
 	p, err := (Tree{}).Get(cmd.Process.Pid)

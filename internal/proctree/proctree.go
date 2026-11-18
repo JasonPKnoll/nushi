@@ -200,7 +200,7 @@ func signal(ps []model.Process, hard bool) bool {
 		if p.Pgid == p.Pid && !errors.Is(signalGroup(p.Pid, hard), errors.ErrUnsupported) {
 			sent = true
 		}
-		if !errors.Is(signalOne(p.Pid, hard), errors.ErrUnsupported) {
+		if !errors.Is(signalOne(p.Pid, p.Started, hard), errors.ErrUnsupported) {
 			sent = true
 		}
 	}
