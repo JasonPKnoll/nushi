@@ -42,6 +42,34 @@ void main() {
     expect(servedFile(Uri.parse('https://$host/a%5C..%5Cb'), root), isNull);
   });
 
+  test('a page leaving for a file opens it only inside its root, never '
+      'a UNC path (SMB would send the NTLM credentials)', () {
+    const root = r'C:\Work\app';
+    final host = pageHost(root);
+    Uri? left(String url) => leaving(Uri.parse(url), root);
+    expect(
+      left('file:///C:/Work/app/docs/a.html'),
+      Uri.file(r'C:\Work\app\docs\a.html', windows: true),
+    );
+    expect(left('file:///c:/work/APP/a.html'), isNotNull);
+    expect(left('https://$host/b.html'), isNotNull);
+    expect(left('https://example.com/x'), Uri.parse('https://example.com/x'));
+    for (final url in [
+      'file://attacker.example/share/x.html',
+      'file://localhost/C:/Work/app/a.html',
+      'file:////attacker.example/share/x.html',
+      'file:///C:/Work/other/a.html',
+      'file:///C:/Work/apple/a.html',
+      'file:///C:/Work/app/../other/a.html',
+      'file:///C:/Work/app/a%5C..%5C..%5Cb.html',
+      'file:///C:/Work/app/a.html:hidden',
+      'file:///C:/Work/app',
+    ]) {
+      expect(left(url), isNull, reason: url);
+    }
+    expect(leaving(Uri.parse('file:///C:/x.html'), ''), isNull);
+  });
+
   test("the hidden renderer's answer is a PNG and its size, or why "
       'not', () {
     final png = [0x89, 0x50, 0x4e, 0x47];

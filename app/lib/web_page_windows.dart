@@ -67,7 +67,7 @@ class WindowsPage implements PageHost {
   void _leave(String url) {
     final to = Uri.tryParse(url);
     if (to == null) return;
-    final open = to.host == pageHost(_root) ? servedFile(to, _root) : to;
+    final open = leaving(to, _root);
     if (open != null) unawaited(openInBrowser(open).catchError((Object _) {}));
   }
 
@@ -98,6 +98,34 @@ String pageHost(String root) {
     hash = ((hash ^ unit) * 0x01000193) & 0xffffffff;
   }
   return 'p${hash.toRadixString(16).padLeft(8, '0')}.nushi.example';
+}
+
+/// What the default browser opens for [to], an address a page served
+/// from [root] left for: a file under the root as itself, another
+/// address as it is, but a `file:` address only for a file inside [root]
+/// (null for any other). One with a host, or a path that starts `\\`,
+/// is a UNC path, which Windows opens over SMB and so sends the user's
+/// NTLM credentials to that host; one outside the root is a file the
+/// page had no business naming.
+Uri? leaving(Uri to, String root) {
+  if (to.host == pageHost(root)) return servedFile(to, root);
+  if (to.scheme != 'file') return to;
+  if (to.host.isNotEmpty) return null;
+  final String path;
+  try {
+    path = to.toFilePath(windows: true);
+  } on Object {
+    return null;
+  }
+  final r = root.toLowerCase().replaceFirst(RegExp(r'\\+$'), '');
+  if (path.startsWith(r'\\') ||
+      r.isEmpty ||
+      !path.toLowerCase().startsWith('$r\\') ||
+      path.indexOf(':', 2) >= 0 || // a stream, or a second drive
+      path.split(RegExp(r'[\\/]')).any((n) => n == '..' || n == '.')) {
+    return null;
+  }
+  return Uri.file(path, windows: true);
 }
 
 /// The address of the file at [path], inside [root], as [host] serves it.
