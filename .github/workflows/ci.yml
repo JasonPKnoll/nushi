@@ -358,9 +358,9 @@ jobs:
 
   windows:
     # The Windows-only tests run on Windows itself (ADR 0124): the processes' job objects and handles, the data
-    # folder's DACL, batch-file shims, locks, logs, the shell's environment and Claude's history there; every
-    # package's tests build there too, but the rest assume Unix. The daemon is built as the app runs it. Unmeasured
-    # yet: 20 until it has run.
+    # folder's DACL, the app's stop event (ADR 0135), batch-file shims, locks, logs, the shell's environment and
+    # Claude's history there; every package's tests build there too, but the rest assume Unix. The daemon is built as
+    # the app runs it. Unmeasured yet: 20 until it has run.
     name: Go on Windows
     needs: changes
     if: needs.changes.outputs.go == 'true'
@@ -385,7 +385,7 @@ jobs:
         run: |
           go test ./internal/procgroup ./internal/filelock ./internal/logs ./internal/shellenv ./internal/batchfile
           go test -run 'TestAlive|TestOpenWindows' ./internal/claudehistory
-          go test -run TestOwnDataFolder ./cmd/nushid
+          go test -run 'TestOwnDataFolder|TestStopEvent' ./cmd/nushid
 
   linux-app:
     name: App tests (Linux, ${{ matrix.shard }}/${{ strategy.job-total }})
