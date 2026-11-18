@@ -24,6 +24,10 @@ type Shell interface {
 	Exit() (exited bool, code int)
 	Attach(stop <-chan struct{}, fn func([]byte) bool)
 	Close()
+	// Name is the shell's name ("zsh", "pwsh"), "" when it doesn't say.
+	// It may differ from one shell to the next: on Windows each is
+	// Windows Terminal's default profile's, read for each.
+	Name() string
 }
 
 // Start starts a shell in folder; changed is called when its foreground
@@ -37,7 +41,7 @@ type Chats interface {
 
 type Service struct {
 	start   Start
-	shell   string // the shell's name, such as "zsh"
+	shell   string // the shell's name, such as "zsh", for one that doesn't say its own
 	chats   Chats
 	publish func(model.Event)
 
@@ -71,12 +75,15 @@ func (s *Service) Open(chatID, folder string, cols, rows int) (model.Terminal, e
 	if t.shell, err = s.start(folder, cols, rows, func() { s.changed(chatID) }); err != nil {
 		return model.Terminal{}, err
 	}
+	if name := t.shell.Name(); name != "" {
+		t.Shell = name
+	}
 	s.mu.Lock()
 	s.terms = append(s.terms, t)
 	m := t.state()
 	s.mu.Unlock()
 	s.changed(chatID)
-	slog.Info("terminal opened", "chat", chatID, "terminal", t.ID, "folder", folder, "shell", s.shell)
+	slog.Info("terminal opened", "chat", chatID, "terminal", t.ID, "folder", folder, "shell", m.Shell)
 	return m, nil
 }
 
@@ -220,6 +227,9 @@ func (s *Service) Restart(id string, cols, rows int) error {
 	old := t.shell
 	if listed {
 		t.shell = sh
+		if name := sh.Name(); name != "" { // the new shell may be another (Windows)
+			t.Shell = name
+		}
 	}
 	s.mu.Unlock()
 	if !listed { // closed meanwhile

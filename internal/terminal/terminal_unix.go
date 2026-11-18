@@ -14,6 +14,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// sys is a Unix terminal's own: its pty's master (Terminal's out and in),
+// the command on it, and the terminal's device, to find what runs on it.
+type sys struct {
+	pty *os.File
+	cmd *exec.Cmd
+	tty int32
+}
+
 // Start runs argv in dir with env, in a terminal of cols × rows. changed is
 // called when the foreground program changes and when the program exits.
 func Start(argv []string, dir string, env []string, cols, rows int, changed func()) (*Terminal, error) {
@@ -31,7 +39,8 @@ func Start(argv []string, dir string, env []string, cols, rows int, changed func
 		_ = master.Close()
 		return nil, err
 	}
-	t := &Terminal{pty: master, cmd: cmd, tty: dev, changed: changed, done: make(chan struct{}), subs: map[*sub]struct{}{}}
+	t := &Terminal{shell: ShellName(argv[0]), pty: master, cmd: cmd, tty: dev, out: master, in: master,
+		changed: changed, done: make(chan struct{}), subs: map[*sub]struct{}{}}
 	if err := t.Resize(cols, rows); err != nil {
 		_ = master.Close()
 		return nil, err
@@ -40,6 +49,7 @@ func Start(argv []string, dir string, env []string, cols, rows int, changed func
 		_ = master.Close()
 		return nil, err
 	}
+	t.proc = cmd.Process
 	read := make(chan struct{})
 	go t.read(read)
 	go t.wait(read)
@@ -67,6 +77,13 @@ func open() (master, tty *os.File, err error) {
 		return nil, nil, err
 	}
 	return os.NewFile(uintptr(fd), "ptmx"), tty, nil
+}
+
+// waitProgram waits for the program to exit, and says its exit code (-1:
+// killed by a signal).
+func (t *Terminal) waitProgram() int {
+	_ = t.cmd.Wait()
+	return t.cmd.ProcessState.ExitCode()
 }
 
 // foreground returns the terminal's foreground process group, or 0.
