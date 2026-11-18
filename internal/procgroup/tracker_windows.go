@@ -1,8 +1,10 @@
 package procgroup
 
 import (
+	"errors"
 	"os"
 	"sync"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -27,6 +29,14 @@ const (
 	jobMsgExitProcess         = 7
 	jobMsgAbnormalExitProcess = 8
 )
+
+// getQueuedCompletionStatus is kernel32's GetQueuedCompletionStatus, called
+// directly rather than through x/sys's wrapper, whose out-parameter is a
+// *Overlapped: a job message's "overlapped" is a process id, and a small
+// integer in a pointer-typed variable on the stack makes the Go runtime
+// throw ("invalid pointer found on stack") when it copies that stack. Here
+// it is a uintptr, as hcsshim reads job messages.
+var getQueuedCompletionStatus = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetQueuedCompletionStatus")
 
 // jobAssociateCompletionPort is JOBOBJECT_ASSOCIATE_COMPLETION_PORT.
 type jobAssociateCompletionPort struct {
@@ -79,6 +89,9 @@ func processes() *tracker {
 // tells of what is created below it, and reads that port; nil when the
 // system refuses either.
 func startTracker() *tracker {
+	if getQueuedCompletionStatus.Find() != nil {
+		return nil
+	}
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
 		return nil
@@ -108,16 +121,17 @@ func startTracker() *tracker {
 	return t
 }
 
-// read takes the port's messages, in the order they came, for good.
+// read takes the port's messages, in the order they came, until the port
+// is gone (it never is: it lives as long as this process).
 func (t *tracker) read(port windows.Handle) {
 	for {
-		var msg uint32
-		var key uintptr
-		var ov *windows.Overlapped
-		if windows.GetQueuedCompletionStatus(port, &msg, &key, &ov, windows.INFINITE) != nil {
+		msg, pid, err := dequeue(port)
+		switch {
+		case errors.Is(err, windows.ERROR_ABANDONED_WAIT_0), errors.Is(err, windows.ERROR_INVALID_HANDLE):
+			return // the port was closed, or isn't one
+		case err != nil:
 			continue // a job's messages carry no I/O to fail; a lost one is skipped
 		}
-		pid := uint32(uintptr(unsafe.Pointer(ov))) //nolint:gosec // a job message's "overlapped" is the process id
 		switch msg {
 		case jobMsgNewProcess:
 			t.created(pid)
@@ -125,6 +139,21 @@ func (t *tracker) read(port windows.Handle) {
 			t.exited(pid)
 		}
 	}
+}
+
+// dequeue waits for the port's next message: its id (a job message's
+// "number of bytes") and the process id it carries (its "overlapped").
+// When the call fails it is an error, whether or not it dequeued a packet
+// (GetQueuedCompletionStatus's documentation tells the two apart by a
+// NULL overlapped; a job never posts a failed one).
+func dequeue(port windows.Handle) (msg, pid uint32, err error) {
+	var key, ov uintptr
+	r, _, e := syscall.SyscallN(getQueuedCompletionStatus.Addr(), uintptr(port),
+		uintptr(unsafe.Pointer(&msg)), uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&ov)), uintptr(windows.INFINITE))
+	if r == 0 {
+		return 0, 0, e
+	}
+	return msg, uint32(ov), nil //nolint:gosec // a job message's "overlapped" is a 32-bit process id
 }
 
 // created notes a new process in its parent's group, or a new group when
