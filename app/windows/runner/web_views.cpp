@@ -234,18 +234,22 @@ void WebViews::Make(int64_t id, const std::wstring& folder, int64_t background,
           return S_OK;
         });
     // In-private, in a profile of their own: a page keeps nothing, and
-    // none of a browser's sign-ins reach it.
+    // none of a browser's sign-ins reach it. A runtime that can't (no
+    // ICoreWebView2Environment10) makes none, rather than a web view that
+    // keeps what pages store: the app opens the page in the browser.
     ComPtr<ICoreWebView2Environment10> env10;
     ComPtr<ICoreWebView2ControllerOptions> options;
-    if (SUCCEEDED(env->QueryInterface(IID_PPV_ARGS(&env10))) &&
-        SUCCEEDED(env10->CreateCoreWebView2ControllerOptions(&options))) {
-      options->put_IsInPrivateModeEnabled(TRUE);
-      options->put_ProfileName(L"pages");
-      env10->CreateCoreWebView2ControllerWithOptions(parent_, options.Get(),
-                                                     made.Get());
-    } else {
-      env->CreateCoreWebView2Controller(parent_, made.Get());
+    if (FAILED(env->QueryInterface(IID_PPV_ARGS(&env10))) ||
+        FAILED(env10->CreateCoreWebView2ControllerOptions(&options)) ||
+        FAILED(options->put_IsInPrivateModeEnabled(TRUE)) ||
+        FAILED(options->put_ProfileName(L"pages"))) {
+      views_.erase(id);
+      return shared->Error("no-private",
+                           "The WebView2 runtime can't make an in-private "
+                           "web view");
     }
+    env10->CreateCoreWebView2ControllerWithOptions(parent_, options.Get(),
+                                                   made.Get());
   });
 }
 
