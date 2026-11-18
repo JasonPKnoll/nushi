@@ -9,8 +9,21 @@
 // along a line; a planet or the sun is a disc whose rim fades over its blur. Rings are drawn first, so a planet
 // always sits on its line, never behind it.
 // The cursor tilts the camera at once, and planets lean toward a nearby cursor and spring back. Scrolling fast
-// winds the rings a little. Nothing turns on its own: the loop runs only while something is still moving, then
-// stops, so an idle page costs nothing. One still frame under Reduce Motion. Plain canvas, no library.
+// winds the rings a little. Nothing turns on its own.
+// Dust: each planet sheds a thin trail of grains along its ring behind it, in the same 3D space (projected, sorted
+// among the planets, blurred by the same depth of field). The grains drift slowly back along the trail; the pointer
+// (or a dragging finger) pushes them aside and drags them along its path, and they spring back. While dust is
+// showing the loop keeps running (at half rate when nothing but the drift moves); once the scene is flat the dust
+// has faded and the loop stops again. One still frame under Reduce Motion. Plain canvas, no library.
+//
+// Debug hook, for headless screenshots (nothing happens without these query params):
+//   ?cam=<i>            pin the camera at stop i (and scroll the page there); 8.5 is halfway from stop 8 to 9
+//   &px=&py=            a simulated pointer sweep ending at this point (0..1 of the window) ...
+//   &pvx=&pvy=          ... travelling at this velocity in px/s; it runs for 0.5 s from t = 1.2 s, then the scene
+//   &hold=<ms>          freezes this long after the sweep ends (default 150), so the wake can be seen
+//   &bare=1             hide the page's content to see the scene alone (and don't scroll it)
+//   &dust=0             no dust (for comparison)
+//   &bench=<frames>     time that many frames of step+draw (&flush=1 also waits for the raster) into document.title
 (() => {
   const sky = document.querySelector('.sky');
   if (!sky) return;
@@ -48,8 +61,11 @@
     sky.append(p.el);
   }
 
+  // A small seeded generator (mulberry32): the same sky and dust on every visit, and comparable screenshots.
+  let seed = 0x6e757368;
+  const ran = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const rnd = (a, b) => a + ran() * (b - a);
   // A few faint stars far out, fixed in the world, so they move only with the camera.
-  const rnd = (a, b) => a + Math.random() * (b - a);
   const STARS = Array.from({ length: innerWidth < 700 ? 30 : 56 }, () => {
     const u = rnd(-1, 1), t = rnd(0, TAU), r = rnd(5, 10), s = Math.sqrt(1 - u * u);
     return { x: r * s * Math.cos(t), y: r * u * 0.7, z: r * s * Math.sin(t), a: rnd(0.25, 0.55), s: rnd(0.7, 1.3) };
@@ -64,14 +80,19 @@
   }
 
   // Stops, read from the page.
+  const Q = new URLSearchParams(location.search);
+  const qn = (k, d) => (Q.has(k) && Q.get(k) !== '' && isFinite(+Q.get(k)) ? +Q.get(k) : d);
+  const PIN = Q.has('cam') ? qn('cam', 0) : null;
+  if (Q.get('bare') === '1') for (const el of document.querySelectorAll('main, footer, .bar')) el.style.visibility = 'hidden';
   const wide = matchMedia('(min-width: 980px)');
-  let stops = [], vw = 0, vh = 0, max = 0;
+  let stops = [], vw = 0, vh = 0, max = 0, dpr = 1;
   function measure() {
     vw = innerWidth; vh = innerHeight;
-    const dpr = Math.min(devicePixelRatio || 1, 2);
+    dpr = Math.min(devicePixelRatio || 1, 2);
     cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     max = Math.max(0, document.documentElement.scrollHeight - vh);
+    sizeDust();
     stops = [...document.querySelectorAll('[data-cam]')].map((el) => {
       const [elev, az, D, K, focus, flat, labels] = el.dataset.cam.split(/\s+/);
       const r = el.getBoundingClientRect(), top = r.top + scrollY;
@@ -101,14 +122,18 @@
   let frozen = false; // Reduce Motion: the page's top, drawn once, scrolling away with the hero
   const T = {};
   function target() {
-    const s = frozen ? 0 : Math.min(scrollY, max);
+    const pin = PIN != null && stops.length ? stops[Math.min(stops.length - 1, Math.max(0, PIN | 0))] : null;
+    const pn = pin && stops[Math.min(stops.length - 1, (PIN | 0) + 1)];
+    const s = pin ? pin.at + (pn.at - pin.at) * (PIN - (PIN | 0)) : frozen ? 0 : Math.min(scrollY, max);
     let i = 0;
     while (i < stops.length - 1 && s >= stops[i + 1].at && s > 0) i++;
+    if (pin) i = stops.indexOf(pin);
     const a = stops[i], b = stops[Math.min(i + 1, stops.length - 1)];
-    let t = b.at > a.at ? (s - a.at) / (b.at - a.at) : 0;
+    let t = pin ? PIN - (PIN | 0) : b.at > a.at ? (s - a.at) / (b.at - a.at) : 0;
+    if (pin) t = 0.15 + 0.7 * t; // a pinned fraction is the tween's own progress
     t = smooth(Math.min(1, Math.max(0, (t - 0.15) / 0.7)));
     for (const k of ['x', 'R', 'el', 'az', 'D', 'K', 'flat', 'labels']) T[k] = a[k] + (b[k] - a[k]) * t;
-    const ya = anchorY(a, frozen ? 0 : scrollY), yb = anchorY(b, frozen ? 0 : scrollY);
+    const ya = anchorY(a, pin ? s : frozen ? 0 : scrollY), yb = anchorY(b, pin ? s : frozen ? 0 : scrollY);
     T.y = ya + (yb - ya) * t;
     T.focus = t < 0.5 ? a.focus : b.focus;
     // While the system travels between two places on screen it fades back, so it never sits on the copy it passes.
@@ -139,8 +164,157 @@
   const pointer = { x: -1e4, y: -1e4, in: false, mouse: false };
   let chosen = null;
 
+  // ---------- dust ----------
+  // Grains live in typed arrays (nothing allocated per frame). Each belongs to a planet and has an "age" that runs
+  // 0..1 at a slow steady rate and wraps; it sits age^1.6 of the trail's span behind its planet, so grains bunch
+  // near the planet and spread and fade further back. Scatter across and above/below the ring grows with that
+  // distance. The pointer acts in screen space, on an offset per grain held by a spring.
+  const DUST_ON = Q.get('dust') !== '0';
+  const DUST_CAP = 1000;
+  const SPAN = [88, 104]; // degrees of trail behind a planet, per ring
+  const DPAT = []; // a grain's planet, interleaved so any prefix is balanced; the marked planets shed a little more
+  for (let r = 0; r < 3; r++) PLANETS.forEach((p, i) => { if (r < (p.mark ? 3 : 2)) DPAT.push(i); });
+  const dP = new Uint8Array(DUST_CAP), dCol = new Uint8Array(DUST_CAP), dGl = new Uint8Array(DUST_CAP), dLay = new Uint8Array(DUST_CAP);
+  const dAge = new Float32Array(DUST_CAP), dRate = new Float32Array(DUST_CAP), dN1 = new Float32Array(DUST_CAP),
+    dN2 = new Float32Array(DUST_CAP), dPh = new Float32Array(DUST_CAP), dSz = new Float32Array(DUST_CAP), dBr = new Float32Array(DUST_CAP);
+  const dOx = new Float32Array(DUST_CAP), dOy = new Float32Array(DUST_CAP), dVx = new Float32Array(DUST_CAP), dVy = new Float32Array(DUST_CAP);
+  const dX = new Float32Array(DUST_CAP), dY = new Float32Array(DUST_CAP), dD = new Float32Array(DUST_CAP),
+    dR = new Float32Array(DUST_CAP), dA = new Float32Array(DUST_CAP);
+  const dOrder = new Uint16Array(DUST_CAP), dStart = new Uint16Array(12), dCur = new Uint16Array(12);
+  const gauss = () => (ran() + ran() + ran() - 1.5) * 2;
+  for (let i = 0; i < DUST_CAP; i++) {
+    dP[i] = DPAT[i % DPAT.length];
+    dAge[i] = ran(); dRate[i] = rnd(0.8, 1.25) / 80; // about 80 s from the planet to the trail's end
+    dN1[i] = gauss(); dN2[i] = gauss(); dPh[i] = rnd(0, TAU);
+    const q = ran();
+    dSz[i] = 0.6 + 0.8 * q * q; dBr[i] = rnd(0.35, 1);
+    const c = ran();
+    dCol[i] = c < 0.06 ? 2 : c < 0.45 ? 0 : 1; // mist, slate-mist, rarely pale amber
+    if (ran() < 0.03) { dGl[i] = 1; dSz[i] *= 1.9; dBr[i] = 1; }
+  }
+  // A grain is one soft disc: a radial gradient made once per colour (mist, slate-mist, pale amber) at unit size,
+  // drawn under a transform that places and scales it, so its falloff is smooth at any size and nothing is
+  // allocated per frame (plain discs stacked to fake the falloff showed rings once blurred).
+  const DCOL = ['238,241,245', '150,172,186', '255,214,140'].map((rgb) => {
+    const r = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+    r.addColorStop(0, `rgba(${rgb},1)`); r.addColorStop(0.18, `rgba(${rgb},.85)`); r.addColorStop(0.4, `rgba(${rgb},.38)`);
+    r.addColorStop(0.65, `rgba(${rgb},.1)`); r.addColorStop(1, `rgba(${rgb},0)`);
+    return r;
+  });
+  let dustN = 0, dustA = 0, dustT = 0, dustCalm = true, RP = 150;
+  // The pointer as the dust feels it: where it is, and its velocity from how far it moved since the last frame.
+  const dptr = { x: 0, y: 0, lx: 0, ly: 0, vx: 0, vy: 0, in: false };
+  const dustAt = (x, y) => {
+    if (!dptr.in) { dptr.lx = x; dptr.ly = y; dptr.vx = dptr.vy = 0; }
+    dptr.x = x; dptr.y = y; dptr.in = true;
+  };
+  function sizeDust() {
+    // About 650 grains on a 1440 x 900 window, scaled by area: fewer on a phone, never more than the cap.
+    dustN = DUST_ON ? Math.round(Math.min(DUST_CAP, Math.max(110, (vw * vh) / (1440 * 900) * 650)) * (frozen ? 0.5 : 1)) : 0;
+    RP = Math.max(80, 0.11 * Math.hypot(vw, vh)); // the pointer's reach
+  }
+
+  const K_SPRING = 28, C_DAMP = 2 * 0.45 * Math.sqrt(K_SPRING); // underdamped: one soft overshoot, then rest
+  function stepDust(dt, still) {
+    // The dust thins as the scene flattens into the mark, and is gone by halfway.
+    const shown = dustN ? 1 - smooth(Math.min(1, cam.flat / 0.5)) : 0;
+    if (shown < 0.01) {
+      // Gone: every grain goes home, so it comes back calm.
+      if (dustA) { dOx.fill(0); dOy.fill(0); dVx.fill(0); dVy.fill(0); }
+      dustA = 0; dustCalm = true;
+      return false;
+    }
+    dustA = shown;
+    const live = !still && !frozen;
+    if (live) dustT += dt;
+    // Pointer velocity from this frame's movement, lightly smoothed; a pointer that stops has none almost at once.
+    if (live && dptr.in && dt > 0) {
+      const k = 1 - Math.exp(-dt * 40);
+      dptr.vx += ((dptr.x - dptr.lx) / dt - dptr.vx) * k; dptr.vy += ((dptr.y - dptr.ly) / dt - dptr.vy) * k;
+      const sp = Math.hypot(dptr.vx, dptr.vy);
+      if (sp > 3000) { dptr.vx *= 3000 / sp; dptr.vy *= 3000 / sp; }
+    } else { dptr.vx = dptr.vy = 0; }
+    dptr.lx = dptr.x; dptr.ly = dptr.y;
+    const on = live && dptr.in, px = dptr.x, py = dptr.y, pvx = dptr.vx, pvy = dptr.vy;
+    const speed = Math.hypot(pvx, pvy), RP2 = RP * RP;
+    const sub = live ? Math.max(1, Math.min(4, Math.ceil(dt * 60 - 0.01))) : 0, h = sub ? Math.min(dt, 1 / 15) / sub : 0;
+    let motion = 0;
+    for (let i = 0; i < dustN; i++) {
+      const p = PLANETS[dP[i]], gR = RINGS[p.ring];
+      if (live) {
+        let a = dAge[i] + dRate[i] * dt;
+        if (a >= 1) { a -= 1; dN1[i] = gauss(); dN2[i] = gauss(); } // off the end, unseen: shed again at the planet
+        dAge[i] = a;
+      }
+      const age = dAge[i], u = age ** 1.6, ph = dPh[i];
+      const ang = (p.a + gR.turn - u * SPAN[p.ring]) * D2R;
+      const r = gR.r + dN1[i] * (0.008 + 0.075 * u) + 0.004 * Math.sin(dustT * 0.37 + ph);
+      const y = dN2[i] * (0.006 + 0.05 * u) + 0.003 * Math.sin(dustT * 0.29 + ph * 1.7);
+      proj(r * Math.cos(ang), y, -r * Math.sin(ang), P);
+      const X = P.X, Y = P.Y;
+      let ox = dOx[i], oy = dOy[i], vx = dVx[i], vy = dVy[i];
+      if (sub) {
+        let ax = 0, ay = 0;
+        if (on) {
+          const dx = X + ox - px, dy = Y + oy - py, d2 = dx * dx + dy * dy;
+          if (d2 < RP2) {
+            const d = Math.sqrt(d2) || 1, nx = dx / d, ny = dy / d;
+            // Nearer grains move a little more.
+            let w = 1 - d / RP; w = w * w * Math.min(1.5, Math.max(0.6, P.s / cam.R));
+            const vn = pvx * nx + pvy * ny;
+            // Pushed aside (a little by a resting pointer, more by a moving one); the flow round a moving body
+            // (ahead and behind carried along, the sides slipping back), which curls a sweep's wake into a pair
+            // of eddies; and a drag along the path.
+            const push = 220 + 1.8 * speed;
+            ax = w * (nx * push + 3.6 * (2 * vn * nx - pvx) + 5.2 * pvx);
+            ay = w * (ny * push + 3.6 * (2 * vn * ny - pvy) + 5.2 * pvy);
+          }
+        }
+        for (let k = 0; k < sub; k++) {
+          vx += (ax - K_SPRING * ox - C_DAMP * vx) * h; vy += (ay - K_SPRING * oy - C_DAMP * vy) * h;
+          ox += vx * h; oy += vy * h;
+        }
+        // Back home and still: snap to rest. Held aside by a resting pointer is calm too; only movement counts.
+        const sp = Math.abs(vx) + Math.abs(vy);
+        if (Math.abs(ox) + Math.abs(oy) < 0.02 && sp < 0.4) ox = oy = vx = vy = 0; else if (sp > 0.4) motion += sp;
+        dOx[i] = ox; dOy[i] = oy; dVx[i] = vx; dVy[i] = vy;
+      } else if (still) { dOx[i] = dOy[i] = dVx[i] = dVy[i] = 0; ox = oy = 0; }
+      dX[i] = X + ox; dY[i] = Y + oy; dD[i] = P.depth;
+      // Depth of field as the planets have it: the blur widens a grain and spreads its light.
+      const r0 = dSz[i] * (P.s / cam.R) * (cam.R / 260) ** 0.3, b = Math.abs(coc(P.depth)), rr = r0 + b;
+      dR[i] = rr;
+      // Fade in once clear of the planet, so grains never speckle its face; fade out down the trail.
+      const fade = Math.min(1, (u * SPAN[p.ring] * D2R * gR.r) / (p.size * 1.3)) * (1 - u) ** 1.8;
+      dA[i] = 0.8 * dBr[i] * fade * dustA * ((r0 + 0.5) / (rr + 0.5)) ** 1.1;
+    }
+    dustCalm = motion === 0 && speed < 1;
+    return live;
+  }
+
+  // Draws the grains of layer L (the ones between bodies L-1 and L, far to near).
+  function drawDust(L) {
+    const end = dStart[L + 1];
+    let col = -1;
+    for (let k = dStart[L]; k < end; k++) {
+      const i = dOrder[k], a = dA[i];
+      if (a < 0.004) continue;
+      const X = dX[i], Y = dY[i], r = dR[i] * 2.4;
+      if (X < -r || Y < -r || X > vw + r || Y > vh + r) continue;
+      if (dCol[i] !== col) { col = dCol[i]; g.fillStyle = DCOL[col]; }
+      g.globalAlpha = a;
+      g.setTransform(dpr * r, 0, 0, dpr * r, dpr * X, dpr * Y);
+      g.fillRect(-1, -1, 2, 2);
+      if (dGl[i]) { // a larger grain catches the light: a faint wide halo round it
+        g.globalAlpha = a * 0.12;
+        g.setTransform(dpr * r * 2.4, 0, 0, dpr * r * 2.4, dpr * X, dpr * Y);
+        g.fillRect(-1, -1, 2, 2);
+      }
+    }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
   // ---------- step: move everything toward where it wants to be; say whether anything still moves ----------
-  let lastScroll = -1, spin = 0;
+  let lastScroll = -1, spin = 0, sceneMoving = false;
   function step(dt, still) {
     target();
     let busy = false;
@@ -209,6 +383,8 @@
       p.label += (want - p.label) * (still ? 1 : 1 - Math.exp(-dt * 10));
       if (Math.abs(want - p.label) > 0.004) busy = true; else p.label = want;
     }
+    sceneMoving = busy;
+    if (stepDust(dt, still)) busy = true;
     return busy;
   }
 
@@ -324,7 +500,22 @@
     bodies.push({ sun: true, d: sunD });
     for (const p of PLANETS) if (p.rad >= 0.3) bodies.push({ p, d: p.depth });
     bodies.sort((a, b) => b.d - a.d);
-    for (const b of bodies) {
+    // Grains go into layers between the bodies (a counting sort): layer L is nearer than the first L bodies,
+    // so it is drawn after them and before the rest.
+    const nb = bodies.length;
+    dStart.fill(0);
+    for (let i = 0; i < dustN; i++) {
+      let L = 0;
+      while (L < nb && bodies[L].d > dD[i]) L++;
+      dLay[i] = L; dStart[L + 1]++;
+    }
+    for (let L = 1; L <= nb + 1; L++) dStart[L] += dStart[L - 1];
+    dCur.set(dStart);
+    for (let i = 0; i < dustN; i++) dOrder[dCur[dLay[i]]++] = i;
+    for (let L = 0; L <= nb; L++) {
+      if (dustA) { drawDust(L); g.globalAlpha = 1; }
+      if (L === nb) break;
+      const b = bodies[L];
       if (b.sun) {
         disc(sunX, sunY, SUN * sunS * (0.62 + 0.38 * flat), Math.abs(coc(sunD)), AMBER, AMBER, flat > 0.9 ? null : '255,214,140', -0.3, -0.3);
         continue;
@@ -346,22 +537,60 @@
     }
   }
 
-  // ---------- loop: runs only while something moves ----------
+  // ---------- loop: runs only while something moves (or dust drifts) ----------
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  let raf = 0, last = 0;
+  let raf = 0, last = 0, drawnAt = 0, nudged = true, t0 = 0;
+  // Debug hook (see the top): a simulated pointer sweep, and a frame timer. Headless Chrome may never fire
+  // requestAnimationFrame, so a sweep is driven by timers, which its virtual time does advance.
+  const SWEEP = Q.has('px') ? { x: qn('px', 0.5), y: qn('py', 0.5), vx: qn('pvx', 0), vy: qn('pvy', 0), hold: qn('hold', 150) / 1000 } : null;
+  const BENCH = qn('bench', 0), FLUSH = Q.get('flush') === '1';
+  const later = SWEEP ? (f) => setTimeout(() => f(performance.now()), 16) : requestAnimationFrame;
+  const unlater = SWEEP ? clearTimeout : cancelAnimationFrame;
+  let halted = false;
   function frame(now) {
     raf = 0;
+    // When only the slow drift moves, half the frame rate is plenty.
+    if (!nudged && !sceneMoving && dustCalm && now - drawnAt < 30) { raf = later(frame); return; }
+    nudged = false; drawnAt = now;
     const dt = Math.min(0.1, last && now > last ? (now - last) / 1000 : 1 / 60);
     last = now;
+    if (SWEEP && sweepAt((now - t0) / 1000)) { halted = true; return; }
     const busy = step(dt, false);
     draw();
     if (busy) kick(); else last = 0;
   }
+  // Places the simulated pointer for time t (s since start); true once the scene should hold still.
+  function sweepAt(t) {
+    t -= 1.2;
+    if (t >= 0) {
+      const k = Math.min(t, 0.5) - 0.5;
+      const x = SWEEP.x * vw + SWEEP.vx * k, y = SWEEP.y * vh + SWEEP.vy * k;
+      pointer.x = x; pointer.y = y; pointer.in = true; pointer.mouse = true;
+      dustAt(x, y);
+    }
+    return t > 0.5 + SWEEP.hold;
+  }
+  // Times n frames of step + draw back to back (the first 10 warm up), with a pointer circling the system so
+  // the dust physics runs too; &flush=1 also waits for each frame's raster.
+  function bench(n) {
+    let sum = 0, worst = 0;
+    for (let f = 0; f < n + 10; f++) {
+      const a = (f / 60) * 4;
+      dustAt(cam.x + Math.cos(a) * cam.R * 0.8, cam.y + Math.sin(a) * cam.R * 0.3);
+      const b0 = performance.now();
+      step(1 / 60, false); draw();
+      if (FLUSH) g.getImageData(0, 0, 1, 1);
+      const ms = performance.now() - b0;
+      if (f >= 10) { sum += ms; worst = Math.max(worst, ms); }
+    }
+    document.title = `bench frames=${n} mean=${(sum / n).toFixed(3)}ms max=${worst.toFixed(2)}ms grains=${dustN}`;
+  }
   function kick() {
-    if (!raf && !frozen && !document.hidden) raf = requestAnimationFrame(frame);
+    nudged = true;
+    if (!raf && !frozen && !halted && !document.hidden) raf = later(frame);
   }
   function still() {
-    if (raf) cancelAnimationFrame(raf);
+    if (raf) unlater(raf);
     raf = 0; last = 0;
     measure();
     step(0, true); draw();
@@ -371,17 +600,29 @@
     document.documentElement.classList.toggle('live', !frozen);
     document.documentElement.classList.toggle('still', frozen);
     measure();
+    if (PIN != null && stops[PIN | 0] && Q.get('bare') !== '1') { const a = stops[PIN | 0], b = stops[Math.min(stops.length - 1, (PIN | 0) + 1)]; scrollTo(0, a.at + (b.at - a.at) * (PIN % 1)); }
     if (frozen) { still(); return; }
+    t0 = performance.now();
     step(0, true); draw();
+    if (BENCH) { bench(BENCH); return; }
     kick();
   }
 
   addEventListener('pointermove', (e) => {
     pointer.x = e.clientX; pointer.y = e.clientY; pointer.in = true; pointer.mouse = e.pointerType === 'mouse';
+    if (e.pointerType !== 'touch') dustAt(e.clientX, e.clientY); // a finger is followed by its touch events below
     kick();
   }, { passive: true });
-  document.addEventListener('pointerleave', () => { pointer.in = false; kick(); });
-  addEventListener('blur', () => { pointer.in = false; kick(); });
+  document.addEventListener('pointerleave', () => { pointer.in = false; dptr.in = false; kick(); });
+  addEventListener('blur', () => { pointer.in = false; dptr.in = false; kick(); });
+  // A finger drags the dust too. Touch events (passive) keep coming while the page scrolls under the finger,
+  // where pointer events are cancelled, so scrolling is never held up.
+  const touch = (e) => { const t = e.touches[0]; if (t) { dustAt(t.clientX, t.clientY); kick(); } };
+  addEventListener('touchstart', touch, { passive: true });
+  addEventListener('touchmove', touch, { passive: true });
+  const untouch = (e) => { if (!e.touches.length) { dptr.in = false; kick(); } };
+  addEventListener('touchend', untouch, { passive: true });
+  addEventListener('touchcancel', untouch, { passive: true });
   addEventListener('scroll', kick, { passive: true });
   // Agent names pull focus to their planet and label it.
   for (const li of document.querySelectorAll('[data-agent]')) {
