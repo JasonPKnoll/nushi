@@ -6,14 +6,24 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/afrase/nushi/internal/testcheck"
 )
 
+// TestHelperProcess is the child TestTree starts: it waits five seconds.
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("NUSHI_FOOTPRINT_HELPER") == "" {
+		t.Skip("run by TestTree")
+	}
+	time.Sleep(5 * time.Second)
+}
+
 // This process's footprint reads, a child it started is among its
 // children, and the tree's is more than this process's alone.
 func TestTree(t *testing.T) {
-	child := exec.Command("sleep", "5")
+	child := exec.Command(os.Args[0], "-test.run=^TestHelperProcess$")
+	child.Env = append(os.Environ(), "NUSHI_FOOTPRINT_HELPER=1")
 	if err := child.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -52,5 +62,13 @@ func TestSumKB(t *testing.T) {
 		if got, ok := sumKB(read(tc.file), tc.names...); got != tc.want || ok != tc.ok {
 			t.Errorf("%s %v: %d %v, want %d %v", tc.file, tc.names, got, ok, tc.want, tc.ok)
 		}
+	}
+}
+
+// A tree whose parent ids loop (ids given again) is walked once.
+func TestTreeOfALoop(t *testing.T) {
+	p := Processes{children: map[int][]int{os.Getpid(): {1 << 30}, 1 << 30: {os.Getpid()}}}
+	if got, want := p.Tree(os.Getpid()), Of(os.Getpid()); got > want+want/2 {
+		t.Errorf("tree %d, this process %d", got, want)
 	}
 }

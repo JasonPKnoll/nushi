@@ -27,11 +27,11 @@ func Of(pid int) uint64 {
 func Snapshot() (Processes, error) {
 	all, err := unix.SysctlKinfoProcSlice("kern.proc.all")
 	if err != nil {
-		return nil, err
+		return Processes{}, err
 	}
-	p := Processes{}
+	p := Processes{children: map[int][]int{}}
 	for _, k := range all {
-		p[int(k.Eproc.Ppid)] = append(p[int(k.Eproc.Ppid)], int(k.Proc.P_pid))
+		p.children[int(k.Eproc.Ppid)] = append(p.children[int(k.Eproc.Ppid)], int(k.Proc.P_pid))
 	}
 	return p, nil
 }
