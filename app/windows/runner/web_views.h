@@ -39,13 +39,14 @@ class WebViews {
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>;
   using Ready = std::function<void(ICoreWebView2Environment*, HRESULT)>;
 
-  // One web view: its controller once made, and the one page its main
-  // frame may show (scheme, host and path: a query or an anchor of it
-  // stays too).
+  // One web view: its controller once made, the one page its main frame
+  // may show (scheme, host and path: a query or an anchor of it stays
+  // too), and the host its folder is served as, if any.
   struct View {
     Microsoft::WRL::ComPtr<ICoreWebView2Controller> controller;
     Microsoft::WRL::ComPtr<ICoreWebView2> web;
     std::wstring page;
+    std::wstring host;
     bool closed = false;
   };
 

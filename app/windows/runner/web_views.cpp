@@ -122,11 +122,19 @@ void WebViews::Handle(const flutter::MethodCall<EncodableValue>& call,
     if (!host || !folder || FAILED(view.web.As(&web3))) {
       return result->Error("map", "Can't map a folder");
     }
-    web3->ClearVirtualHostNameToFolderMapping(Wide(*host).c_str());
+    // One folder a view: the previous root's host goes, or a page under
+    // the new root could still frame the old one's files.
+    std::wstring wide_host = Wide(*host);
+    if (!view.host.empty()) {
+      web3->ClearVirtualHostNameToFolderMapping(view.host.c_str());
+      view.host.clear();
+    }
+    web3->ClearVirtualHostNameToFolderMapping(wide_host.c_str());
     HRESULT hr = web3->SetVirtualHostNameToFolderMapping(
-        Wide(*host).c_str(), Wide(*folder).c_str(),
+        wide_host.c_str(), Wide(*folder).c_str(),
         COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
     if (FAILED(hr)) return result->Error("map", "Can't map the folder");
+    view.host = wide_host;
     return result->Success();
   }
   if (method == "load") {
